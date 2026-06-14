@@ -60,6 +60,32 @@ export type Tournament = {
   hex: string;
 };
 
+/** Active registration callout — set `active: false` when sign-ups close. */
+export const tournamentRegistration = {
+  active: true,
+  cupId: "fc26-cup-1",
+  title: "FC26 CUP I",
+  detail: "2v2 · 20 June 2026",
+  /** Main headline — use the public-facing cup name here. */
+  message: "Registrations are live for FIFA CUP 1.",
+  href: "https://docs.google.com/forms/d/e/1FAIpQLScLO1HKslTILHz14WGZFogqr6YzMvAfncXGavYPeqqQ6HvZew/viewform",
+  /** Last calendar day the banner may show (YYYY-MM-DD). Hidden from the next day onward. */
+  hideAfter: "2026-06-20",
+};
+
+/** True while the registration banner should render (respects `active` + `hideAfter`). */
+export function isTournamentRegistrationLive(
+  reg: typeof tournamentRegistration = tournamentRegistration,
+): boolean {
+  if (!reg.active) return false;
+  if (reg.hideAfter) {
+    const [y, m, d] = reg.hideAfter.split("-").map(Number);
+    const lastVisible = new Date(y, m - 1, d, 23, 59, 59, 999);
+    if (Date.now() > lastVisible.getTime()) return false;
+  }
+  return true;
+}
+
 export const tournaments: Tournament[] = [
   {
     id: "val-cup-1",
@@ -112,11 +138,21 @@ export const tournaments: Tournament[] = [
     hex: `#${siValorant.hex}`,
   },
   {
-    id: "cs-cup-2",
-    name: "CS CUP II",
-    game: "Counter-Strike 2",
-    season: "Season 02",
-    date: "Dates TBA",
+    id: "fc26-cup-1",
+    name: "FC26 CUP I",
+    game: "EA FC 26 · 2v2",
+    season: "Season 03",
+    date: "June 2026",
+    status: "Soon",
+    iconPath: siEa.path,
+    hex: `#${siEa.hex}`,
+  },
+  {
+    id: "auc-cup-3",
+    name: "AUC CUP III",
+    game: "Counter-Strike 2 · Auction Draft",
+    season: "Season 03",
+    date: "June 2026",
     status: "Soon",
     iconPath: siCounterstrike.path,
     hex: `#${siCounterstrike.hex}`,

@@ -1,8 +1,8 @@
 "use client";
 
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import BrandIcon from "./ui/BrandIcon";
-import { tournaments } from "@/lib/data";
+import { isTournamentRegistrationLive, tournamentRegistration, tournaments } from "@/lib/data";
 
 export default function TournamentVault() {
   return (
@@ -28,10 +28,48 @@ export default function TournamentVault() {
           </h2>
         </div>
         <p className="max-w-sm text-white/55">
-          Five seasons hosted, one more loading. The NTG tournament vault —
+          Seven cups on the board, two more loading. The NTG tournament vault —
           every champion etched into the lounge&apos;s history.
         </p>
       </motion.div>
+
+      <AnimatePresence>
+        {isTournamentRegistrationLive() ? (
+          <motion.aside
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -6 }}
+            transition={{ duration: 0.45, ease: "easeOut" }}
+            className="mb-8 flex flex-col gap-3 rounded-2xl border border-white/[0.08] bg-white/[0.03] px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-5"
+            role="status"
+            aria-live="polite"
+          >
+            <div className="min-w-0">
+              <p className="text-[10px] font-medium uppercase tracking-[0.32em] text-[var(--color-brand)]/90">
+                Now registering
+              </p>
+              <p className="mt-1 font-display text-base font-medium text-white sm:text-lg">
+                {tournamentRegistration.message}
+              </p>
+              <p className="mt-0.5 text-xs text-white/50">
+                {tournamentRegistration.title} · {tournamentRegistration.detail}
+              </p>
+            </div>
+            <a
+              href={tournamentRegistration.href}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-[var(--color-brand)]/35 bg-[var(--color-brand)]/10 px-4 py-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--color-brand)] transition-colors hover:border-[var(--color-brand)]/55 hover:bg-[var(--color-brand)]/15"
+            >
+              Register
+              <svg viewBox="0 0 24 24" className="h-3 w-3" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+                <path d="M7 17L17 7" />
+                <path d="M8 7h9v9" />
+              </svg>
+            </a>
+          </motion.aside>
+        ) : null}
+      </AnimatePresence>
 
       <motion.ol
         initial="hidden"
