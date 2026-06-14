@@ -15,6 +15,11 @@ import {
   siDiscord,
   siWhatsapp,
 } from "simple-icons";
+import {
+  discordUrl,
+  instagramUrl,
+  whatsappInquiryUrl,
+} from "./env";
 
 export type GameIcon = {
   name: string;
@@ -50,7 +55,7 @@ export type Tournament = {
   game: string;
   season: string;
   date: string;
-  status: "Past" | "Upcoming";
+  status: "Hosted" | "Soon";
   iconPath: string;
   hex: string;
 };
@@ -61,8 +66,8 @@ export const tournaments: Tournament[] = [
     name: "VAL CUP I",
     game: "Valorant",
     season: "Season 01",
-    date: "2024",
-    status: "Past",
+    date: "March 2026",
+    status: "Hosted",
     iconPath: siValorant.path,
     hex: `#${siValorant.hex}`,
   },
@@ -71,8 +76,8 @@ export const tournaments: Tournament[] = [
     name: "CS CUP I",
     game: "Counter-Strike 2",
     season: "Season 01",
-    date: "2024",
-    status: "Past",
+    date: "March 2026",
+    status: "Hosted",
     iconPath: siCounterstrike.path,
     hex: `#${siCounterstrike.hex}`,
   },
@@ -81,37 +86,47 @@ export const tournaments: Tournament[] = [
     name: "VAL CUP II",
     game: "Valorant",
     season: "Season 02",
-    date: "2025",
-    status: "Past",
+    date: "April 2026",
+    status: "Hosted",
     iconPath: siValorant.path,
     hex: `#${siValorant.hex}`,
   },
   {
     id: "auc-cup-1",
     name: "AUC CUP I",
-    game: "Auction Draft Cup",
+    game: "Valorant · Auction Draft",
     season: "Edition 01",
-    date: "2025",
-    status: "Past",
+    date: "April 2026",
+    status: "Hosted",
     iconPath: siValorant.path,
-    hex: "#a855f7",
+    hex: `#${siValorant.hex}`,
   },
   {
     id: "auc-cup-2",
     name: "AUC CUP II",
-    game: "Auction Draft Cup",
+    game: "Valorant · Auction Draft",
     season: "Edition 02",
-    date: "2025",
-    status: "Past",
+    date: "June 2026",
+    status: "Hosted",
     iconPath: siValorant.path,
-    hex: "#d946ef",
+    hex: `#${siValorant.hex}`,
+  },
+  {
+    id: "cs-cup-2",
+    name: "CS CUP II",
+    game: "Counter-Strike 2",
+    season: "Season 02",
+    date: "Dates TBA",
+    status: "Soon",
+    iconPath: siCounterstrike.path,
+    hex: `#${siCounterstrike.hex}`,
   },
 ];
 
 export const socials = [
-  { name: "Instagram", href: "https://instagram.com/ntg_lounge", path: siInstagram.path },
-  { name: "Discord", href: "#", path: siDiscord.path },
-  { name: "WhatsApp", href: "#", path: siWhatsapp.path },
+  { name: "Instagram", href: instagramUrl, path: siInstagram.path },
+  { name: "Discord", href: discordUrl || "#", path: siDiscord.path },
+  { name: "WhatsApp", href: whatsappInquiryUrl(), path: siWhatsapp.path },
 ];
 
 export const specs = [
@@ -125,10 +140,13 @@ export const services = ["PC", "PS5", "Screening", "Birthdays", "Esports"];
 
 export const brand = {
   name: "NTG Lounge",
-  meaning: "Namma Tulu Nadu Gaming",
+  meaning: "Namma Tulunad Gaming",
   tagline: "Esport Lounge",
   hours: "10 AM — 11 PM",
   address: "302, Lotus Paradise Elite, Bunts Hostel, MLR",
+  // Lat/Lng of the lounge — used for the embedded map so it never
+  // auto-opens Google's place info card.
+  coords: "12.876034,74.843494",
   link: "linktr.ee/NTGEsport",
   instagram: "@ntg_lounge",
 };

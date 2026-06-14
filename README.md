@@ -1,6 +1,6 @@
 # NTG Lounge
 
-Landing page for **NTG Lounge** — Namma Tulu Nadu Gaming, Mangaluru's premier esports lounge.
+Landing page for **NTG Lounge** — Namma Tulunad Gaming, Mangaluru's premier esports lounge.
 
 ## Stack
 

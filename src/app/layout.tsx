@@ -16,7 +16,7 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  title: "NTG Lounge — Namma Tulu Nadu Gaming",
+  title: "NTG Lounge — Namma Tulunad Gaming",
   description:
     "Mangaluru's premier esports lounge. Ryzen 5 7600X · RTX 5060 · 300Hz. Home to VAL CUP, CS CUP and AUC CUP tournaments.",
 };

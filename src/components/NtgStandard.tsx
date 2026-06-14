@@ -6,7 +6,7 @@ import { brand } from "@/lib/data";
 
 const letters = [
   { letter: "N", word: "Namma", meaning: "Our" },
-  { letter: "T", word: "Tulu Nadu", meaning: "The Tulu Land" },
+  { letter: "T", word: "Tulunad", meaning: "The Tulunad Land" },
   { letter: "G", word: "Gaming", meaning: "The Stage" },
 ];
 
@@ -26,7 +26,7 @@ export default function NtgStandard() {
         className="mb-14 text-center"
       >
         <span className="text-[10px] font-medium uppercase tracking-[0.4em] text-[var(--color-brand)]/80">
-          05 — Heritage
+          04 — Heritage
         </span>
         <h2 className="mt-3 font-display text-4xl font-semibold tracking-[-0.02em] text-white sm:text-5xl">
           What <span className="font-display italic font-light text-white/55">does</span>{" "}
@@ -79,7 +79,7 @@ export default function NtgStandard() {
             transition={{ duration: 0.55, delay: 0.35 }}
             className="mt-10 max-w-md text-base leading-relaxed text-white/60"
           >
-            Born in the Tulu-speaking heartland of coastal Karnataka.
+            Born in the Tulunad heartland of coastal Karnataka.
             NTG is a love letter from{" "}
             <span className="text-gradient-brand font-medium">Mangaluru</span>{" "}
             to the players who&apos;ve made it home — a lounge built by the

@@ -3,6 +3,11 @@
 import { motion } from "framer-motion";
 import { brand, socials } from "@/lib/data";
 import BrandIcon from "./ui/BrandIcon";
+import {
+  mapsEmbedFor,
+  mapsSearchUrl,
+  whatsappInquiryUrl,
+} from "@/lib/env";
 
 const contacts = [
   {
@@ -17,7 +22,7 @@ const contacts = [
   },
   {
     label: `Open Daily · ${brand.hours}`,
-    sub: "Squads always active",
+    sub: "Walk-ins welcome · squads always active",
     icon: (
       <>
         <circle cx="12" cy="12" r="9" />
@@ -25,21 +30,11 @@ const contacts = [
       </>
     ),
   },
-  {
-    label: brand.link,
-    sub: "All bookings · social · contact",
-    icon: (
-      <>
-        <path d="M10 14a4 4 0 005.66 0l3-3a4 4 0 10-5.66-5.66l-1 1" />
-        <path d="M14 10a4 4 0 00-5.66 0l-3 3a4 4 0 105.66 5.66l1-1" />
-      </>
-    ),
-  },
 ];
 
 export default function VisitLounge() {
   return (
-    <section id="visit" className="relative mx-auto w-full max-w-6xl scroll-mt-28 px-5 py-24 sm:py-32">
+    <section id="visit" className="relative mx-auto w-full max-w-7xl scroll-mt-28 px-5 py-24 sm:py-32">
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         whileInView={{ opacity: 1, y: 0 }}
@@ -48,7 +43,7 @@ export default function VisitLounge() {
         className="mb-10 text-center"
       >
         <span className="text-[10px] font-medium uppercase tracking-[0.4em] text-[var(--color-brand)]/80">
-          06 — Visit
+          05 — Visit
         </span>
         <h2 className="mt-3 font-display text-4xl font-semibold tracking-[-0.02em] text-white sm:text-5xl">
           Step{" "}
@@ -64,14 +59,14 @@ export default function VisitLounge() {
         transition={{ duration: 0.7 }}
         className="shine-border relative overflow-hidden rounded-[2rem]"
       >
-        <div className="shine-border-inner glass-strong grid gap-8 rounded-[2rem] p-6 md:grid-cols-2 md:p-10">
+        <div className="shine-border-inner glass-strong grid gap-10 rounded-[2rem] p-6 md:grid-cols-[1fr_1.05fr] md:gap-14 md:p-10 lg:gap-20">
           <div className="flex flex-col justify-center">
             <h3 className="font-display text-3xl font-semibold tracking-[-0.01em] text-white sm:text-4xl">
               {brand.name}.
             </h3>
             <p className="mt-3 max-w-sm text-white/55">
-              {brand.tagline} — drop by, plug up, play your sharpest. Reservations
-              recommended for tournament nights and private vaults.
+              {brand.tagline} — drop by, plug up, play your sharpest. DM us on
+              WhatsApp to inquire about slots, tournament nights and private vaults.
             </p>
 
             <div className="mt-7 space-y-3">
@@ -92,12 +87,17 @@ export default function VisitLounge() {
 
             <div className="mt-8 flex flex-wrap items-center gap-3">
               <a
-                href={`https://${brand.link}`}
+                href={whatsappInquiryUrl(
+                  "Hi NTG Lounge, I'd like to inquire about a slot at the lounge.",
+                )}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="cta rounded-full px-6 py-3 text-sm font-semibold uppercase tracking-[0.18em] transition-all hover:scale-[1.03] hover:brightness-110"
+                className="cta inline-flex items-center gap-2 rounded-full px-6 py-3 text-sm font-semibold uppercase tracking-[0.18em] transition-all hover:scale-[1.03] hover:brightness-110"
               >
-                Reserve via Linktree
+                <svg viewBox="0 0 24 24" className="h-4 w-4" fill="currentColor">
+                  <path d="M12.04 2C6.6 2 2.16 6.43 2.16 11.86c0 1.91.5 3.78 1.45 5.42L2 22l4.86-1.57a9.86 9.86 0 005.18 1.41c5.43 0 9.87-4.43 9.87-9.86A9.83 9.83 0 0012.04 2zm0 17.94a8.07 8.07 0 01-4.34-1.27l-.31-.19-2.89.94.95-2.81-.2-.32a8.05 8.05 0 1114.86-4.43 8.07 8.07 0 01-8.07 8.08zm4.65-6.09c-.25-.13-1.5-.74-1.74-.83-.23-.08-.4-.13-.57.13-.17.25-.66.83-.81 1-.15.17-.3.19-.55.06-.25-.13-1.07-.4-2.04-1.27-.75-.67-1.26-1.5-1.41-1.75-.15-.25-.02-.39.11-.51.11-.11.25-.3.38-.45.13-.15.17-.25.25-.42.08-.17.04-.31-.02-.45-.06-.13-.57-1.37-.78-1.87-.21-.5-.42-.43-.57-.43h-.49c-.17 0-.45.06-.69.31-.23.25-.9.88-.9 2.15 0 1.27.92 2.5 1.05 2.67.13.17 1.81 2.77 4.4 3.88.62.27 1.1.43 1.47.55.62.2 1.18.17 1.62.1.5-.07 1.5-.61 1.71-1.2.21-.59.21-1.1.15-1.2-.06-.1-.23-.17-.48-.29z" />
+                </svg>
+                Inquire on WhatsApp
               </a>
               <div className="flex items-center gap-2">
                 {socials.map((s) => (
@@ -116,35 +116,78 @@ export default function VisitLounge() {
             </div>
           </div>
 
-          {/* Stylized map */}
-          <div className="relative aspect-[4/3] overflow-hidden rounded-3xl border border-white/[0.08] bg-[#0a1020]">
-            <div className="absolute inset-0 bg-[linear-gradient(rgba(94,234,212,0.06)_1px,transparent_1px),linear-gradient(90deg,rgba(94,234,212,0.06)_1px,transparent_1px)] bg-[size:38px_38px]" />
+          {/* Neon teal map — locked to one location, prominent NTG pin */}
+          <div className="group relative min-h-[280px] overflow-hidden rounded-3xl border border-[var(--color-brand)]/25 bg-[#060a14] shadow-[0_0_40px_rgba(94,234,212,0.08),inset_0_0_60px_rgba(124,58,237,0.05)] md:min-h-[340px]">
+            <iframe
+              title={`Map · ${brand.name}`}
+              src={mapsEmbedFor(brand.coords)}
+              loading="lazy"
+              referrerPolicy="no-referrer-when-downgrade"
+              tabIndex={-1}
+              aria-hidden
+              className="pointer-events-none absolute inset-0 h-[112%] w-full -translate-y-[5%] scale-[1.03] border-0 select-none transition-all duration-700 [filter:invert(1)_hue-rotate(180deg)_brightness(0.92)_contrast(1.1)_saturate(1.4)] group-hover:[filter:invert(1)_hue-rotate(180deg)_brightness(1)_contrast(1.05)_saturate(1.55)]"
+            />
 
-            <div className="absolute left-0 top-1/4 h-[2px] w-full -rotate-6 bg-white/[0.07]" />
-            <div className="absolute left-0 top-2/3 h-[2px] w-full rotate-3 bg-white/[0.06]" />
-            <div className="absolute left-1/3 top-0 h-full w-[2px] rotate-3 bg-white/[0.07]" />
-            <div className="absolute left-2/3 top-0 h-full w-[2px] -rotate-2 bg-white/[0.05]" />
+            {/* Atmospheric neon glows — let the map color show through */}
+            <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_75%_10%,rgba(124,58,237,0.28),transparent_55%)]" />
+            <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_10%_95%,rgba(34,211,238,0.22),transparent_55%)]" />
 
-            <div className="absolute inset-0 bg-[radial-gradient(circle_at_55%_45%,rgba(168,85,247,0.22),transparent_55%)]" />
-            <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_80%,rgba(34,211,238,0.16),transparent_60%)]" />
+            {/* Faint teal grid */}
+            <div
+              aria-hidden
+              className="pointer-events-none absolute inset-0 opacity-[0.08] [background:linear-gradient(rgba(94,234,212,0.45)_1px,transparent_1px),linear-gradient(90deg,rgba(94,234,212,0.45)_1px,transparent_1px)] [background-size:48px_48px]"
+            />
 
-            <span className="absolute left-[28%] top-[30%] h-1.5 w-1.5 rounded-full bg-white/35" />
-            <span className="absolute left-[72%] top-[68%] h-1.5 w-1.5 rounded-full bg-white/30" />
-            <span className="absolute left-[40%] top-[78%] h-1.5 w-1.5 rounded-full bg-white/25" />
-            <span className="absolute left-[78%] top-[20%] h-1.5 w-1.5 rounded-full bg-white/30" />
+            {/* Vignette to focus the eye */}
+            <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,transparent_45%,rgba(6,10,20,0.78)_100%)]" />
 
-            <div className="absolute left-[55%] top-[45%] -translate-x-1/2 -translate-y-1/2">
-              <span className="absolute -inset-6 animate-ping rounded-full bg-[var(--color-brand)]/25" />
-              <span className="absolute -inset-3 rounded-full bg-[var(--color-brand)]/30 blur-md" />
-              <span className="relative flex h-7 w-7 items-center justify-center rounded-full bg-[var(--color-brand)] text-[#04221d] shadow-[0_0_30px_rgba(94,234,212,0.9)] ring-2 ring-white/30">
-                <svg viewBox="0 0 24 24" className="h-4 w-4" fill="currentColor">
-                  <path d="M12 2C8 2 5 5 5 9c0 5 7 13 7 13s7-8 7-13c0-4-3-7-7-7zm0 9.5A2.5 2.5 0 1112 6a2.5 2.5 0 010 5.5z" />
-                </svg>
-              </span>
-              <span className="mt-2 block whitespace-nowrap rounded-md bg-black/65 px-2 py-0.5 text-[10px] uppercase tracking-[0.22em] text-white/80 backdrop-blur">
-                {brand.name}
-              </span>
+            {/* HUD corner brackets */}
+            <span aria-hidden className="pointer-events-none absolute left-3 top-3 h-6 w-6 border-l-2 border-t-2 border-[var(--color-brand)]/65" />
+            <span aria-hidden className="pointer-events-none absolute right-3 top-3 h-6 w-6 border-r-2 border-t-2 border-[var(--color-brand)]/65" />
+            <span aria-hidden className="pointer-events-none absolute bottom-3 left-3 h-6 w-6 border-b-2 border-l-2 border-[var(--color-iris)]/55" />
+            <span aria-hidden className="pointer-events-none absolute bottom-3 right-3 h-6 w-6 border-b-2 border-r-2 border-[var(--color-iris)]/55" />
+
+            <div className="pointer-events-none absolute inset-0 ring-1 ring-inset ring-[var(--color-brand)]/20" />
+
+            {/* Pin + callout — pinned to the locked map center */}
+            <div className="pointer-events-none absolute left-1/2 top-1/2 flex -translate-x-1/2 -translate-y-1/2 flex-col items-center">
+              <div className="relative">
+                <span className="absolute -inset-8 animate-ping rounded-full bg-[var(--color-brand)]/25" />
+                <span className="absolute -inset-4 rounded-full bg-[var(--color-brand)]/35 blur-md" />
+                <span className="relative flex h-10 w-10 items-center justify-center rounded-full bg-[var(--color-brand)] text-[#04221d] shadow-[0_0_30px_rgba(94,234,212,0.95),0_0_60px_rgba(94,234,212,0.45)] ring-2 ring-white/40">
+                  <svg viewBox="0 0 24 24" className="h-5 w-5" fill="currentColor">
+                    <path d="M12 2C8 2 5 5 5 9c0 5 7 13 7 13s7-8 7-13c0-4-3-7-7-7zm0 9.5A2.5 2.5 0 1112 6a2.5 2.5 0 010 5.5z" />
+                  </svg>
+                </span>
+              </div>
+              <div className="mt-3 whitespace-nowrap rounded-xl border border-[var(--color-brand)]/45 bg-[#0a1020]/90 px-4 py-2 text-center shadow-[0_0_22px_rgba(94,234,212,0.28)] backdrop-blur">
+                <p className="font-display text-sm font-semibold tracking-wide text-white">
+                  Namma <span className="text-[var(--color-brand)]">Tulunad</span> Gaming
+                </p>
+                <p className="mt-0.5 text-[9px] uppercase tracking-[0.26em] text-white/55">
+                  NTG Esports Lounge
+                </p>
+              </div>
             </div>
+
+            {/* Top-left pill */}
+            <div className="pointer-events-none absolute left-4 top-4 inline-flex items-center rounded-full border border-[var(--color-brand)]/40 bg-[#0a1020]/85 px-3 py-1 text-[10px] font-medium uppercase tracking-[0.28em] text-[var(--color-brand)] shadow-[0_0_14px_rgba(94,234,212,0.2)] backdrop-blur">
+              <span className="mr-1.5 inline-block h-1.5 w-1.5 rounded-full bg-[var(--color-brand)] shadow-[0_0_6px_rgba(94,234,212,0.95)]" />
+              Mangaluru
+            </div>
+
+            <a
+              href={mapsSearchUrl(`${brand.name}, ${brand.address}, Mangaluru`)}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="absolute bottom-3 right-3 inline-flex items-center gap-1.5 rounded-full border border-[var(--color-brand)]/35 bg-[#0a1020]/80 px-3 py-1.5 text-[10px] font-medium uppercase tracking-[0.22em] text-white/95 shadow-[0_0_16px_rgba(94,234,212,0.15)] backdrop-blur transition-all hover:border-[var(--color-brand)]/65 hover:text-[var(--color-brand)]"
+            >
+              Open in Maps
+              <svg viewBox="0 0 24 24" className="h-3 w-3" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+                <path d="M7 17L17 7" />
+                <path d="M8 7h9v9" />
+              </svg>
+            </a>
           </div>
         </div>
       </motion.div>

@@ -28,8 +28,8 @@ export default function TournamentVault() {
           </h2>
         </div>
         <p className="max-w-sm text-white/55">
-          Five seasons. Three games. One stage. The NTG tournament vault — every
-          champion etched into the lounge&apos;s history.
+          Five seasons hosted, one more loading. The NTG tournament vault —
+          every champion etched into the lounge&apos;s history.
         </p>
       </motion.div>
 
@@ -99,15 +99,25 @@ export default function TournamentVault() {
                   <span className="rounded-full bg-white/[0.05] px-3 py-1 text-[10px] uppercase tracking-[0.22em] text-white/55 ring-1 ring-inset ring-white/10">
                     {t.date}
                   </span>
-                  <span
-                    className="rounded-full px-3 py-1 text-[10px] uppercase tracking-[0.22em] text-white"
-                    style={{
-                      background: `${t.hex}1f`,
-                      boxShadow: `inset 0 0 0 1px ${t.hex}55`,
-                    }}
-                  >
-                    {t.status}
-                  </span>
+                  {t.status === "Soon" ? (
+                    <span className="inline-flex items-center gap-1.5 rounded-full bg-[var(--color-brand)]/10 px-3 py-1 text-[10px] uppercase tracking-[0.22em] text-[var(--color-brand)] ring-1 ring-inset ring-[var(--color-brand)]/45">
+                      <span className="relative flex h-1.5 w-1.5">
+                        <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-[var(--color-brand)] opacity-75" />
+                        <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-[var(--color-brand)]" />
+                      </span>
+                      Soon
+                    </span>
+                  ) : (
+                    <span
+                      className="rounded-full px-3 py-1 text-[10px] uppercase tracking-[0.22em] text-white"
+                      style={{
+                        background: `${t.hex}1f`,
+                        boxShadow: `inset 0 0 0 1px ${t.hex}55`,
+                      }}
+                    >
+                      {t.status}
+                    </span>
+                  )}
                 </div>
               </div>
             </div>
@@ -122,8 +132,7 @@ export default function TournamentVault() {
         transition={{ duration: 0.5, delay: 0.1 }}
         className="mt-8 text-center text-sm text-white/45"
       >
-        Next cup announcement —{" "}
-        <span className="text-gradient-brand font-medium">soon.</span>
+        Want in on the next cup? <span className="text-gradient-brand font-medium">DM us on WhatsApp.</span>
       </motion.div>
     </section>
   );

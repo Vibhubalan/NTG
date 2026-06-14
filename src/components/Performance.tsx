@@ -3,6 +3,7 @@
 import Image from "next/image";
 import { AnimatePresence, motion, useInView } from "framer-motion";
 import { useEffect, useRef, useState } from "react";
+import ReviewCarousel from "./ReviewCarousel";
 
 const championshipSlides = [
   "/arena/arena-tournament.png",
@@ -171,55 +172,6 @@ function ChampionshipCard({
   );
 }
 
-function QuoteCard({ className = "", delay = 0 }: { className?: string; delay?: number }) {
-  return (
-    <motion.article
-      initial={{ opacity: 0, y: 24 }}
-      whileInView={{ opacity: 1, y: 0 }}
-      viewport={{ once: true, margin: "-80px" }}
-      transition={{ duration: 0.65, delay }}
-      className={`group glass-strong relative flex h-full min-h-[220px] flex-col justify-between overflow-hidden rounded-3xl border border-white/[0.08] p-6 sm:p-7 ${className}`}
-    >
-      <div className="pointer-events-none absolute inset-0 -z-10 bg-[radial-gradient(110%_70%_at_100%_0%,rgba(124,58,237,0.22),transparent_55%)]" />
-      <div className="pointer-events-none absolute inset-0 -z-10 bg-[radial-gradient(80%_60%_at_0%_100%,rgba(34,211,238,0.14),transparent_55%)]" />
-
-      <div>
-        <span className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/[0.04] px-3 py-1 text-[10px] font-medium uppercase tracking-[0.32em] text-[var(--color-brand)]">
-          <span className="h-1 w-1 rounded-full bg-[var(--color-brand)]" />
-          Player Voice
-        </span>
-
-        <svg
-          aria-hidden
-          viewBox="0 0 24 24"
-          className="mt-4 h-5 w-5 text-white/15"
-          fill="currentColor"
-        >
-          <path d="M7 7h4v4H7c0 2.2 1.8 4 4 4v2c-3.3 0-6-2.7-6-6V7zm9 0h4v4h-4c0 2.2 1.8 4 4 4v2c-3.3 0-6-2.7-6-6V7z" />
-        </svg>
-
-        <p className="mt-3 font-display text-base leading-snug tracking-[-0.005em] text-white/90 sm:text-lg">
-          &ldquo;NTG is where my{" "}
-          <span className="text-gradient-brand">best plays</span>
-          {" "}live. The gear, the lights, the crowd — everything hits different.&rdquo;
-        </p>
-      </div>
-
-      <div className="mt-5 flex items-center gap-3">
-        <span className="flex h-9 w-9 items-center justify-center rounded-full bg-gradient-to-br from-[var(--color-brand)] to-[var(--color-iris)] text-[10px] font-bold tracking-wider text-[#0a0f1c]">
-          FC
-        </span>
-        <div className="leading-tight">
-          <p className="text-sm font-medium text-white">Fearlesscoconut</p>
-          <p className="text-[11px] uppercase tracking-[0.18em] text-white/45">
-            AUC Cup Champion · Valorant
-          </p>
-        </div>
-      </div>
-    </motion.article>
-  );
-}
-
 export default function Performance() {
   return (
     <section id="arena" className="relative mx-auto w-full max-w-6xl scroll-mt-28 px-5 py-20 sm:py-28">
@@ -263,7 +215,7 @@ export default function Performance() {
           imgClassName="min-h-[220px] md:min-h-full md:aspect-auto"
         />
 
-        <QuoteCard delay={0.16} />
+        <ReviewCarousel delay={0.16} />
       </div>
     </section>
   );

@@ -1,4 +1,3 @@
-import Navbar from "@/components/Navbar";
 import Hero from "@/components/Hero";
 import SpecsRibbon from "@/components/SpecsRibbon";
 import Performance from "@/components/Performance";

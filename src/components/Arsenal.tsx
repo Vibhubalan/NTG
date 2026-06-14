@@ -28,8 +28,8 @@ export default function Arsenal() {
           </h2>
         </div>
         <p className="max-w-sm text-white/55">
-          From tactical FPS to MOBA marathons — the lineup is curated, ready to
-          launch in a click.
+          From tactical FPS to MOBA marathons — every title in the lineup runs
+          on full premium hardware, ready when you are.
         </p>
       </motion.div>
 
@@ -44,9 +44,8 @@ export default function Arsenal() {
         className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-3 lg:grid-cols-3"
       >
         {games.map((g) => (
-          <motion.a
+          <motion.div
             key={g.slug}
-            href="#"
             variants={{
               hidden: { opacity: 0, y: 20 },
               visible: { opacity: 1, y: 0, transition: { duration: 0.45, ease: "easeOut" } }
@@ -68,7 +67,7 @@ export default function Arsenal() {
                 {g.category}
               </p>
             </div>
-          </motion.a>
+          </motion.div>
         ))}
       </motion.div>
 

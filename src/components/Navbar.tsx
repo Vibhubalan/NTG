@@ -3,6 +3,7 @@
 import Image from "next/image";
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
+import { whatsappInquiryUrl } from "@/lib/env";
 
 const links = [
   { label: "Arena", href: "#arena" },
@@ -59,10 +60,12 @@ function NavbarContent() {
         </ul>
 
         <a
-          href="#visit"
+          href={whatsappInquiryUrl()}
+          target="_blank"
+          rel="noopener noreferrer"
           className="cta rounded-full px-5 py-2.5 text-[13px] font-semibold uppercase tracking-[0.18em] transition-all hover:scale-[1.04] hover:brightness-110"
         >
-          Reserve
+          Inquire
         </a>
       </nav>
     </header>

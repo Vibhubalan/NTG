@@ -1,3 +1,5 @@
+import { whatsappInquiryUrl } from "@/lib/env";
+
 export default function Hero() {
   return (
     <section
@@ -48,7 +50,7 @@ export default function Hero() {
 
         <h1 className="font-display font-semibold uppercase text-white">
           <span className="block text-4xl leading-[0.96] tracking-[-0.025em] sm:text-6xl md:text-7xl lg:text-[6rem]">
-            Namma Tulu Nadu
+            Namma Tulunad
           </span>
           <span className="mt-2 block text-4xl leading-[0.96] tracking-[-0.025em] sm:text-6xl md:text-7xl lg:text-[6rem]">
             <span className="text-gradient-brand">Gaming</span>
@@ -62,10 +64,12 @@ export default function Hero() {
 
         <div className="mt-10 flex flex-wrap items-center justify-center gap-3">
           <a
-            href="#visit"
+            href={whatsappInquiryUrl()}
+            target="_blank"
+            rel="noopener noreferrer"
             className="cta group relative inline-flex items-center gap-2 rounded-full px-7 py-3.5 text-sm font-semibold uppercase tracking-[0.18em] transition-all hover:scale-[1.03] hover:brightness-110"
           >
-            Reserve Station
+            Inquire Now
             <svg
               viewBox="0 0 24 24"
               className="h-4 w-4 transition-transform group-hover:translate-x-0.5"
