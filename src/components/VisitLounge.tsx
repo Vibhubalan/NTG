@@ -3,6 +3,7 @@
 import { motion } from "framer-motion";
 import { brand, socials } from "@/lib/data";
 import BrandIcon from "./ui/BrandIcon";
+import LazyMap from "./LazyMap";
 import {
   mapsEmbedFor,
   mapsSearchUrl,
@@ -116,30 +117,27 @@ export default function VisitLounge() {
             </div>
           </div>
 
-          {/* Neon teal map — locked to one location, prominent NTG pin */}
-          <div className="group relative min-h-[280px] overflow-hidden rounded-3xl border border-[var(--color-brand)]/25 bg-[#060a14] shadow-[0_0_40px_rgba(94,234,212,0.08),inset_0_0_60px_rgba(124,58,237,0.05)] md:min-h-[340px]">
-            <iframe
+          {/*
+            Neon teal map — locked, mobile-optimized.
+            • Lazy-mounted iframe (no Google JS until near viewport)
+            • Lighter filter chain on mobile, fuller chain on desktop
+            • No backdrop-blur or animate-ping below `md` (GPU-cheap)
+          */}
+          <div className="group relative min-h-[280px] overflow-hidden rounded-3xl border border-[var(--color-brand)]/25 bg-[#060a14] [contain:layout_paint] [content-visibility:auto] md:min-h-[340px] md:shadow-[0_0_40px_rgba(94,234,212,0.08),inset_0_0_60px_rgba(124,58,237,0.05)]">
+            <LazyMap
               title={`Map · ${brand.name}`}
               src={mapsEmbedFor(brand.coords)}
-              loading="lazy"
-              referrerPolicy="no-referrer-when-downgrade"
-              tabIndex={-1}
-              aria-hidden
-              className="pointer-events-none absolute inset-0 h-[112%] w-full -translate-y-[5%] scale-[1.03] border-0 select-none transition-all duration-700 [filter:invert(1)_hue-rotate(180deg)_brightness(0.92)_contrast(1.1)_saturate(1.4)] group-hover:[filter:invert(1)_hue-rotate(180deg)_brightness(1)_contrast(1.05)_saturate(1.55)]"
+              iframeClassName="pointer-events-none absolute inset-0 h-[112%] w-full border-0 select-none [transform:translate3d(0,-5%,0)_scale(1.03)] [filter:invert(1)_hue-rotate(180deg)] md:[filter:invert(1)_hue-rotate(180deg)_brightness(0.92)_contrast(1.1)_saturate(1.4)]"
             />
 
-            {/* Atmospheric neon glows — let the map color show through */}
-            <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_75%_10%,rgba(124,58,237,0.28),transparent_55%)]" />
-            <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_10%_95%,rgba(34,211,238,0.22),transparent_55%)]" />
+            {/* One combined atmosphere overlay — was three separate gradients */}
+            <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_75%_10%,rgba(124,58,237,0.28),transparent_55%),radial-gradient(ellipse_at_10%_95%,rgba(34,211,238,0.22),transparent_55%),radial-gradient(circle_at_50%_50%,transparent_45%,rgba(6,10,20,0.78)_100%)]" />
 
-            {/* Faint teal grid */}
+            {/* Grid — desktop only (most expensive overlay on mobile) */}
             <div
               aria-hidden
-              className="pointer-events-none absolute inset-0 opacity-[0.08] [background:linear-gradient(rgba(94,234,212,0.45)_1px,transparent_1px),linear-gradient(90deg,rgba(94,234,212,0.45)_1px,transparent_1px)] [background-size:48px_48px]"
+              className="pointer-events-none absolute inset-0 hidden opacity-[0.08] md:block [background:linear-gradient(rgba(94,234,212,0.45)_1px,transparent_1px),linear-gradient(90deg,rgba(94,234,212,0.45)_1px,transparent_1px)] [background-size:48px_48px]"
             />
-
-            {/* Vignette to focus the eye */}
-            <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,transparent_45%,rgba(6,10,20,0.78)_100%)]" />
 
             {/* HUD corner brackets */}
             <span aria-hidden className="pointer-events-none absolute left-3 top-3 h-6 w-6 border-l-2 border-t-2 border-[var(--color-brand)]/65" />
@@ -149,18 +147,18 @@ export default function VisitLounge() {
 
             <div className="pointer-events-none absolute inset-0 ring-1 ring-inset ring-[var(--color-brand)]/20" />
 
-            {/* Pin + callout — pinned to the locked map center */}
+            {/* Pin + callout — animate-ping desktop only, no blur on mobile */}
             <div className="pointer-events-none absolute left-1/2 top-1/2 flex -translate-x-1/2 -translate-y-1/2 flex-col items-center">
               <div className="relative">
-                <span className="absolute -inset-8 animate-ping rounded-full bg-[var(--color-brand)]/25" />
-                <span className="absolute -inset-4 rounded-full bg-[var(--color-brand)]/35 blur-md" />
-                <span className="relative flex h-10 w-10 items-center justify-center rounded-full bg-[var(--color-brand)] text-[#04221d] shadow-[0_0_30px_rgba(94,234,212,0.95),0_0_60px_rgba(94,234,212,0.45)] ring-2 ring-white/40">
+                <span className="absolute -inset-8 hidden rounded-full bg-[var(--color-brand)]/25 motion-safe:md:block motion-safe:md:animate-ping" />
+                <span className="absolute -inset-4 hidden rounded-full bg-[var(--color-brand)]/35 blur-md md:block" />
+                <span className="relative flex h-10 w-10 items-center justify-center rounded-full bg-[var(--color-brand)] text-[#04221d] ring-2 ring-white/40 shadow-[0_0_18px_rgba(94,234,212,0.85)] md:shadow-[0_0_30px_rgba(94,234,212,0.95),0_0_60px_rgba(94,234,212,0.45)]">
                   <svg viewBox="0 0 24 24" className="h-5 w-5" fill="currentColor">
                     <path d="M12 2C8 2 5 5 5 9c0 5 7 13 7 13s7-8 7-13c0-4-3-7-7-7zm0 9.5A2.5 2.5 0 1112 6a2.5 2.5 0 010 5.5z" />
                   </svg>
                 </span>
               </div>
-              <div className="mt-3 whitespace-nowrap rounded-xl border border-[var(--color-brand)]/45 bg-[#0a1020]/90 px-4 py-2 text-center shadow-[0_0_22px_rgba(94,234,212,0.28)] backdrop-blur">
+              <div className="mt-3 whitespace-nowrap rounded-xl border border-[var(--color-brand)]/45 bg-[#0a1020]/95 px-4 py-2 text-center md:bg-[#0a1020]/90 md:shadow-[0_0_22px_rgba(94,234,212,0.28)] md:backdrop-blur">
                 <p className="font-display text-sm font-semibold tracking-wide text-white">
                   Namma <span className="text-[var(--color-brand)]">Tulunad</span> Gaming
                 </p>
@@ -171,8 +169,8 @@ export default function VisitLounge() {
             </div>
 
             {/* Top-left pill */}
-            <div className="pointer-events-none absolute left-4 top-4 inline-flex items-center rounded-full border border-[var(--color-brand)]/40 bg-[#0a1020]/85 px-3 py-1 text-[10px] font-medium uppercase tracking-[0.28em] text-[var(--color-brand)] shadow-[0_0_14px_rgba(94,234,212,0.2)] backdrop-blur">
-              <span className="mr-1.5 inline-block h-1.5 w-1.5 rounded-full bg-[var(--color-brand)] shadow-[0_0_6px_rgba(94,234,212,0.95)]" />
+            <div className="pointer-events-none absolute left-4 top-4 inline-flex items-center rounded-full border border-[var(--color-brand)]/40 bg-[#0a1020]/95 px-3 py-1 text-[10px] font-medium uppercase tracking-[0.28em] text-[var(--color-brand)] md:bg-[#0a1020]/85 md:shadow-[0_0_14px_rgba(94,234,212,0.2)] md:backdrop-blur">
+              <span className="mr-1.5 inline-block h-1.5 w-1.5 rounded-full bg-[var(--color-brand)] md:shadow-[0_0_6px_rgba(94,234,212,0.95)]" />
               Mangaluru
             </div>
 
@@ -180,7 +178,7 @@ export default function VisitLounge() {
               href={mapsSearchUrl(`${brand.name}, ${brand.address}, Mangaluru`)}
               target="_blank"
               rel="noopener noreferrer"
-              className="absolute bottom-3 right-3 inline-flex items-center gap-1.5 rounded-full border border-[var(--color-brand)]/35 bg-[#0a1020]/80 px-3 py-1.5 text-[10px] font-medium uppercase tracking-[0.22em] text-white/95 shadow-[0_0_16px_rgba(94,234,212,0.15)] backdrop-blur transition-all hover:border-[var(--color-brand)]/65 hover:text-[var(--color-brand)]"
+              className="absolute bottom-3 right-3 inline-flex items-center gap-1.5 rounded-full border border-[var(--color-brand)]/35 bg-[#0a1020]/95 px-3 py-1.5 text-[10px] font-medium uppercase tracking-[0.22em] text-white/95 transition-colors hover:border-[var(--color-brand)]/65 hover:text-[var(--color-brand)] md:bg-[#0a1020]/80 md:shadow-[0_0_16px_rgba(94,234,212,0.15)] md:backdrop-blur"
             >
               Open in Maps
               <svg viewBox="0 0 24 24" className="h-3 w-3" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">

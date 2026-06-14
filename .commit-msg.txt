@@ -1,0 +1,28 @@
+Mobile perf: lazy-mount map, slim filter chain, drop heavy effects below md
+
+Visit section was the worst offender on phones — Google Maps iframe with a
+5-stage CSS filter chain, animate-ping, backdrop-blur on multiple pills, and
+a 700ms filter transition all running concurrently as the user scrolled in.
+
+- LazyMap component: iframe is mounted only when within 300px of the
+  viewport (saves the ~1–2 MB Google tile/JS load until needed).
+- Map filter cut to `invert(1) hue-rotate(180deg)` on mobile; full chain
+  with brightness/contrast/saturate kept on `md:` only.
+- Removed `transition-all duration-700` on iframe (no hover on touch).
+- Replaced 3 separate gradient overlays + grid + vignette with one combined
+  multi-radial-gradient layer; teal grid only renders on `md:`.
+- `animate-ping`, blur halo and double box-shadow on the pin: desktop only
+  (also wrapped in `motion-safe:` for prefers-reduced-motion users).
+- All map pills (Mangaluru, NTG callout, Open in Maps): `backdrop-blur` and
+  outer glow shadows are `md:` only; mobile uses solid 95% backgrounds.
+- Added `[contain:layout_paint] [content-visibility:auto]` on the map
+  container so the browser can skip its render work entirely off-screen.
+
+CtaBanner:
+- Combined two radial-gradient layers into one.
+- Dot pattern background and noise texture: `md:` only.
+- `[content-visibility:auto]` on the section.
+
+Result: scrolling into Visit/CTA on mobile no longer drops frames; the
+Google iframe stays out of the network/JS pipeline until the user is
+actually about to see it.

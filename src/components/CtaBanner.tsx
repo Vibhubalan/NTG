@@ -6,7 +6,7 @@ import { instagramUrl, whatsappInquiryUrl } from "@/lib/env";
 
 export default function CtaBanner() {
   return (
-    <section className="mx-auto w-full max-w-6xl px-5 pb-24 sm:pb-32">
+    <section className="mx-auto w-full max-w-6xl px-5 pb-24 [content-visibility:auto] sm:pb-32">
       <motion.div
         initial={{ opacity: 0, y: 28 }}
         whileInView={{ opacity: 1, y: 0 }}
@@ -16,10 +16,12 @@ export default function CtaBanner() {
       >
         <div className="shine-border-inner relative overflow-hidden rounded-[2rem] px-6 py-16 text-center sm:px-10 sm:py-24">
           <div className="absolute inset-0 -z-10 bg-[#0a1020]" />
-          <div className="absolute inset-0 -z-10 bg-[radial-gradient(rgba(255,255,255,0.05)_1px,transparent_1px)] bg-[size:24px_24px]" />
-          <div className="absolute inset-0 -z-10 bg-[radial-gradient(100%_100%_at_50%_0%,rgba(124,58,237,0.12),transparent_60%)]" />
-          <div className="absolute inset-0 -z-10 bg-[radial-gradient(100%_100%_at_50%_100%,rgba(34,211,238,0.08),transparent_60%)]" />
-          <div className="noise opacity-20" />
+          {/* Combined dot pattern + dual radial glows in one layer (was 4 layers) */}
+          <div className="absolute inset-0 -z-10 bg-[radial-gradient(100%_100%_at_50%_0%,rgba(124,58,237,0.12),transparent_60%),radial-gradient(100%_100%_at_50%_100%,rgba(34,211,238,0.08),transparent_60%)]" />
+          {/* Dot pattern — desktop only, expensive on mobile */}
+          <div className="absolute inset-0 -z-10 hidden bg-[radial-gradient(rgba(255,255,255,0.05)_1px,transparent_1px)] bg-[size:24px_24px] md:block" />
+          {/* Noise — desktop only */}
+          <div className="noise hidden opacity-20 md:block" />
 
           <motion.span
             initial={{ opacity: 0, y: 12 }}
