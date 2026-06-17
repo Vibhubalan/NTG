@@ -7,10 +7,12 @@ import NtgStandard from "@/components/NtgStandard";
 import VisitLounge from "@/components/VisitLounge";
 import CtaBanner from "@/components/CtaBanner";
 import Footer from "@/components/Footer";
+import LocalBusinessJsonLd from "@/components/seo/LocalBusinessJsonLd";
 
 export default function Home() {
   return (
     <main className="relative min-h-screen">
+      <LocalBusinessJsonLd />
       <Hero />
       <SpecsRibbon />
       <Performance />
