@@ -5,6 +5,24 @@ import { prisma } from "@core/database/client";
 import { serverEnv } from "@core/config/env.server";
 import { verifyCredentials } from "../application/register.service";
 
+function isStaleSessionError(error: unknown): boolean {
+  if (error instanceof Error) {
+    return (
+      error.name === "JWTSessionError" ||
+      error.message.includes("no matching decryption secret")
+    );
+  }
+  if (typeof error === "object" && error !== null) {
+    const e = error as { type?: string; name?: string; message?: string };
+    return (
+      e.type === "JWTSessionError" ||
+      e.name === "JWTSessionError" ||
+      Boolean(e.message?.includes("no matching decryption secret"))
+    );
+  }
+  return false;
+}
+
 function createAuthInstance() {
   const secret = serverEnv.authSecret;
   if (!secret) return null;
@@ -12,9 +30,16 @@ function createAuthInstance() {
   return NextAuth({
     adapter: PrismaAdapter(prisma),
     secret,
+    trustHost: true,
     session: { strategy: "jwt" },
     pages: {
       signIn: "/login",
+    },
+    logger: {
+      error(error) {
+        if (isStaleSessionError(error)) return;
+        console.error("[auth]", error);
+      },
     },
     providers: [
       Credentials({
