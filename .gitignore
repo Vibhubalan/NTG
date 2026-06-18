@@ -12,6 +12,12 @@
 
 # testing
 /coverage
+/test-results
+
+# local debug scripts
+/debug-*.js
+/fix-*.js
+/sync-*.js
 
 # next.js
 /.next/
