@@ -36,6 +36,7 @@ function createAuthInstance() {
         if (user) {
           token.id = user.id;
           if (user.name) token.name = user.name;
+          if (user.email) token.email = user.email;
         }
         return token;
       },
@@ -43,6 +44,7 @@ function createAuthInstance() {
         if (session.user) {
           if (token.id) session.user.id = token.id as string;
           if (token.name) session.user.name = token.name as string;
+          if (token.email) session.user.email = token.email as string;
         }
         return session;
       },

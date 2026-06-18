@@ -5,7 +5,7 @@ import {
   type RegistrationParticipantRole,
   type ValorantRole,
 } from "@prisma/client";
-import { normalizeAccountId } from "@auth-membership/domain/account-id";
+import { findUserByUsername, usernameKeyFromDisplayName } from "@auth-membership/domain/username";
 import { validateCs2RanksForRegistration, normalizeCs2PeakPremierRank } from "@auth-membership/domain/game-profile";
 import { isTournamentRegistrationLive } from "../domain/registration-window";
 import { syncUserRank } from "./rank-sync.service";
@@ -20,14 +20,13 @@ export type TournamentRegisterInput = {
 
 export type FifaRegisterInput = {
   teamName: string;
-  partnerAccountId: string;
+  partnerUsername: string;
 };
 
 export type RegistrationEligibility = {
   canRegister: boolean;
   missing: string[];
   displayName: string | null;
-  accountId: string | null;
   email: string | null;
   phone: string | null;
   olympusId: string | null;
@@ -111,7 +110,6 @@ function buildEligibilityFromUser(
   user: {
     email: string | null;
     phone: string | null;
-    accountId: string | null;
     dateOfBirth: Date | null;
     olympusId: string | null;
     riotGameName: string | null;
@@ -135,7 +133,6 @@ function buildEligibilityFromUser(
     canRegister: missing.length === 0,
     missing,
     displayName: user.playerProfile?.displayName ?? user.name,
-    accountId: user.accountId,
     email: user.email,
     phone: user.phone,
     olympusId: user.olympusId,
@@ -178,7 +175,6 @@ export async function getRegistrationEligibility(
 }
 
 function userSnapshotFields(user: {
-  accountId: string | null;
   phone: string | null;
   dateOfBirth: Date | null;
   olympusId: string | null;
@@ -192,7 +188,6 @@ function userSnapshotFields(user: {
   return {
     snapshotDisplayName: user.playerProfile?.displayName ?? user.name,
     snapshotPhone: user.phone,
-    snapshotAccountId: user.accountId,
     snapshotOlympusId: user.olympusId,
     snapshotDateOfBirth: user.dateOfBirth,
     snapshotRiotId:
@@ -384,19 +379,19 @@ export async function registerFifaTeam(
     return { ok: false, error: missing[0] };
   }
 
-  const partnerAccountId = normalizeAccountId(input.partnerAccountId);
+  const partnerUsername = input.partnerUsername.trim();
 
-  if (initiator.accountId === partnerAccountId) {
+  if (
+    usernameKeyFromDisplayName(initiator.playerProfile?.displayName ?? "") ===
+    usernameKeyFromDisplayName(partnerUsername)
+  ) {
     return { ok: false, error: "You cannot register yourself as your own partner." };
   }
 
-  const partner = await prisma.user.findUnique({
-    where: { accountId: partnerAccountId },
-    include: { playerProfile: true },
-  });
+  const partner = await findUserByUsername(partnerUsername);
 
   if (!partner) {
-    return { ok: false, error: "Partner Account ID not found. They must sign up first." };
+    return { ok: false, error: "Partner username not found. They must sign up first." };
   }
 
   if (!partner.signupCompleted) {
@@ -430,6 +425,8 @@ export async function registerFifaTeam(
   const sortOrder = (tournament.tournamentTeams[0]?.sortOrder ?? -1) + 1;
   const partnerDisplayName =
     partner.playerProfile?.displayName ?? partner.name ?? "Player";
+  const initiatorDisplayName =
+    initiator.playerProfile?.displayName ?? initiator.name ?? "Captain";
 
   try {
     const captainReg = await prisma.$transaction(async (tx) => {
@@ -451,7 +448,7 @@ export async function registerFifaTeam(
           teamName,
           partnerUserId: partner.id,
           partnerName: partnerDisplayName,
-          snapshotPartnerAccountId: partner.accountId,
+          snapshotPartnerUsername: partnerDisplayName,
           ...userSnapshotFields(initiator),
           status: "APPROVED",
         },
@@ -464,6 +461,9 @@ export async function registerFifaTeam(
           participantRole: "PLAYER",
           teamId: team.id,
           teamName,
+          partnerUserId: initiator.id,
+          partnerName: initiatorDisplayName,
+          snapshotPartnerUsername: initiatorDisplayName,
           ...userSnapshotFields(partner),
           status: "APPROVED",
         },
@@ -496,14 +496,22 @@ export type SetPlacementInput = {
 export async function setTournamentPlacements(
   slug: string,
   placements: SetPlacementInput[],
+  options?: { clearRoles?: import("@prisma/client").PlacementRole[] },
 ): Promise<{ ok: true } | { ok: false; error: string }> {
   const tournament = await prisma.tournament.findUnique({ where: { slug } });
   if (!tournament) {
     return { ok: false, error: "Tournament not found." };
   }
 
-  await prisma.$transaction(
-    placements.map((p) =>
+  const clearRoles = options?.clearRoles ?? [];
+
+  await prisma.$transaction([
+    ...clearRoles.map((role) =>
+      prisma.tournamentPlacement.deleteMany({
+        where: { tournamentId: tournament.id, role },
+      }),
+    ),
+    ...placements.map((p) =>
       prisma.tournamentPlacement.upsert({
         where: {
           tournamentId_role: { tournamentId: tournament.id, role: p.role },
@@ -520,7 +528,7 @@ export async function setTournamentPlacements(
         },
       }),
     ),
-  );
+  ]);
 
   return { ok: true };
 }
@@ -563,7 +571,6 @@ export async function buildRegistrationSnapshotForUser(
       data: {
         snapshotDisplayName: string | null;
         snapshotPhone: string | null;
-        snapshotAccountId: string | null;
         snapshotOlympusId: string | null;
         snapshotDateOfBirth: Date | null;
         snapshotRiotId: string | null;
@@ -622,7 +629,7 @@ export async function adminAddTournamentRegistration(
   slug: string,
   input: {
     userId?: string;
-    accountId?: string;
+    username?: string;
     email?: string;
     participantRole?: RegistrationParticipantRole;
     teamName?: string;
@@ -635,13 +642,9 @@ export async function adminAddTournamentRegistration(
   if (!tournament) return { ok: false, error: "Tournament not found." };
 
   let userId = input.userId?.trim();
-  if (!userId && input.accountId?.trim()) {
-    const accountId = normalizeAccountId(input.accountId);
-    const byAccount = await prisma.user.findUnique({
-      where: { accountId },
-      select: { id: true },
-    });
-    userId = byAccount?.id;
+  if (!userId && input.username?.trim()) {
+    const byUsername = await findUserByUsername(input.username);
+    userId = byUsername?.id;
   }
   if (!userId && input.email?.trim()) {
     const byEmail = await prisma.user.findFirst({

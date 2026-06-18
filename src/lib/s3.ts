@@ -75,6 +75,12 @@ export async function deleteFromS3(key: string): Promise<void> {
 const ALLOWED_TYPES = new Set(["image/jpeg", "image/png", "image/webp"]);
 const MAX_BYTES = 5 * 1024 * 1024;
 const TEAM_LOGO_MAX_BYTES = 10 * 1024 * 1024;
+const RULEBOOK_MAX_BYTES = 15 * 1024 * 1024;
+const RULEBOOK_TYPES = new Set([
+  "application/pdf",
+  "application/msword",
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+]);
 
 export function validateImageUpload(
   file: File,
@@ -121,9 +127,57 @@ export function validateTeamLogoUpload(
   return validateImageUpload(file, TEAM_LOGO_MAX_BYTES);
 }
 
-export function sanitizeUploadKey(prefix: string, filename: string): string {
+export function validateRulebookUpload(
+  file: File,
+): { ok: true } | { ok: false; error: string } {
+  if (!RULEBOOK_TYPES.has(file.type)) {
+    return { ok: false, error: "Only PDF and Word documents (.pdf, .doc, .docx) are allowed." };
+  }
+  if (file.size > RULEBOOK_MAX_BYTES) {
+    return { ok: false, error: "Rulebook must be 15 MB or smaller." };
+  }
+  return { ok: true };
+}
+
+export function validateDocumentBuffer(
+  buffer: Buffer,
+  fileName: string,
+): { ok: true; contentType: string } | { ok: false; error: string } {
+  const ext = fileName.split(".").pop()?.toLowerCase() ?? "";
+  if (buffer.length >= 4 && buffer.toString("ascii", 0, 4) === "%PDF") {
+    return { ok: true, contentType: "application/pdf" };
+  }
+  if (
+    buffer.length >= 4 &&
+    buffer[0] === 0xd0 &&
+    buffer[1] === 0xcf &&
+    buffer[2] === 0x11 &&
+    buffer[3] === 0xe0
+  ) {
+    return { ok: true, contentType: "application/msword" };
+  }
+  if (
+    buffer.length >= 4 &&
+    buffer[0] === 0x50 &&
+    buffer[1] === 0x4b &&
+    buffer[2] === 0x03 &&
+    buffer[3] === 0x04 &&
+    ext === "docx"
+  ) {
+    return {
+      ok: true,
+      contentType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    };
+  }
+  return { ok: false, error: "File content is not a valid PDF or Word document." };
+}
+
+export function sanitizeUploadKey(prefix: string, filename: string, kind: "image" | "document" = "image"): string {
   const ext = filename.split(".").pop()?.toLowerCase().replace(/[^a-z0-9]/g, "") ?? "jpg";
-  const safeExt = ["jpg", "jpeg", "png", "webp"].includes(ext) ? ext : "jpg";
+  const imageExts = ["jpg", "jpeg", "png", "webp"];
+  const docExts = ["pdf", "doc", "docx"];
+  const allowed = kind === "document" ? docExts : imageExts;
+  const safeExt = allowed.includes(ext) ? ext : allowed[0];
   const id = `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
   return `${prefix.replace(/\/$/, "")}/${id}.${safeExt}`;
 }

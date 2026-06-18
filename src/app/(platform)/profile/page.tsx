@@ -15,7 +15,7 @@ async function handleSignOut() {
 }
 
 export const metadata = {
-  title: "Profile — NTG Lounge",
+  title: "Profile",
 };
 
 export default async function ProfilePage() {

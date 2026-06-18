@@ -3,7 +3,7 @@ import { listTournamentsAdmin } from "@tournaments-leagues/index";
 import { prisma } from "@core/database/client";
 import { serverEnv } from "@core/config/env.server";
 
-export const metadata = { title: "Admin Dashboard — NTG" };
+export const metadata = { title: "Admin Dashboard" };
 
 const quickLinks = [
   {

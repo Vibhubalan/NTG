@@ -86,7 +86,7 @@ export default function GameProfilesPanel({
           Game profiles
         </p>
         <p className="mt-2 text-sm text-white/45">
-          Link accounts here for Valorant and CS2 cups. Linked accounts cannot be removed — contact an admin.
+          Link accounts here for Valorant and CS2 cups. Linked accounts cannot be removed. Contact an admin.
         </p>
       </div>
 
@@ -217,7 +217,7 @@ export default function GameProfilesPanel({
           ) : (
             <div className="space-y-3 pt-2">
               <p className="text-xs text-white/45">
-                Enter Faceit rank and/or peak premier rank. Use NA for ranks you don&apos;t have — at least one must be real.
+                Enter Faceit rank and/or peak premier rank. Use NA for ranks you don&apos;t have. At least one must be real.
               </p>
               <div>
                 <label className="mb-1 block text-[10px] uppercase tracking-wider text-white/35">Faceit rank</label>

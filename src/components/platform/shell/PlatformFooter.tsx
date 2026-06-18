@@ -20,6 +20,9 @@ export default function PlatformFooter() {
           <Link href="/gallery" className="text-white/45 transition-colors hover:text-white">
             Moments
           </Link>
+          <Link href="/privacy" className="text-white/45 transition-colors hover:text-white">
+            Privacy
+          </Link>
         </div>
       </div>
     </footer>

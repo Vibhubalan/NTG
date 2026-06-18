@@ -8,7 +8,7 @@ import {
 import { serverEnv } from "@core/config/env.server";
 import type { PrizeSplitRow } from "@core/contracts";
 
-export const metadata = { title: "Edit Cup — Admin" };
+export const metadata = { title: "Edit Cup" };
 
 type Props = { params: Promise<{ slug: string }> };
 
@@ -48,6 +48,7 @@ export default async function AdminTournamentEditPage({ params }: Props) {
     autoManageStatus: t.autoManageStatus,
     hideAfter: t.hideAfter?.toISOString() ?? null,
     bracketUrl: t.bracketUrl,
+    rulebookUrl: t.rulebookUrl,
     tournamentTeams: t.tournamentTeams.map((team) => ({
       id: team.id,
       name: team.name,
@@ -68,10 +69,9 @@ export default async function AdminTournamentEditPage({ params }: Props) {
       displayName: r.snapshotDisplayName,
       email: r.user.email,
       phone: r.snapshotPhone ?? r.user.phone,
-      accountId: r.snapshotAccountId ?? r.user.accountId,
       olympusId: r.snapshotOlympusId ?? r.user.olympusId,
       dateOfBirth: r.snapshotDateOfBirth?.toISOString().slice(0, 10) ?? null,
-      partnerAccountId: r.snapshotPartnerAccountId,
+      partnerUsername: r.snapshotPartnerUsername,
       partnerName: r.partnerName,
       riotId: r.snapshotRiotId,
       rankTier: r.snapshotRankTier,
@@ -89,9 +89,6 @@ export default async function AdminTournamentEditPage({ params }: Props) {
   };
 
   return (
-    <AdminTournamentEditor
-      key={`${t.slug}-${t.updatedAt.toISOString()}`}
-      initial={initial}
-    />
+    <AdminTournamentEditor initial={initial} />
   );
 }

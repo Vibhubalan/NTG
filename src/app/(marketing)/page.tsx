@@ -12,7 +12,7 @@ export const dynamic = "force-dynamic";
 
 export default function MarketingHome() {
   return (
-    <main className="relative min-h-screen">
+    <main id="main-content" className="relative min-h-screen">
       <Hero />
       <SpecsRibbon />
       <Performance />

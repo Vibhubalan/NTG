@@ -38,9 +38,13 @@ import {
 
   getSignupStatus,
 
+  abandonIncompleteSignup,
+
+  abandonIncompleteSignupWithCredentials,
+
 } from "../application/register.service";
 
-import { getSignupUserId } from "../infrastructure/signup-session";
+import { getSignupPendingId } from "../infrastructure/signup-session";
 
 import { linkRiotAccount } from "../application/riot-link.service";
 
@@ -130,11 +134,10 @@ export async function handleRegisterStep1(req: Request) {
 
         ok: true,
 
-        userId: result.userId,
-
         ...(result.resumeStep ? { resumeStep: result.resumeStep } : {}),
 
         ...(result.devOtp ? { devOtp: result.devOtp } : {}),
+        ...(result.devOtpHint ? { devOtpHint: result.devOtpHint } : {}),
 
       },
 
@@ -142,7 +145,9 @@ export async function handleRegisterStep1(req: Request) {
 
     );
 
-  } catch {
+  } catch (err) {
+
+    console.error("[register step-1]", err);
 
     return NextResponse.json({ error: "Registration failed." }, { status: 500 });
 
@@ -156,7 +161,7 @@ export async function handleSendOtp() {
 
   try {
 
-    const userId = await getSignupUserId();
+    const userId = await getSignupPendingId();
 
     if (!userId) {
 
@@ -181,6 +186,7 @@ export async function handleSendOtp() {
       ok: true,
 
       ...(result.devOtp ? { devOtp: result.devOtp } : {}),
+      ...(result.devOtpHint ? { devOtpHint: result.devOtpHint } : {}),
 
     });
 
@@ -198,7 +204,7 @@ export async function handleSignupStatus() {
 
   try {
 
-    const userId = await getSignupUserId();
+    const userId = await getSignupPendingId();
 
     if (!userId) {
 
@@ -222,13 +228,69 @@ export async function handleSignupStatus() {
 
 
 
+export async function handleAbandonSignup(req?: Request) {
+
+  try {
+
+    if (req) {
+      let body: { email?: string; password?: string } = {};
+      try {
+        body = await req.json();
+      } catch {
+        body = {};
+      }
+
+      if (body.email && body.password) {
+        const result = await abandonIncompleteSignupWithCredentials(
+          body.email,
+          body.password,
+        );
+        if (!result.ok) {
+          return NextResponse.json({ error: result.error }, { status: 400 });
+        }
+        return NextResponse.json({ ok: true });
+      }
+    }
+
+    const userId = await getSignupPendingId();
+
+    if (!userId) {
+
+      return NextResponse.json({ ok: true });
+
+    }
+
+
+
+    const result = await abandonIncompleteSignup(userId);
+
+    if (!result.ok) {
+
+      return NextResponse.json({ error: result.error }, { status: 400 });
+
+    }
+
+
+
+    return NextResponse.json({ ok: true });
+
+  } catch {
+
+    return NextResponse.json({ error: "Could not restart signup." }, { status: 500 });
+
+  }
+
+}
+
+
+
 export async function handleVerifyOtp(req: Request) {
 
   try {
 
-    const userId = await getSignupUserId();
+    const pendingId = await getSignupPendingId();
 
-    if (!userId) {
+    if (!pendingId) {
 
       return NextResponse.json({ error: "Signup session expired." }, { status: 401 });
 
@@ -254,7 +316,7 @@ export async function handleVerifyOtp(req: Request) {
 
 
 
-    const result = await verifyOtpStep2(userId, parsed.data.code);
+    const result = await verifyOtpStep2(pendingId, parsed.data.code);
 
     if (!result.ok) {
 
@@ -280,7 +342,7 @@ export async function handleSelectGames(req: Request) {
 
   try {
 
-    const userId = await getSignupUserId();
+    const userId = await getSignupPendingId();
 
     if (!userId) {
 
@@ -334,7 +396,7 @@ export async function handleLinkRiotSignup(req: Request) {
 
   try {
 
-    const userId = await getSignupUserId();
+    const userId = await getSignupPendingId();
 
     if (!userId) {
 
@@ -392,7 +454,7 @@ export async function handleLinkSteamSignup(req: Request) {
 
   try {
 
-    const userId = await getSignupUserId();
+    const userId = await getSignupPendingId();
 
     if (!userId) {
 
@@ -450,7 +512,7 @@ export async function handleCompleteSignup() {
 
   try {
 
-    const userId = await getSignupUserId();
+    const userId = await getSignupPendingId();
 
     if (!userId) {
 
@@ -811,6 +873,7 @@ export async function handleLoginCheck(req: Request) {
       resumeStep: block.resumeStep,
 
       ...(block.devOtp ? { devOtp: block.devOtp } : {}),
+      ...(block.devOtpHint ? { devOtpHint: block.devOtpHint } : {}),
 
     });
 

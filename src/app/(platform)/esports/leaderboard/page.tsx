@@ -4,7 +4,7 @@ import { getValorantRankings } from "@tournaments-leagues/index";
 export const dynamic = "force-dynamic";
 
 export const metadata = {
-  title: "Rankings — NTG Esports",
+  title: { absolute: "Rankings | NTG Esports" },
 };
 
 export default async function EsportsLeaderboardPage() {

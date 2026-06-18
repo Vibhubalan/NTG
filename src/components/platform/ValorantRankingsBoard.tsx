@@ -6,46 +6,10 @@ import type { LeaderboardPreview, LeaderboardPreviewEntry } from "@core/contract
 import {
   formatRankLabel,
   rankAccentClass,
-  rankEloFromTier,
   rankIconUrl,
 } from "@/lib/valorant-rank";
 
 const PAGE_SIZE = 10;
-
-function placeholderEntry(
-  displayName: string,
-  riotId: string,
-  rankTier: string,
-  rankTierId: number,
-  rr: number,
-): LeaderboardPreviewEntry {
-  return {
-    rank: 0,
-    displayName,
-    riotId,
-    mmr: rankEloFromTier(rankTierId, rr),
-    rankTier,
-    rankTierId,
-    peakMmr: null,
-    lastSyncedAt: null,
-    game: "VALORANT",
-  };
-}
-
-const DUMMY_ENTRIES: LeaderboardPreviewEntry[] = [
-  placeholderEntry("rxven", "rxven#NTG", "Immortal 3", 26, 67),
-  placeholderEntry("viperX", "viperX#MGU", "Immortal 2", 25, 44),
-  placeholderEntry("jettMain", "jett#JETT", "Immortal 1", 24, 58),
-  placeholderEntry("ShadowStrike", "Shadow#NTG", "Ascendant 3", 23, 71),
-  placeholderEntry("neonRush", "neon#RUSH", "Ascendant 2", 22, 39),
-  placeholderEntry("MangaIGL", "MangaIGL#MGU", "Ascendant 1", 21, 52),
-  placeholderEntry("Nexus7", "Nexus#77", "Diamond 3", 20, 63),
-  placeholderEntry("clutchgod", "clutch#GOD", "Diamond 2", 19, 41),
-  placeholderEntry("ZephyrVal", "Zephyr#VAL", "Diamond 1", 18, 28),
-  placeholderEntry("PhoenixNTG", "Phoenix#NTG", "Platinum 3", 17, 55),
-  placeholderEntry("BlazeShot", "Blaze#SHOT", "Platinum 2", 16, 33),
-  placeholderEntry("AceKing", "Ace#KING", "Platinum 1", 15, 76),
-];
 
 function sortByMmr(entries: LeaderboardPreviewEntry[]): LeaderboardPreviewEntry[] {
   return [...entries]
@@ -93,15 +57,7 @@ export default function ValorantRankingsBoard({ data }: Props) {
   const [query, setQuery] = useState("");
   const [page, setPage] = useState(1);
 
-  const sorted = useMemo(() => {
-    const realKeys = new Set(
-      data.entries.map((e) => (e.riotId ?? e.displayName).toLowerCase()),
-    );
-    const extras = DUMMY_ENTRIES.filter(
-      (d) => !realKeys.has((d.riotId ?? d.displayName).toLowerCase()),
-    );
-    return sortByMmr([...data.entries, ...extras]);
-  }, [data.entries]);
+  const sorted = useMemo(() => sortByMmr(data.entries), [data.entries]);
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -128,6 +84,11 @@ export default function ValorantRankingsBoard({ data }: Props) {
     if (page > totalPages) setPage(totalPages);
   }, [page, totalPages]);
 
+  const goToPage = (newPage: number) => {
+    setPage(newPage);
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
   return (
     <div className="relative w-full">
       {/* Hero */}
@@ -147,7 +108,7 @@ export default function ValorantRankingsBoard({ data }: Props) {
           Who runs Mangaluru?
         </h2>
         <p className="relative mt-4 max-w-xl text-base leading-relaxed text-white/45">
-          NTG players with linked Riot IDs — sorted by current RR. Link yours at
+          NTG players with linked Riot IDs, sorted by current RR. Link yours at
           signup to join the board.
         </p>
       </div>
@@ -316,28 +277,28 @@ export default function ValorantRankingsBoard({ data }: Props) {
             <PaginationBtn
               label="First page"
               disabled={safePage <= 1}
-              onClick={() => setPage(1)}
+              onClick={() => goToPage(1)}
             >
               |&lt;
             </PaginationBtn>
             <PaginationBtn
               label="Previous page"
               disabled={safePage <= 1}
-              onClick={() => setPage((p) => Math.max(1, p - 1))}
+              onClick={() => goToPage(Math.max(1, safePage - 1))}
             >
               &lt;
             </PaginationBtn>
             <PaginationBtn
               label="Next page"
               disabled={safePage >= totalPages}
-              onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+              onClick={() => goToPage(Math.min(totalPages, safePage + 1))}
             >
               &gt;
             </PaginationBtn>
             <PaginationBtn
               label="Last page"
               disabled={safePage >= totalPages}
-              onClick={() => setPage(totalPages)}
+              onClick={() => goToPage(totalPages)}
             >
               &gt;|
             </PaginationBtn>

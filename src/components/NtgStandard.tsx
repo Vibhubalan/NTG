@@ -26,7 +26,7 @@ export default function NtgStandard() {
         className="mb-14 text-center"
       >
         <span className="text-[10px] font-medium uppercase tracking-[0.4em] text-[var(--color-brand)]/80">
-          04 — Heritage
+          04 · Heritage
         </span>
         <h2 className="mt-3 font-display text-4xl font-semibold tracking-[-0.02em] text-white sm:text-5xl">
           What <span className="font-display italic font-light text-white/55">does</span>{" "}
@@ -82,7 +82,7 @@ export default function NtgStandard() {
             Born in the Tulunad heartland of coastal Karnataka.
             NTG is a love letter from{" "}
             <span className="text-gradient-brand font-medium">Mangaluru</span>{" "}
-            to the players who&apos;ve made it home — a lounge built by the
+            to the players who&apos;ve made it home: a lounge built by the
             community, for the community.
           </motion.p>
         </div>

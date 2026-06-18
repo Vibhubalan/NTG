@@ -17,9 +17,9 @@ function sign(payload: string): string {
   return createHmac("sha256", getSecret()).update(payload).digest("hex");
 }
 
-export async function setSignupSession(userId: string): Promise<void> {
+export async function setSignupSession(pendingSignupId: string): Promise<void> {
   const exp = Date.now() + MAX_AGE_SEC * 1000;
-  const payload = `${userId}.${exp}`;
+  const payload = `${pendingSignupId}.${exp}`;
   const token = `${payload}.${sign(payload)}`;
   const jar = await cookies();
   jar.set(COOKIE_NAME, token, {
@@ -31,7 +31,8 @@ export async function setSignupSession(userId: string): Promise<void> {
   });
 }
 
-export async function getSignupUserId(): Promise<string | null> {
+/** Pending signup id stored in the signup cookie (no User row until OTP verified). */
+export async function getSignupPendingId(): Promise<string | null> {
   const jar = await cookies();
   const token = jar.get(COOKIE_NAME)?.value;
   if (!token) return null;
@@ -39,8 +40,8 @@ export async function getSignupUserId(): Promise<string | null> {
   const parts = token.split(".");
   if (parts.length !== 3) return null;
 
-  const [userId, expStr, sig] = parts;
-  const payload = `${userId}.${expStr}`;
+  const [pendingSignupId, expStr, sig] = parts;
+  const payload = `${pendingSignupId}.${expStr}`;
   const expected = sign(payload);
 
   try {
@@ -52,9 +53,14 @@ export async function getSignupUserId(): Promise<string | null> {
   }
 
   const exp = Number(expStr);
-  if (!userId || !exp || Date.now() > exp) return null;
+  if (!pendingSignupId || !exp || Date.now() > exp) return null;
 
-  return userId;
+  return pendingSignupId;
+}
+
+/** @deprecated Use getSignupPendingId — kept for legacy signup-step handlers. */
+export async function getSignupUserId(): Promise<string | null> {
+  return getSignupPendingId();
 }
 
 export async function clearSignupSession(): Promise<void> {

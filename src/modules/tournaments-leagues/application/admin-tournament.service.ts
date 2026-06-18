@@ -30,9 +30,10 @@ export type CreateTournamentInput = {
   autoManageStatus?: boolean;
   prizePool?: number;
   prizeNotes?: string;
-  prizeSplit?: PrizeSplitRow[];
+  prizeSplit?: PrizeSplitRow[] | null;
   bracketUrl?: string;
   posterUrl?: string;
+  rulebookUrl?: string;
   hubBannerUrl?: string;
   hubCarouselImages?: string[];
   showOnEsportsHub?: boolean;
@@ -147,6 +148,7 @@ export async function createTournament(
       prizeSplit: prizeSplit ? (prizeSplit as unknown as Prisma.InputJsonValue) : undefined,
       bracketUrl: input.bracketUrl?.trim() || null,
       posterUrl: input.posterUrl?.trim() || null,
+      rulebookUrl: input.rulebookUrl?.trim() || null,
       hubBannerUrl: input.hubBannerUrl?.trim() || null,
       hubCarouselImages: input.hubCarouselImages?.length
         ? (input.hubCarouselImages as unknown as Prisma.InputJsonValue)
@@ -158,10 +160,63 @@ export async function createTournament(
   return { ok: true, slug };
 }
 
+export type AdminCupFieldsSnapshot = {
+  name: string;
+  game: GameSlug;
+  gameLabel: string | null;
+  status: TournamentStatus;
+  description: string | null;
+  posterUrl: string | null;
+  hubBannerUrl: string | null;
+  hubCarouselImages: string[];
+  showOnEsportsHub: boolean;
+  prizePool: string | null;
+  prizeNotes: string | null;
+  prizeSplit: PrizeSplitRow[] | null;
+  startsAt: string | null;
+  endsAt: string | null;
+  registrationOpensAt: string | null;
+  registrationClosesAt: string | null;
+  autoManageStatus: boolean;
+  bracketUrl: string | null;
+  rulebookUrl: string | null;
+};
+
+function parseCarouselImages(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+  return value.filter((v): v is string => typeof v === "string");
+}
+
+export function toAdminCupFieldsSnapshot(
+  t: NonNullable<Awaited<ReturnType<typeof getTournamentAdmin>>>,
+): AdminCupFieldsSnapshot {
+  return {
+    name: t.name,
+    game: t.game,
+    gameLabel: t.gameLabel,
+    status: t.status,
+    description: t.description,
+    posterUrl: t.posterUrl,
+    hubBannerUrl: t.hubBannerUrl,
+    hubCarouselImages: parseCarouselImages(t.hubCarouselImages),
+    showOnEsportsHub: t.showOnEsportsHub,
+    prizePool: t.prizePool?.toString() ?? null,
+    prizeNotes: t.prizeNotes,
+    prizeSplit: parsePrizeSplit(t.prizeSplit),
+    startsAt: t.startsAt?.toISOString() ?? null,
+    endsAt: t.endsAt?.toISOString() ?? null,
+    registrationOpensAt: t.registrationOpensAt?.toISOString() ?? null,
+    registrationClosesAt: t.registrationClosesAt?.toISOString() ?? null,
+    autoManageStatus: t.autoManageStatus,
+    bracketUrl: t.bracketUrl,
+    rulebookUrl: t.rulebookUrl,
+  };
+}
+
 export async function updateTournamentFull(
   slug: string,
   input: UpdateTournamentInput,
-): Promise<{ ok: true } | { ok: false; error: string }> {
+): Promise<{ ok: true; tournament: AdminCupFieldsSnapshot } | { ok: false; error: string }> {
   const tournament = await prisma.tournament.findUnique({ where: { slug } });
   if (!tournament) return { ok: false, error: "Tournament not found." };
 
@@ -195,15 +250,19 @@ export async function updateTournamentFull(
       : null;
   }
   if (input.autoManageStatus !== undefined) data.autoManageStatus = input.autoManageStatus;
-  if (input.prizePool !== undefined) data.prizePool = input.prizePool;
+  if (input.prizePool !== undefined) {
+    data.prizePool = input.prizePool;
+  }
   if (input.prizeNotes !== undefined) data.prizeNotes = input.prizeNotes?.trim() || null;
   if (input.prizeSplit !== undefined) {
-    data.prizeSplit = input.prizeSplit.length
-      ? (input.prizeSplit as unknown as Prisma.InputJsonValue)
-      : Prisma.JsonNull;
+    data.prizeSplit =
+      input.prizeSplit && input.prizeSplit.length
+        ? (input.prizeSplit as unknown as Prisma.InputJsonValue)
+        : Prisma.JsonNull;
   }
   if (input.bracketUrl !== undefined) data.bracketUrl = input.bracketUrl?.trim() || null;
   if (input.posterUrl !== undefined) data.posterUrl = input.posterUrl?.trim() || null;
+  if (input.rulebookUrl !== undefined) data.rulebookUrl = input.rulebookUrl?.trim() || null;
   if (input.hubBannerUrl !== undefined) data.hubBannerUrl = input.hubBannerUrl?.trim() || null;
   if (input.hubCarouselImages !== undefined) {
     data.hubCarouselImages = input.hubCarouselImages.length
@@ -278,7 +337,10 @@ export async function updateTournamentFull(
     }
   }
 
-  return { ok: true };
+  const saved = await getTournamentAdmin(slug);
+  if (!saved) return { ok: false, error: "Tournament not found after save." };
+
+  return { ok: true, tournament: toAdminCupFieldsSnapshot(saved) };
 }
 
 export async function deleteTournament(
@@ -527,10 +589,9 @@ export type AdminRegistrationRow = {
   displayName: string | null;
   email: string | null;
   phone: string | null;
-  accountId: string | null;
   olympusId: string | null;
   dateOfBirth: string | null;
-  partnerAccountId: string | null;
+  partnerUsername: string | null;
   partnerName: string | null;
   riotId: string | null;
   rankTier: string | null;
@@ -570,10 +631,9 @@ export async function listTournamentRegistrationsAdmin(
       displayName: r.snapshotDisplayName,
       email: r.user.email,
       phone: r.snapshotPhone ?? r.user.phone,
-      accountId: r.snapshotAccountId ?? r.user.accountId,
       olympusId: r.snapshotOlympusId ?? r.user.olympusId,
       dateOfBirth: r.snapshotDateOfBirth?.toISOString().slice(0, 10) ?? null,
-      partnerAccountId: r.snapshotPartnerAccountId,
+      partnerUsername: r.snapshotPartnerUsername,
       partnerName: r.partnerName,
       riotId: r.snapshotRiotId,
       rankTier: r.snapshotRankTier,
@@ -638,12 +698,11 @@ export function buildRegistrationsCsv(
       "Name",
       "Email",
       "Phone",
-      "Account ID",
       "Olympus ID",
       "DOB",
       "Role",
       "Team",
-      "Partner Account ID",
+      "Partner Username",
       "Partner Name",
       "Registered At",
     ];
@@ -688,12 +747,11 @@ export function buildRegistrationsCsv(
           csvEscape(r.displayName),
           csvEscape(r.email),
           csvEscape(r.phone),
-          csvEscape(r.accountId),
           csvEscape(r.olympusId),
           csvEscape(r.dateOfBirth),
           csvEscape(role),
           csvEscape(r.teamName),
-          csvEscape(r.partnerAccountId),
+          csvEscape(r.partnerUsername),
           csvEscape(r.partnerName),
           csvEscape(at),
         ].join(","),

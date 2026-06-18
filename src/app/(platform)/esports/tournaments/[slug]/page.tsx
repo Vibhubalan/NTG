@@ -1,6 +1,5 @@
 import { notFound } from "next/navigation";
 import TournamentDetailView from "@/components/platform/TournamentDetailView";
-import { mergeTournamentDetail, STATIC_TOURNAMENT_DETAIL, useStaticTournamentDetail } from "@/lib/tournament-static-detail";
 import { fetchChallongeBracket } from "@/lib/challonge-api";
 import { getSession } from "@core/auth/session";
 import { requireAdmin } from "@core/auth/require-admin";
@@ -11,7 +10,7 @@ type Props = { params: Promise<{ slug: string }> };
 export async function generateMetadata({ params }: Props) {
   const { slug } = await params;
   const t = await getTournamentDetail(slug);
-  return { title: t ? `${t.name} — NTG Lounge` : "Tournament — NTG Lounge" };
+  return { title: t ? t.name : "Tournament" };
 }
 
 export default async function TournamentDetailPage({ params }: Props) {
@@ -20,20 +19,10 @@ export default async function TournamentDetailPage({ params }: Props) {
   const userId = session?.user?.id;
   const raw = await getTournamentDetail(slug, userId);
   if (!raw) notFound();
-  const tournament = mergeTournamentDetail(raw);
+  const tournament = raw;
   const bracket = tournament.bracketUrl
     ? await fetchChallongeBracket(tournament.bracketUrl)
     : null;
-
-  if (bracket && tournament.teams.length === 0 && bracket.participants.length > 0) {
-    tournament.teams = bracket.participants;
-  }
-
-  const staticOverlay = useStaticTournamentDetail ? STATIC_TOURNAMENT_DETAIL[slug] : undefined;
-  const staticMvp = staticOverlay?.placements?.mvp ?? null;
-  if (bracket && staticMvp) {
-    bracket.mvp = staticMvp;
-  }
 
   const admin = await requireAdmin();
   const registrationPreview = userId
@@ -45,7 +34,6 @@ export default async function TournamentDetailPage({ params }: Props) {
       <TournamentDetailView
         tournament={tournament}
         bracket={bracket}
-        staticMvp={staticMvp}
         isLoggedIn={!!userId}
         registrationPreview={registrationPreview}
       />

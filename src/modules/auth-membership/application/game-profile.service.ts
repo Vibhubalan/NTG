@@ -1,6 +1,11 @@
 import { prisma } from "@core/database/client";
 import type { PlayedGame, ValorantRole } from "@prisma/client";
-import { assignUniqueAccountId } from "../domain/account-id";
+import {
+  isOlympusIdTaken,
+  isUsernameTaken,
+  olympusIdKeyFromValue,
+  usernameKeyFromDisplayName,
+} from "../domain/username";
 import {
   parsePlayedGames,
   validateValorantRoles,
@@ -11,7 +16,6 @@ import { clearSignupSession } from "../infrastructure/signup-session";
 
 export type PlayerGameProfile = {
   userId: string;
-  accountId: string | null;
   displayName: string;
   email: string | null;
   phone: string | null;
@@ -48,7 +52,6 @@ export async function getPlayerGameProfile(userId: string): Promise<PlayerGamePr
   const rank = user.leaderboard[0];
   return {
     userId: user.id,
-    accountId: user.accountId,
     displayName: user.playerProfile.displayName,
     email: user.email,
     phone: user.phone,
@@ -79,10 +82,6 @@ export async function migrateLegacySignupUser(userId: string): Promise<void> {
     include: { playerProfile: true },
   });
   if (!user) return;
-
-  if (!user.accountId) {
-    await assignUniqueAccountId(userId).catch(() => {});
-  }
 
   if (user.signupCompleted) return;
   if (!user.emailVerified || !user.playerProfile) return;
@@ -160,7 +159,7 @@ export async function updateAccountInfo(
   userId: string,
   input: { dateOfBirth?: string; olympusId?: string },
 ): Promise<{ ok: true } | { ok: false; error: string }> {
-  const data: { dateOfBirth?: Date; olympusId?: string } = {};
+  const data: { dateOfBirth?: Date; olympusId?: string; olympusIdKey?: string } = {};
   if (input.dateOfBirth) {
     const d = new Date(`${input.dateOfBirth}T00:00:00`);
     if (Number.isNaN(d.getTime())) {
@@ -171,7 +170,11 @@ export async function updateAccountInfo(
   if (input.olympusId !== undefined) {
     const trimmed = input.olympusId.trim();
     if (!trimmed) return { ok: false, error: "Olympus ID cannot be empty." };
+    if (await isOlympusIdTaken(trimmed, userId)) {
+      return { ok: false, error: "That Olympus ID is already registered to another account." };
+    }
     data.olympusId = trimmed;
+    data.olympusIdKey = olympusIdKeyFromValue(trimmed);
   }
   if (Object.keys(data).length === 0) {
     return { ok: false, error: "Nothing to update." };
@@ -208,10 +211,6 @@ export async function tryCompleteSignup(
   }
   if (!user.playerProfile) {
     return { ok: false, error: "Profile not found." };
-  }
-
-  if (!user.accountId) {
-    await assignUniqueAccountId(userId);
   }
 
   await prisma.user.update({

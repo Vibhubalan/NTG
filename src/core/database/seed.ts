@@ -76,7 +76,8 @@ async function main() {
         : null;
 
     const placement = samplePlacements[t.id];
-    const status = mapStatus(t);
+    const isLiveFifaCup = t.id === "fc26-cup-1";
+    const status = isLiveFifaCup ? "REGISTRATION_OPEN" : mapStatus(t);
 
     const tournament = await prisma.tournament.upsert({
       where: { slug: t.id },
@@ -92,6 +93,7 @@ async function main() {
         prizeNotes: t.id === "fc26-cup-1" ? "2v2 · PS5 · Top 8" : null,
         registrationUrl: null,
         hideAfter,
+        showOnEsportsHub: isLiveFifaCup,
       },
       update: {
         name: t.name,
@@ -104,6 +106,7 @@ async function main() {
         prizeNotes: t.id === "fc26-cup-1" ? "2v2 · PS5 · Top 8" : null,
         registrationUrl: null,
         hideAfter,
+        showOnEsportsHub: isLiveFifaCup,
       },
     });
 

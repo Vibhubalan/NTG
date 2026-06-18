@@ -10,7 +10,6 @@ type Member = {
   email: string | null;
   name: string | null;
   phone: string | null;
-  accountId: string | null;
   dateOfBirth: string | null;
   age: number | null;
   olympusId: string | null;
@@ -44,7 +43,6 @@ export default function AdminMembersPanel({ initialMembers }: { initialMembers: 
       m.email?.toLowerCase().includes(q) ||
       m.name?.toLowerCase().includes(q) ||
       m.displayName?.toLowerCase().includes(q) ||
-      m.accountId?.toLowerCase().includes(q) ||
       m.olympusId?.toLowerCase().includes(q) ||
       m.riotId?.toLowerCase().includes(q)
     );
@@ -167,7 +165,7 @@ export default function AdminMembersPanel({ initialMembers }: { initialMembers: 
               className={`${inputClass} pl-10`}
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search by name, email, Account ID, or Olympus ID..."
+              placeholder="Search by name, email, username, or Olympus ID..."
             />
           </div>
 
@@ -200,8 +198,8 @@ export default function AdminMembersPanel({ initialMembers }: { initialMembers: 
                       <div className="min-w-0 flex-1">
                         <p className="font-semibold text-sm truncate">{m.displayName ?? m.name ?? m.email}</p>
                         <p className="text-xs text-white/40 truncate mt-0.5">
-                          {m.accountId ? (
-                            <span className="font-mono text-[var(--color-brand)]/80">{m.accountId}</span>
+                          {m.displayName ? (
+                            <span className="text-[var(--color-brand)]/80">@{m.displayName}</span>
                           ) : (
                             m.email
                           )}
@@ -315,9 +313,9 @@ export default function AdminMembersPanel({ initialMembers }: { initialMembers: 
                 <p className="text-[10px] font-bold uppercase tracking-wider text-white/40">Membership details</p>
                 <dl className="grid gap-2 text-xs">
                   <div className="flex justify-between gap-3">
-                    <dt className="text-white/40">Account ID</dt>
-                    <dd className="font-mono font-semibold text-[var(--color-brand)]/90">
-                      {selected.accountId ?? "—"}
+                    <dt className="text-white/40">Username</dt>
+                    <dd className="font-semibold text-[var(--color-brand)]/90">
+                      {selected.displayName ?? "—"}
                     </dd>
                   </div>
                   <div className="flex justify-between gap-3">

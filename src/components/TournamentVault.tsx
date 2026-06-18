@@ -25,7 +25,7 @@ export default function TournamentVault({ tournaments, registration }: Tournamen
       >
         <div>
           <span className="text-[10px] font-medium uppercase tracking-[0.4em] text-[var(--color-brand)]/80">
-            03 — Trophy Room
+            03 · Trophy Room
           </span>
           <h2 className="mt-3 font-display text-4xl font-semibold tracking-[-0.02em] text-white sm:text-5xl">
             Cups <span className="font-display italic font-light text-white/55">we&apos;ve</span>{" "}
@@ -33,7 +33,7 @@ export default function TournamentVault({ tournaments, registration }: Tournamen
           </h2>
         </div>
         <p className="max-w-sm text-white/55">
-          Seven cups on the board, two more loading. The NTG tournament vault —
+          Seven cups on the board, two more loading. The NTG tournament vault:
           every champion etched into the lounge&apos;s history.
         </p>
       </motion.div>

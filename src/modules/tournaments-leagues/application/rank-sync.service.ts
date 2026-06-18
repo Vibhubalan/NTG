@@ -4,10 +4,10 @@ import { henrikFetch, henrikHeaders } from "@/lib/henrik-client";
 import { GameSlug } from "@prisma/client";
 
 const PLATFORM = "pc";
-/** Stop cron batch before typical serverless limit; continuation via `after()`. */
-const DEFAULT_CRON_BUDGET_MS = 100_000;
-/** Cron every 6h — re-sync if older than ~5.5h (skips unchanged rows). */
-const STALE_AFTER_MS = 5.5 * 60 * 60 * 1_000;
+/** Daily cron processes at most this many players per batch (~28 req/min with Henrik spacing). */
+export const RANK_SYNC_MAX_BATCH_SIZE = 26;
+const SYNC_RETRY_ATTEMPTS = 3;
+const SYNC_RETRY_BASE_MS = 1_500;
 
 export type MmrSnapshot = {
   mmr: number;
@@ -32,6 +32,10 @@ type HenrikV3MmrResponse = {
     };
   };
 };
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
 
 function parseV3MmrBody(body: HenrikV3MmrResponse): MmrSnapshot | null {
   const current = body.data?.current;
@@ -214,80 +218,134 @@ export async function syncUserRank(
   return { ok: true };
 }
 
+/** Prevents the same user from blocking overnight batches after retryable failures. */
+async function markSyncAttempted(userId: string): Promise<void> {
+  await prisma.leaderboardEntry.updateMany({
+    where: {
+      userId,
+      game: GameSlug.VALORANT,
+      scope: "TOWN",
+      seasonId: null,
+    },
+    data: { lastSyncedAt: new Date() },
+  });
+}
+
+const NON_RETRYABLE_ERRORS = new Set([
+  "Riot ID not linked.",
+  "No competitive rank data found.",
+]);
+
+async function syncUserRankWithRetry(
+  userId: string,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  let last: { ok: false; error: string } = { ok: false, error: "Sync failed." };
+
+  for (let attempt = 0; attempt < SYNC_RETRY_ATTEMPTS; attempt++) {
+    const result = await syncUserRank(userId);
+    if (result.ok) return result;
+
+    last = result;
+    if (NON_RETRYABLE_ERRORS.has(result.error)) return result;
+
+    if (attempt < SYNC_RETRY_ATTEMPTS - 1) {
+      await sleep(SYNC_RETRY_BASE_MS * (attempt + 1));
+    }
+  }
+
+  return last;
+}
+
+type LinkedPlayerFilter = {
+  fullRefreshBefore?: Date;
+};
+
+function linkedPlayerWhere(filter: LinkedPlayerFilter = {}) {
+  const base = {
+    signupCompleted: true,
+    riotPuuid: { not: null },
+    riotGameName: { not: null },
+    riotTagLine: { not: null },
+  } as const;
+
+  if (!filter.fullRefreshBefore) {
+    return base;
+  }
+
+  return {
+    ...base,
+    OR: [
+      {
+        leaderboard: {
+          none: { game: GameSlug.VALORANT, scope: "TOWN", seasonId: null },
+        },
+      },
+      {
+        leaderboard: {
+          some: {
+            game: GameSlug.VALORANT,
+            scope: "TOWN",
+            seasonId: null,
+            lastSyncedAt: { lt: filter.fullRefreshBefore },
+          },
+        },
+      },
+    ],
+  };
+}
+
 export type SyncAllResult = {
   synced: number;
   failed: number;
   skipped: number;
   hasMore: boolean;
   pending: number;
+  batchSize: number;
 };
 
 export async function syncAllLinkedPlayers(options?: {
-  staleOnly?: boolean;
-  timeBudgetMs?: number;
+  /** When set, only players not synced since this timestamp (daily full refresh). */
+  fullRefreshBefore?: Date;
+  maxBatchSize?: number;
 }): Promise<SyncAllResult> {
-  const staleOnly = options?.staleOnly ?? true;
-  const deadline = Date.now() + (options?.timeBudgetMs ?? DEFAULT_CRON_BUDGET_MS);
-  const staleBefore = new Date(Date.now() - STALE_AFTER_MS);
+  const maxBatchSize = Math.min(
+    options?.maxBatchSize ?? RANK_SYNC_MAX_BATCH_SIZE,
+    RANK_SYNC_MAX_BATCH_SIZE,
+  );
+  const where = linkedPlayerWhere({ fullRefreshBefore: options?.fullRefreshBefore });
 
-  const users = await prisma.user.findMany({
-    where: {
-      signupCompleted: true,
-      riotPuuid: { not: null },
-      riotGameName: { not: null },
-      riotTagLine: { not: null },
-      ...(staleOnly
-        ? {
-            OR: [
-              {
-                leaderboard: {
-                  none: { game: GameSlug.VALORANT, scope: "TOWN", seasonId: null },
-                },
-              },
-              {
-                leaderboard: {
-                  some: {
-                    game: GameSlug.VALORANT,
-                    scope: "TOWN",
-                    seasonId: null,
-                    lastSyncedAt: { lt: staleBefore },
-                  },
-                },
-              },
-            ],
-          }
-        : {}),
-    },
-    select: { id: true },
-    orderBy: { updatedAt: "asc" },
-  });
+  const [users, pendingBefore] = await Promise.all([
+    prisma.user.findMany({
+      where,
+      select: { id: true },
+      orderBy: { updatedAt: "asc" },
+      take: maxBatchSize,
+    }),
+    prisma.user.count({ where }),
+  ]);
 
   let synced = 0;
   let failed = 0;
   let skipped = 0;
-  let processed = 0;
-  let stoppedEarly = false;
 
   for (const user of users) {
-    if (Date.now() >= deadline) {
-      stoppedEarly = true;
-      break;
-    }
-
-    const result = await syncUserRank(user.id);
-    processed += 1;
+    const result = await syncUserRankWithRetry(user.id);
     if (result.ok) synced += 1;
     else if (result.error === "No competitive rank data found.") skipped += 1;
-    else failed += 1;
+    else {
+      failed += 1;
+      await markSyncAttempted(user.id).catch(() => {});
+    }
   }
 
-  const pending = users.length - processed;
+  const pending = Math.max(0, pendingBefore - users.length);
 
   return {
     synced,
     failed,
     skipped,
-    hasMore: stoppedEarly && pending > 0,
-    pending: stoppedEarly ? pending : 0,
+    hasMore: pending > 0,
+    pending,
+    batchSize: users.length,
   };
 }

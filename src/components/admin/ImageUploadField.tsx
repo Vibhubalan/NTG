@@ -9,6 +9,8 @@ type Props = {
   onUploaded: (url: string) => void;
   /** Called right after a successful upload (e.g. auto-save to DB) */
   onUploadedComplete?: (url: string) => Promise<void>;
+  /** Remove the current image and clear stored URL */
+  onClear?: () => void | Promise<void>;
   hint?: string;
 };
 
@@ -18,6 +20,7 @@ export default function ImageUploadField({
   currentUrl,
   onUploaded,
   onUploadedComplete,
+  onClear,
   hint,
 }: Props) {
   const [uploading, setUploading] = useState(false);
@@ -62,6 +65,15 @@ export default function ImageUploadField({
         <div className="relative mb-2 h-24 overflow-hidden rounded-xl border border-white/10">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src={currentUrl} alt="" className="h-full w-full object-cover" />
+          {onClear ? (
+            <button
+              type="button"
+              onClick={() => void onClear()}
+              className="absolute right-2 top-2 rounded-lg bg-black/70 px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-white hover:bg-rose-600/90 transition-colors"
+            >
+              Remove
+            </button>
+          ) : null}
         </div>
       ) : null}
       <input

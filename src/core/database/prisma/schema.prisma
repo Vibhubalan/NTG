@@ -108,6 +108,7 @@ model User {
   phone            String?   @unique
   dateOfBirth      DateTime? @db.Date
   olympusId        String?
+  olympusIdKey     String?   @unique
   riotPuuid        String?   @unique
   riotGameName     String?
   riotTagLine      String?
@@ -134,6 +135,7 @@ model User {
   leaderboard   LeaderboardEntry[]
   captainedTeams TournamentTeam[] @relation("TeamCaptain")
   teamPlayers   TournamentTeamPlayer[]
+  adminAuditLogs AdminAuditLog[]
 }
 
 model EmailOtp {
@@ -147,6 +149,22 @@ model EmailOtp {
   createdAt DateTime @default(now())
 
   @@index([email, expiresAt])
+}
+
+/** Step-1 signup data held until email OTP is verified — no User row yet. */
+model PendingSignup {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  phone        String   @unique
+  passwordHash String
+  displayName  String
+  dateOfBirth  DateTime @db.Date
+  olympusId    String
+  olympusIdKey String   @unique
+  expiresAt    DateTime
+  createdAt    DateTime @default(now())
+
+  @@index([expiresAt])
 }
 
 model Account {
@@ -187,6 +205,7 @@ model PlayerProfile {
   userId      String   @unique
   user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   displayName     String
+  usernameKey     String         @unique
   town            String         @default("Mangaluru")
   bio             String?
   playedGames     PlayedGame[]   @default([])
@@ -247,6 +266,7 @@ model Tournament {
   registrationUrl      String?
   hideAfter            DateTime?
   bracketUrl           String?
+  rulebookUrl          String?
   teams                Json?
   createdAt            DateTime         @default(now())
   updatedAt            DateTime         @updatedAt
@@ -309,7 +329,7 @@ model TournamentRegistration {
   partnerName           String?
   partnerUserId         String?
   partner               User?                       @relation("RegistrationPartner", fields: [partnerUserId], references: [id], onDelete: SetNull)
-  snapshotPartnerAccountId String?
+  snapshotPartnerUsername String?
   snapshotOlympusId     String?
   snapshotDateOfBirth   DateTime?                   @db.Date
   snapshotAccountId     String?
@@ -481,4 +501,18 @@ model SocialReelPost {
   active    Boolean  @default(true)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+}
+
+/** Tamper-evident log of admin mutations (no PII in metadata). */
+model AdminAuditLog {
+  id        String   @id @default(cuid())
+  adminId   String
+  admin     User     @relation(fields: [adminId], references: [id], onDelete: Cascade)
+  action    String
+  target    String?
+  metadata  Json?
+  createdAt DateTime @default(now())
+
+  @@index([adminId, createdAt])
+  @@index([action, createdAt])
 }

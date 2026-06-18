@@ -7,7 +7,7 @@ const inputClass =
   "w-full rounded-xl border border-white/10 bg-white/[0.04] px-4 py-2.5 text-sm text-white placeholder:text-white/30 focus:border-[var(--color-brand)]/45 focus:outline-none";
 
 type AccountProfile = {
-  accountId: string | null;
+  displayName: string | null;
   dateOfBirth: string | null;
   olympusId: string | null;
   email: string | null;
@@ -79,9 +79,9 @@ export default function AccountInfoPanel({
       <p className="text-[10px] font-medium uppercase tracking-[0.32em] text-white/40">Account</p>
       <dl className="space-y-3">
         <div className="flex items-center justify-between gap-4 rounded-xl border border-white/[0.08] bg-white/[0.04] px-5 py-6">
-          <dt className="text-xs font-medium uppercase tracking-[0.14em] text-white/50">Account ID</dt>
-          <dd className="font-mono text-xl font-bold tracking-wider text-white">
-            {profile.accountId ?? "—"}
+          <dt className="text-xs font-medium uppercase tracking-[0.14em] text-white/50">Username</dt>
+          <dd className="text-xl font-bold tracking-wide text-white">
+            {profile.displayName ?? "N/A"}
           </dd>
         </div>
         {profile.email ? (
@@ -106,7 +106,8 @@ export default function AccountInfoPanel({
             value={displayDob}
             onChange={handleDobChange}
             placeholder="DD/MM/YYYY"
-            className={inputClass}
+            disabled={!!profile.dateOfBirth}
+            className={`${inputClass} disabled:opacity-50 disabled:cursor-not-allowed`}
           />
           {dateOfBirth && age !== null ? (
             <p className="mt-1.5 text-xs text-white/40">
@@ -124,7 +125,8 @@ export default function AccountInfoPanel({
             value={olympusId}
             onChange={(e) => onOlympusIdChange(e.target.value)}
             placeholder="Your Olympus ID"
-            className={inputClass}
+            disabled={!!profile.olympusId}
+            className={`${inputClass} disabled:opacity-50 disabled:cursor-not-allowed`}
           />
         </div>
       </div>

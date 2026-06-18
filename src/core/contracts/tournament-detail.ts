@@ -34,6 +34,7 @@ export type TournamentDetail = {
   registrationOpensAt: string | null;
   registrationClosesAt: string | null;
   bracketUrl: string | null;
+  rulebookUrl: string | null;
   teams: string[];
   teamDetails: TournamentTeamView[];
   placements: TournamentPlacementView[];
@@ -52,7 +53,6 @@ export type TournamentTeamPlayerView = {
   id: string;
   displayName: string;
   riotId: string | null;
-  accountId?: string | null;
   olympusId?: string | null;
   participantRole?: "CAPTAIN" | "PLAYER";
 };

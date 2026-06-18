@@ -17,18 +17,24 @@ export async function POST(req: Request, { params }: Props) {
   if (!isAuthedAdmin(auth)) return guardResponse(auth)!;
 
   const { slug } = await params;
-  let body: { placements?: { role: PlacementRole; teamLabel?: string; userId?: string }[] };
+  let body: {
+    placements?: { role: PlacementRole; teamLabel?: string; userId?: string }[];
+    clearRoles?: PlacementRole[];
+  };
   try {
     body = await req.json();
   } catch {
     return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
   }
 
-  if (!body.placements?.length) {
-    return NextResponse.json({ error: "placements array required" }, { status: 400 });
+  const placements = body.placements ?? [];
+  const clearRoles = body.clearRoles ?? [];
+
+  if (placements.length === 0 && clearRoles.length === 0) {
+    return NextResponse.json({ error: "placements or clearRoles required" }, { status: 400 });
   }
 
-  const result = await setTournamentPlacements(slug, body.placements);
+  const result = await setTournamentPlacements(slug, placements, { clearRoles });
   if (!result.ok) {
     return NextResponse.json({ error: result.error }, { status: 400 });
   }

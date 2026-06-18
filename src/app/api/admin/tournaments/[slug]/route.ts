@@ -1,4 +1,6 @@
 import { guardResponse, isAuthedAdmin, requireAdmin } from "@/lib/auth-guard";
+import { logAdminAction } from "@/lib/admin-audit";
+import { normalizeOptionalDateTime, normalizeOptionalString } from "@/lib/admin-fields";
 import { serverEnv } from "@core/config/env.server";
 import {
   deleteTournament,
@@ -49,21 +51,25 @@ export async function PATCH(req: Request, { params }: Props) {
   const result = await updateTournamentFull(slug, {
     name: body.name as string | undefined,
     game: body.game as GameSlug | undefined,
-    gameLabel: body.gameLabel as string | undefined,
-    seasonId: body.seasonId as string | undefined,
+    gameLabel: normalizeOptionalString(body.gameLabel),
+    seasonId: normalizeOptionalString(body.seasonId),
     status: body.status as TournamentStatus | undefined,
-    description: body.description as string | undefined,
-    startsAt: body.startsAt as string | undefined,
-    endsAt: body.endsAt as string | undefined,
-    registrationOpensAt: body.registrationOpensAt as string | undefined,
-    registrationClosesAt: body.registrationClosesAt as string | undefined,
+    description: normalizeOptionalString(body.description),
+    startsAt: normalizeOptionalDateTime(body.startsAt),
+    endsAt: normalizeOptionalDateTime(body.endsAt),
+    registrationOpensAt: normalizeOptionalDateTime(body.registrationOpensAt),
+    registrationClosesAt: normalizeOptionalDateTime(body.registrationClosesAt),
     autoManageStatus: body.autoManageStatus as boolean | undefined,
-    prizePool: body.prizePool as number | undefined,
-    prizeNotes: body.prizeNotes as string | undefined,
-    prizeSplit: body.prizeSplit as PrizeSplitRow[] | undefined,
-    bracketUrl: body.bracketUrl as string | undefined,
-    posterUrl: body.posterUrl as string | undefined,
-    hubBannerUrl: body.hubBannerUrl as string | undefined,
+    prizePool:
+      body.prizePool === null || body.prizePool === ""
+        ? null
+        : (body.prizePool as number | undefined),
+    prizeNotes: normalizeOptionalString(body.prizeNotes),
+    prizeSplit: body.prizeSplit as PrizeSplitRow[] | null | undefined,
+    bracketUrl: normalizeOptionalString(body.bracketUrl),
+    posterUrl: normalizeOptionalString(body.posterUrl),
+    rulebookUrl: normalizeOptionalString(body.rulebookUrl),
+    hubBannerUrl: normalizeOptionalString(body.hubBannerUrl),
     hubCarouselImages: body.hubCarouselImages as string[] | undefined,
     showOnEsportsHub: body.showOnEsportsHub as boolean | undefined,
     hideAfter: body.hideAfter as string | null | undefined,
@@ -74,7 +80,11 @@ export async function PATCH(req: Request, { params }: Props) {
     return NextResponse.json({ error: result.error }, { status: 400 });
   }
 
-  return NextResponse.json({ ok: true });
+  await logAdminAction(auth.userId, "tournament.update", slug, {
+    fields: Object.keys(body),
+  });
+
+  return NextResponse.json({ ok: true, tournament: result.tournament });
 }
 
 export async function DELETE(_req: Request, { params }: Props) {
@@ -90,6 +100,8 @@ export async function DELETE(_req: Request, { params }: Props) {
   if (!result.ok) {
     return NextResponse.json({ error: result.error }, { status: 400 });
   }
+
+  await logAdminAction(auth.userId, "tournament.delete", slug);
 
   return NextResponse.json({ ok: true });
 }

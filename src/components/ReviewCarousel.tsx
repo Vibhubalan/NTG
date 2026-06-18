@@ -8,14 +8,14 @@ const fallbackReviews: Review[] = [
   {
     id: "fallback-1",
     author: "Rahul",
-    text: "Insane setup and the vibe is unmatched. Best esports lounge in Mangaluru — gear feels premium and the crowd brings real energy.",
+    text: "Insane setup and the vibe is unmatched. Best esports lounge in Mangaluru. Gear feels premium and the crowd brings real energy.",
     rating: 5,
     relativeTime: "Google Review",
   },
   {
     id: "fallback-2",
     author: "Aditya",
-    text: "Tournaments here are amazing, AUC nights are fire. The atmosphere makes you play your sharpest — total favourite spot.",
+    text: "Tournaments here are amazing, AUC nights are fire. The atmosphere makes you play your sharpest. Total favourite spot.",
     rating: 5,
     relativeTime: "Google Review",
   },

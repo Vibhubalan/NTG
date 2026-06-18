@@ -8,8 +8,18 @@ export function normalizePhone(raw: string): string {
   throw new Error("Invalid phone number. Use a 10-digit Indian mobile number.");
 }
 
+export const usernameSchema = z
+  .string()
+  .trim()
+  .min(2, "Username must be at least 2 characters.")
+  .max(32, "Username must be at most 32 characters.")
+  .regex(
+    /^[a-zA-Z0-9_-]+$/,
+    "Username can only use letters, numbers, underscores, and hyphens.",
+  );
+
 export const signupStep1Schema = z.object({
-  displayName: z.string().trim().min(2).max(32),
+  displayName: usernameSchema,
   email: z.string().trim().toLowerCase().email(),
   phone: z.string().trim().min(10).max(16),
   password: z.string().min(8).max(128),
@@ -66,13 +76,16 @@ export const cs2PremierRankSchema = z.string().trim().min(1).max(16);
 
 export const cs2FaceitRankSchema = z.string().trim().min(1).max(32);
 
+const registrationTermsField = {
+  acceptedTerms: z.literal(true, {
+    errorMap: () => ({ message: "You must agree to the rules and policy." }),
+  }),
+};
+
 export const fifaRegisterSchema = z.object({
   teamName: z.string().trim().min(2).max(48),
-  partnerAccountId: z
-    .string()
-    .trim()
-    .transform((v) => v.toUpperCase())
-    .refine((v) => /^NTG[0-9]{4}$/.test(v), "Partner Account ID must look like NTG1234."),
+  partnerUsername: usernameSchema,
+  ...registrationTermsField,
 });
 
 export const profileAccountPatchSchema = z.object({
@@ -91,11 +104,13 @@ export const tournamentRegisterSchema = z.discriminatedUnion("participantRole", 
     logoUrl: z.string().trim().url(),
     valorantRoles: valorantRolesSchema.optional(),
     cs2PeakPremierRank: cs2PremierRankSchema.optional(),
+    ...registrationTermsField,
   }),
   z.object({
     participantRole: z.literal("PLAYER"),
     valorantRoles: valorantRolesSchema.optional(),
     cs2PeakPremierRank: cs2PremierRankSchema.optional(),
+    ...registrationTermsField,
   }),
 ]);
 

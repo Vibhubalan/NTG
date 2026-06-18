@@ -1,11 +1,13 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import ImageUploadField from "@/components/admin/ImageUploadField";
+import RulebookUploadField from "@/components/admin/RulebookUploadField";
 import { AdminSection } from "@/components/admin/AdminSection";
 import { useAdminDeleteConfirm } from "@/components/admin/useAdminDeleteConfirm";
 import type { PrizeSplitRow } from "@core/contracts";
+import { emptyToNull, prizeSplitForSave } from "@/lib/admin-fields";
 
 type Team = {
   id: string;
@@ -28,10 +30,9 @@ type RegistrationRow = {
   displayName: string | null;
   email: string | null;
   phone: string | null;
-  accountId: string | null;
   olympusId: string | null;
   dateOfBirth: string | null;
-  partnerAccountId: string | null;
+  partnerUsername: string | null;
   partnerName: string | null;
   riotId: string | null;
   rankTier: string | null;
@@ -71,6 +72,7 @@ type TournamentData = {
   autoManageStatus: boolean;
   hideAfter: string | null;
   bracketUrl: string | null;
+  rulebookUrl: string | null;
   tournamentTeams: Team[];
   registrations: RegistrationRow[];
   poolPlayers: PoolPlayer[];
@@ -98,24 +100,31 @@ const inputClass =
 const checkboxLabelClass =
   "flex items-center gap-3 rounded-xl border border-white/[0.05] bg-[#0a1020]/30 px-4 py-3 text-sm text-white/70 hover:bg-white/[0.02] cursor-pointer transition-colors";
 
+type CupFields = Omit<
+  TournamentData,
+  "slug" | "tournamentTeams" | "registrations" | "poolPlayers" | "placements" | "hideAfter"
+>;
+
+function applyCupFields(form: TournamentData, fields: CupFields): TournamentData {
+  return { ...form, ...fields };
+}
+
 export default function AdminTournamentEditor({ initial }: { initial: TournamentData }) {
   const router = useRouter();
   const { openDeleteConfirm, DeleteConfirmDialog } = useAdminDeleteConfirm();
   const [form, setForm] = useState(initial);
+  const [listVersion, setListVersion] = useState(0);
+  const registrations = initial.registrations;
+  const tournamentTeams = initial.tournamentTeams;
+  const poolPlayers = initial.poolPlayers;
   const [activeTab, setActiveTab] = useState<
     "general" | "media" | "prizes" | "standings" | "registrations" | "teams"
   >("general");
-  const [champion, setChampion] = useState(
-    initial.placements.find((p) => p.role === "CHAMPION")?.teamLabel ?? "",
-  );
-  const [runnerUp, setRunnerUp] = useState(
-    initial.placements.find((p) => p.role === "RUNNER_UP")?.teamLabel ?? "",
-  );
-  const [third, setThird] = useState(
-    initial.placements.find((p) => p.role === "THIRD")?.teamLabel ?? "",
-  );
   const [mvp, setMvp] = useState(
     initial.placements.find((p) => p.role === "MVP")?.teamLabel ?? "",
+  );
+  const savedMvpRef = useRef(
+    initial.placements.find((p) => p.role === "MVP")?.teamLabel?.trim() ?? "",
   );
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
@@ -124,7 +133,7 @@ export default function AdminTournamentEditor({ initial }: { initial: Tournament
   const [poolPick, setPoolPick] = useState<Record<string, string>>({});
   const [memberSearch, setMemberSearch] = useState("");
   const [memberResults, setMemberResults] = useState<
-    { id: string; email: string | null; name: string | null; displayName: string | null; accountId: string | null }[]
+    { id: string; email: string | null; name: string | null; displayName: string | null }[]
   >([]);
   const [selectedMember, setSelectedMember] = useState<{
     id: string;
@@ -134,9 +143,9 @@ export default function AdminTournamentEditor({ initial }: { initial: Tournament
   const [addTeamName, setAddTeamName] = useState("");
   const [addingMember, setAddingMember] = useState(false);
 
-  const prizeSplit =
+  const prizeSplitDisplay =
     form.prizeSplit ??
-    (form.prizePool ? defaultSplit(Number(form.prizePool)) : defaultSplit(15000));
+    (form.prizePool ? defaultSplit(Number(form.prizePool)) : []);
 
   const cupUrl = `/esports/tournaments/${form.slug}`;
   const hubUrl = "/esports";
@@ -153,6 +162,22 @@ export default function AdminTournamentEditor({ initial }: { initial: Tournament
       return now >= opens && now < closes;
     }
     return form.status === "REGISTRATION_OPEN";
+  }
+
+  useEffect(() => {
+    if (listVersion === 0) return;
+    savedMvpRef.current =
+      initial.placements.find((p) => p.role === "MVP")?.teamLabel?.trim() ?? "";
+    setMvp(savedMvpRef.current);
+  }, [listVersion, initial.placements]);
+
+  function applySavedCupFields(fields: CupFields) {
+    setForm((current) => applyCupFields(current, fields));
+  }
+
+  function refreshLists() {
+    setListVersion((v) => v + 1);
+    router.refresh();
   }
 
   const isRegistrationOpen = isRegistrationLiveNow();
@@ -200,7 +225,7 @@ export default function AdminTournamentEditor({ initial }: { initial: Tournament
       setAddTeamName("");
       setAddRole("PLAYER");
       setMessage("Member added to cup.");
-      router.refresh();
+      refreshLists();
     } finally {
       setAddingMember(false);
     }
@@ -221,7 +246,7 @@ export default function AdminTournamentEditor({ initial }: { initial: Tournament
         );
         if (res.ok) {
           setMessage("Registration removed.");
-          router.refresh();
+          refreshLists();
         } else {
           const data = await res.json();
           setMessage(data.error ?? "Remove failed.");
@@ -241,8 +266,10 @@ export default function AdminTournamentEditor({ initial }: { initial: Tournament
       setMessage(data.error ?? "Save failed.");
       return false;
     }
+    if (data.tournament) {
+      applySavedCupFields(data.tournament as CupFields);
+    }
     setMessage(successMsg);
-    router.refresh();
     return true;
   }
 
@@ -276,24 +303,25 @@ export default function AdminTournamentEditor({ initial }: { initial: Tournament
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          name: form.name,
+          name: form.name.trim(),
           game: form.game,
-          gameLabel: form.gameLabel,
+          gameLabel: emptyToNull(form.gameLabel),
           status: form.status,
-          description: form.description,
-          posterUrl: form.posterUrl,
-          hubBannerUrl: form.hubBannerUrl,
+          description: emptyToNull(form.description),
+          posterUrl: emptyToNull(form.posterUrl),
+          hubBannerUrl: emptyToNull(form.hubBannerUrl),
           hubCarouselImages: form.hubCarouselImages,
           showOnEsportsHub: form.showOnEsportsHub,
           prizePool: form.prizePool ? Number(form.prizePool) : null,
-          prizeNotes: form.prizeNotes,
-          prizeSplit,
+          prizeNotes: emptyToNull(form.prizeNotes),
+          prizeSplit: prizeSplitForSave(form.prizePool, form.prizeSplit, defaultSplit),
           startsAt: form.startsAt || null,
           endsAt: form.endsAt || null,
           registrationOpensAt: form.registrationOpensAt || null,
           autoManageStatus: form.autoManageStatus,
           hideAfter: null,
-          bracketUrl: form.bracketUrl,
+          bracketUrl: emptyToNull(form.bracketUrl),
+          rulebookUrl: emptyToNull(form.rulebookUrl),
         }),
       });
       const data = await res.json();
@@ -302,27 +330,31 @@ export default function AdminTournamentEditor({ initial }: { initial: Tournament
         return;
       }
 
-      const placements = [];
-      if (champion.trim()) placements.push({ role: "CHAMPION", teamLabel: champion.trim() });
-      if (runnerUp.trim()) placements.push({ role: "RUNNER_UP", teamLabel: runnerUp.trim() });
-      if (third.trim()) placements.push({ role: "THIRD", teamLabel: third.trim() });
-      if (mvp.trim()) placements.push({ role: "MVP", teamLabel: mvp.trim() });
+      if (data.tournament) {
+        applySavedCupFields(data.tournament as CupFields);
+      }
 
-      if (placements.length > 0) {
+      const mvpValue = mvp.trim();
+      const mvpChanged = mvpValue !== savedMvpRef.current;
+
+      if (mvpChanged) {
+        const placements = mvpValue ? [{ role: "MVP" as const, teamLabel: mvpValue }] : [];
+        const clearRoles = ["CHAMPION", "RUNNER_UP", "THIRD", ...(mvpValue ? [] : (["MVP"] as const))];
+
         const pRes = await fetch(`/api/admin/tournaments/${form.slug}/placements`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ placements }),
+          body: JSON.stringify({ placements, clearRoles }),
         });
         if (!pRes.ok) {
           const d = await pRes.json();
-          setMessage(d.error ?? "Placements save failed.");
+          setMessage(d.error ?? "MVP save failed.");
           return;
         }
+        savedMvpRef.current = mvpValue;
       }
 
       setMessage("All changes successfully saved.");
-      router.refresh();
     } catch {
       setMessage("Something went wrong.");
     } finally {
@@ -351,7 +383,7 @@ export default function AdminTournamentEditor({ initial }: { initial: Tournament
       confirmLabel: "Delete team",
       onConfirm: async () => {
         await fetch(`/api/admin/tournaments/${form.slug}/teams/${teamId}`, { method: "DELETE" });
-        router.refresh();
+        refreshLists();
       },
     });
   }
@@ -366,7 +398,7 @@ export default function AdminTournamentEditor({ initial }: { initial: Tournament
           `/api/admin/tournaments/${form.slug}/teams/${teamId}/players/${playerId}`,
           { method: "DELETE" },
         );
-        router.refresh();
+        refreshLists();
       },
     });
   }
@@ -394,7 +426,7 @@ export default function AdminTournamentEditor({ initial }: { initial: Tournament
     const data = await res.json();
     if (res.ok) {
       setNewTeamName("");
-      router.refresh();
+      refreshLists();
     } else {
       setMessage(data.error ?? "Failed to add team.");
     }
@@ -412,7 +444,7 @@ export default function AdminTournamentEditor({ initial }: { initial: Tournament
       });
       if (res.ok) {
         setPoolPick((prev) => ({ ...prev, [teamId]: "" }));
-        router.refresh();
+        refreshLists();
       }
       return;
     }
@@ -425,12 +457,12 @@ export default function AdminTournamentEditor({ initial }: { initial: Tournament
     });
     if (res.ok) {
       setNewPlayerNames((prev) => ({ ...prev, [teamId]: "" }));
-      router.refresh();
+      refreshLists();
     }
   }
 
   function updateSplit(i: number, field: keyof PrizeSplitRow, value: string) {
-    const next = [...prizeSplit];
+    const next = [...prizeSplitDisplay];
     const row = { ...next[i] };
     if (field === "amount") row.amount = Number(value) || 0;
     else if (field === "place") row.place = Number(value) || 1;
@@ -649,7 +681,7 @@ export default function AdminTournamentEditor({ initial }: { initial: Tournament
                     value={form.status}
                     onChange={(e) => setForm({ ...form, status: e.target.value })}
                   >
-                    <option value="DRAFT" className="bg-[#0a1020]">Draft (admin only — hidden from cups list badge)</option>
+                    <option value="DRAFT" className="bg-[#0a1020]">Draft (admin only, hidden from cups list badge)</option>
                     <option value="UPCOMING" className="bg-[#0a1020]">Upcoming (announced, registration not open)</option>
                     <option value="REGISTRATION_OPEN" className="bg-[#0a1020]">Registration Open</option>
                     <option value="IN_PROGRESS" className="bg-[#0a1020]">Live (Ongoing)</option>
@@ -705,7 +737,7 @@ export default function AdminTournamentEditor({ initial }: { initial: Tournament
                 >
                   {isRegistrationOpen ? (
                     <p>
-                      <strong className="text-emerald-300">Registration is live</strong> — visible on{" "}
+                      <strong className="text-emerald-300">Registration is live</strong>. Visible on{" "}
                       <a href={hubUrl} target="_blank" rel="noopener noreferrer" className="underline hover:text-white">
                         /esports
                       </a>{" "}
@@ -724,6 +756,26 @@ export default function AdminTournamentEditor({ initial }: { initial: Tournament
                   )}
                 </div>
               </div>
+            </AdminSection>
+
+            <AdminSection
+              title="Cup rulebook"
+              showsOn="Linked from the registration form when players agree to rules"
+            >
+              <RulebookUploadField
+                label="Rulebook (PDF or Word)"
+                prefix={`tournaments/${form.slug}/rulebook`}
+                currentUrl={form.rulebookUrl}
+                onUploaded={(url) => setForm({ ...form, rulebookUrl: url })}
+                onUploadedComplete={async (url) => {
+                  await patchField({ rulebookUrl: url }, "Cup rulebook saved.");
+                }}
+                onClear={async () => {
+                  setForm({ ...form, rulebookUrl: null });
+                  await patchField({ rulebookUrl: null }, "Cup rulebook removed.");
+                }}
+                hint="Upload the organizer's rulebook. Players must agree to it before registering."
+              />
             </AdminSection>
 
             <AdminSection
@@ -754,7 +806,7 @@ export default function AdminTournamentEditor({ initial }: { initial: Tournament
                     }
                   />
                   <p className="text-xs text-white/35">
-                    Registration closes automatically 1 minute before cup start — no separate end date needed.
+                    Registration closes automatically 1 minute before cup start. No separate end date needed.
                   </p>
                 </div>
                 <div className="space-y-1">
@@ -809,6 +861,10 @@ export default function AdminTournamentEditor({ initial }: { initial: Tournament
                   onUploadedComplete={async (url) => {
                     await patchField({ hubBannerUrl: url }, "Hub background image saved.");
                   }}
+                  onClear={async () => {
+                    setForm({ ...form, hubBannerUrl: null });
+                    await patchField({ hubBannerUrl: null }, "Hub background image removed.");
+                  }}
                 />
 
                 <div className="border-t border-white/[0.04] pt-5">
@@ -820,6 +876,10 @@ export default function AdminTournamentEditor({ initial }: { initial: Tournament
                     onUploaded={(url) => setForm({ ...form, posterUrl: url })}
                     onUploadedComplete={async (url) => {
                       await patchField({ posterUrl: url }, "Cup page poster image saved.");
+                    }}
+                    onClear={async () => {
+                      setForm({ ...form, posterUrl: null });
+                      await patchField({ posterUrl: null }, "Cup page poster removed.");
                     }}
                   />
                 </div>
@@ -902,7 +962,7 @@ export default function AdminTournamentEditor({ initial }: { initial: Tournament
                 </div>
                 
                 <div className="space-y-3">
-                  {prizeSplit.map((row, i) => (
+                  {prizeSplitDisplay.map((row, i) => (
                     <div key={`${row.place}-${i}`} className="flex flex-col sm:flex-row items-center gap-3">
                       <div className="w-full sm:w-1/4">
                         <span className="text-xs font-semibold text-white/55">Place #{row.place}</span>
@@ -932,37 +992,15 @@ export default function AdminTournamentEditor({ initial }: { initial: Tournament
                 </div>
               </div>
             </AdminSection>
-
-            <AdminSection
-              title="Tournament MVP"
-              showsOn="Cup page → Final Results section (MVP card below placements)"
-              viewHref={cupUrl}
-            >
-              <div className="space-y-1">
-                <label className="text-[10px] font-bold uppercase tracking-wider text-cyan-400">
-                  MVP player name
-                </label>
-                <input
-                  className={inputClass}
-                  value={mvp}
-                  onChange={(e) => setMvp(e.target.value)}
-                  placeholder="e.g. PlayerName or Team IGL"
-                />
-                <p className="text-xs text-white/40">
-                  Optional. Appears on the cup page even if 1st/2nd/3rd are not set yet. Click{" "}
-                  <strong className="text-white/55">Save all</strong> to publish.
-                </p>
-              </div>
-            </AdminSection>
           </div>
         )}
 
-        {/* Tab 4: Bracket & Standings */}
+        {/* Tab 4: Bracket & MVP */}
         {activeTab === "standings" && (
           <div className="space-y-6 animate-in fade-in duration-200">
             <AdminSection
-              title="Bracket Link & Placements"
-              showsOn="Interactive native bracket views and Final Standings grids"
+              title="Bracket Link & MVP"
+              showsOn="Challonge bracket on the cup page; MVP card in Final Results"
               viewHref={cupUrl}
             >
               <div className="space-y-4">
@@ -974,57 +1012,23 @@ export default function AdminTournamentEditor({ initial }: { initial: Tournament
                     onChange={(e) => setForm({ ...form, bracketUrl: e.target.value || null })}
                     placeholder="e.g. https://challonge.com/jyln1rx4"
                   />
-                  <p className="text-[10px] text-white/30 italic">Links are verified and normalized to fetch active bracket layouts.</p>
-                </div>
-
-                <div className="border-t border-white/[0.04] pt-5 space-y-4">
-                  <div>
-                    <h3 className="text-xs font-bold uppercase tracking-wider text-white/60">Podium placements</h3>
-                    <p className="text-xs text-white/40 mt-1">
-                      1st, 2nd, and 3rd on the cup page. MVP is in the <strong className="text-white/55">Prizes</strong> tab.
-                    </p>
-                  </div>
-                  
-                  <div className="grid gap-3 sm:grid-cols-2">
-                    <div className="space-y-1">
-                      <label className="text-[10px] font-bold uppercase tracking-wider text-amber-400">🥇 1st Place (Champion)</label>
-                      <input
-                        className={inputClass}
-                        value={champion}
-                        onChange={(e) => setChampion(e.target.value)}
-                        placeholder="Champion team name"
-                      />
-                    </div>
-                    <div className="space-y-1">
-                      <label className="text-[10px] font-bold uppercase tracking-wider text-zinc-300">🥈 2nd Place (Runner Up)</label>
-                      <input
-                        className={inputClass}
-                        value={runnerUp}
-                        onChange={(e) => setRunnerUp(e.target.value)}
-                        placeholder="Runner up team name"
-                      />
-                    </div>
-                    <div className="space-y-1 sm:col-span-2">
-                      <label className="text-[10px] font-bold uppercase tracking-wider text-amber-600/90">🥉 3rd Place</label>
-                      <input
-                        className={inputClass}
-                        value={third}
-                        onChange={(e) => setThird(e.target.value)}
-                        placeholder="Third place team name"
-                      />
-                    </div>
-                  </div>
+                  <p className="text-[10px] text-white/30 italic">
+                    Winner and runner-up are loaded from this bracket. Links are verified and normalized automatically.
+                  </p>
                 </div>
 
                 <div className="border-t border-white/[0.04] pt-5 space-y-1">
-                  <label className="text-[10px] font-bold uppercase tracking-wider text-cyan-400">🔥 MVP player</label>
+                  <label className="text-[10px] font-bold uppercase tracking-wider text-cyan-400">MVP player</label>
                   <input
                     className={inputClass}
                     value={mvp}
                     onChange={(e) => setMvp(e.target.value)}
                     placeholder="MVP player or username"
                   />
-                  <p className="text-xs text-white/40">Same field as the Prizes tab — either place works.</p>
+                  <p className="text-xs text-white/40">
+                    Optional. Shown on the cup page below the Challonge results. Click{" "}
+                    <strong className="text-white/55">Save all</strong> to publish.
+                  </p>
                 </div>
               </div>
             </AdminSection>
@@ -1039,7 +1043,7 @@ export default function AdminTournamentEditor({ initial }: { initial: Tournament
               showsOn="Player sign-ups with profile snapshots at registration time"
             >
               <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
-                <p className="text-sm text-white/45">{initial.registrations.length} total</p>
+                <p className="text-sm text-white/45">{registrations.length} total</p>
                 <a
                   href={`/api/admin/tournaments/${form.slug}/registrations/export`}
                   className="rounded-xl border border-amber-500/25 bg-amber-500/10 px-4 py-2 text-xs font-semibold text-amber-200 hover:bg-amber-500/20"
@@ -1058,13 +1062,13 @@ export default function AdminTournamentEditor({ initial }: { initial: Tournament
                       setMemberSearch(e.target.value);
                       setSelectedMember(null);
                     }}
-                    placeholder="Search by name, email, or Account ID…"
+                    placeholder="Search by name, email, or username…"
                   />
                   {memberResults.length > 0 && !selectedMember ? (
                     <ul className="max-h-40 overflow-y-auto rounded-xl border border-white/[0.06] bg-[#0a1020]/80">
                       {memberResults.map((m) => {
                         const label =
-                          m.displayName ?? m.name ?? m.email ?? m.accountId ?? "Member";
+                          m.displayName ?? m.name ?? m.email ?? "Member";
                         return (
                           <li key={m.id}>
                             <button
@@ -1077,9 +1081,6 @@ export default function AdminTournamentEditor({ initial }: { initial: Tournament
                               className="w-full px-3 py-2 text-left text-xs text-white/75 hover:bg-white/[0.04]"
                             >
                               <span className="font-medium text-white/90">{label}</span>
-                              {m.accountId ? (
-                                <span className="ml-2 font-mono text-[var(--color-brand)]/80">{m.accountId}</span>
-                              ) : null}
                               {m.email ? (
                                 <span className="ml-2 text-white/40">{m.email}</span>
                               ) : null}
@@ -1128,7 +1129,7 @@ export default function AdminTournamentEditor({ initial }: { initial: Tournament
                 </button>
               </div>
 
-              {initial.registrations.length === 0 ? (
+              {registrations.length === 0 ? (
                 <p className="text-sm text-white/35">No registrations yet.</p>
               ) : (
                 <div className="overflow-x-auto rounded-xl border border-white/[0.06]">
@@ -1148,9 +1149,8 @@ export default function AdminTournamentEditor({ initial }: { initial: Tournament
                           </>
                         ) : form.game === "EA_FC26" ? (
                           <>
-                            <th className="px-3 py-2">Account ID</th>
                             <th className="px-3 py-2">Olympus</th>
-                            <th className="px-3 py-2">Partner ID</th>
+                            <th className="px-3 py-2">Partner username</th>
                             <th className="px-3 py-2">Partner</th>
                           </>
                         ) : (
@@ -1165,7 +1165,7 @@ export default function AdminTournamentEditor({ initial }: { initial: Tournament
                       </tr>
                     </thead>
                     <tbody>
-                      {initial.registrations.map((r) => (
+                      {registrations.map((r) => (
                         <tr key={r.id} className="border-b border-white/[0.04]">
                           <td className="px-3 py-2 font-medium text-white/85">{r.displayName ?? "—"}</td>
                           <td className="px-3 py-2">{r.email ?? "—"}</td>
@@ -1180,9 +1180,8 @@ export default function AdminTournamentEditor({ initial }: { initial: Tournament
                             </>
                           ) : form.game === "EA_FC26" ? (
                             <>
-                              <td className="px-3 py-2 font-mono">{r.accountId ?? "—"}</td>
                               <td className="px-3 py-2">{r.olympusId ?? "—"}</td>
-                              <td className="px-3 py-2 font-mono">{r.partnerAccountId ?? "—"}</td>
+                              <td className="px-3 py-2">{r.partnerUsername ?? "—"}</td>
                               <td className="px-3 py-2">{r.partnerName ?? "—"}</td>
                             </>
                           ) : (
@@ -1244,13 +1243,13 @@ export default function AdminTournamentEditor({ initial }: { initial: Tournament
                 </div>
 
                 {/* Team Lists */}
-                {initial.tournamentTeams.length === 0 ? (
+                {tournamentTeams.length === 0 ? (
                   <div className="rounded-xl border border-dashed border-white/10 p-8 text-center text-sm text-white/30">
                     No teams registered for this tournament yet.
                   </div>
                 ) : (
                   <div className="grid gap-4 md:grid-cols-2">
-                    {initial.tournamentTeams.map((team) => (
+                    {tournamentTeams.map((team) => (
                       <div key={team.id} className="rounded-xl border border-white/[0.06] bg-[#0c1424]/40 p-4.5 space-y-4">
                         <div className="flex items-center justify-between border-b border-white/[0.04] pb-2">
                           <div className="flex items-center gap-3 min-w-0">
@@ -1294,7 +1293,7 @@ export default function AdminTournamentEditor({ initial }: { initial: Tournament
 
                         {/* Add Player to this team */}
                         <div className="space-y-2 pt-2 border-t border-white/[0.04]">
-                          {initial.poolPlayers.length > 0 ? (
+                          {poolPlayers.length > 0 ? (
                             <select
                               className={`${inputClass} text-xs py-2 px-3`}
                               value={poolPick[team.id] ?? ""}
@@ -1303,7 +1302,7 @@ export default function AdminTournamentEditor({ initial }: { initial: Tournament
                               }
                             >
                               <option value="">Assign from player pool…</option>
-                              {initial.poolPlayers.map((p) => (
+                              {poolPlayers.map((p) => (
                                 <option key={p.id} value={p.id}>
                                   {p.displayName}
                                   {p.riotId ? ` (${p.riotId})` : p.steamId64 ? ` (${p.steamId64})` : ""}

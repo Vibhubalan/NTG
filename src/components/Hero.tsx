@@ -60,7 +60,7 @@ export default function Hero() {
         <div className="relative top-10 flex flex-col items-center">
           <p className="max-w-xl text-balance text-base leading-relaxed text-white/55 sm:text-lg translate-x-2.5">
             Mangaluru&apos;s premier esports lounge. Premium hardware, electric
-            atmosphere — engineered for the players who set the standard.
+            atmosphere, engineered for the players who set the standard.
           </p>
 
           <div className="mt-10 flex flex-wrap items-center justify-center gap-3">

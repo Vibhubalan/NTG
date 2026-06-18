@@ -1,4 +1,5 @@
 import { guardResponse, isAuthedAdmin, requireAdmin } from "@/lib/auth-guard";
+import { logAdminAction } from "@/lib/admin-audit";
 import { serverEnv } from "@core/config/env.server";
 import {
   deleteMemberAdmin,
@@ -55,6 +56,7 @@ export async function PATCH(req: Request, { params }: Props) {
   if (body.action === "resetPassword") {
     const result = await resetMemberPasswordAdmin(id, String(body.newPassword ?? ""));
     if (!result.ok) return NextResponse.json({ error: result.error }, { status: 400 });
+    await logAdminAction(auth.userId, "member.resetPassword", id);
     return NextResponse.json({ ok: true });
   }
 
@@ -64,24 +66,28 @@ export async function PATCH(req: Request, { params }: Props) {
     after(() => {
       syncUserRank(id).catch(console.error);
     });
+    await logAdminAction(auth.userId, "member.linkRiot", id);
     return NextResponse.json({ ok: true });
   }
 
   if (body.action === "unlinkRiot") {
     const result = await unlinkMemberRiotAdmin(id);
     if (!result.ok) return NextResponse.json({ error: result.error }, { status: 400 });
+    await logAdminAction(auth.userId, "member.unlinkRiot", id);
     return NextResponse.json({ ok: true });
   }
 
   if (body.action === "unlinkSteam") {
     const result = await unlinkMemberSteamAdmin(id);
     if (!result.ok) return NextResponse.json({ error: result.error }, { status: 400 });
+    await logAdminAction(auth.userId, "member.unlinkSteam", id);
     return NextResponse.json({ ok: true });
   }
 
   if (body.action === "linkSteam") {
     const result = await linkMemberSteamAdmin(id, String(body.steamUrl ?? ""));
     if (!result.ok) return NextResponse.json({ error: result.error }, { status: 400 });
+    await logAdminAction(auth.userId, "member.linkSteam", id);
     return NextResponse.json({ ok: true });
   }
 
@@ -95,6 +101,10 @@ export async function PATCH(req: Request, { params }: Props) {
   if (!result.ok) {
     return NextResponse.json({ error: result.error }, { status: 400 });
   }
+
+  await logAdminAction(auth.userId, "member.update", id, {
+    fields: Object.keys(body),
+  });
 
   return NextResponse.json({ ok: true });
 }
@@ -112,6 +122,8 @@ export async function DELETE(_req: Request, { params }: Props) {
   if (!result.ok) {
     return NextResponse.json({ error: result.error }, { status: 400 });
   }
+
+  await logAdminAction(auth.userId, "member.delete", id);
 
   return NextResponse.json({ ok: true });
 }

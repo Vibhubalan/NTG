@@ -20,7 +20,7 @@ export async function POST(req: Request, { params }: Props) {
 
   let body: {
     userId?: string;
-    accountId?: string;
+    username?: string;
     email?: string;
     participantRole?: RegistrationParticipantRole;
     teamName?: string;
@@ -31,9 +31,9 @@ export async function POST(req: Request, { params }: Props) {
     return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
   }
 
-  if (!body.userId && !body.accountId?.trim() && !body.email?.trim()) {
+  if (!body.userId && !body.username?.trim() && !body.email?.trim()) {
     return NextResponse.json(
-      { error: "Provide a member userId, Account ID, or email." },
+      { error: "Provide a member userId, username, or email." },
       { status: 400 },
     );
   }

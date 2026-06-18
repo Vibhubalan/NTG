@@ -5,11 +5,6 @@ import { gameMetaFor } from "@/lib/tournament-display";
 import { syncRegistrationStatus } from "../application/admin-tournament.service";
 import { isTournamentRegistrationLive } from "../domain/registration-window";
 
-function parseTeams(value: unknown): string[] {
-  if (!Array.isArray(value)) return [];
-  return value.filter((item): item is string => typeof item === "string" && item.trim().length > 0);
-}
-
 function parsePrizeSplit(value: unknown): PrizeSplitRow[] | null {
   if (!Array.isArray(value)) return null;
   const rows = value
@@ -47,8 +42,16 @@ function formatRegistrationBannerDetail(t: {
   startsAt: Date | null;
 }): string {
   const meta = gameMetaFor(t.game);
-  const parts = [meta.label];
-  if (t.gameLabel?.trim()) parts.push(t.gameLabel.trim());
+  const parts = [];
+  const gl = t.gameLabel?.trim();
+  
+  if (gl && gl.toLowerCase().includes(meta.label.toLowerCase())) {
+    parts.push(gl);
+  } else {
+    parts.push(meta.label);
+    if (gl) parts.push(gl);
+  }
+
   if (t.startsAt) {
     parts.push(
       t.startsAt.toLocaleDateString("en-IN", {
@@ -151,7 +154,6 @@ export class TournamentRepository {
                 id: true,
                 participantRole: true,
                 snapshotDisplayName: true,
-                snapshotAccountId: true,
                 snapshotOlympusId: true,
                 snapshotRiotId: true,
               },
@@ -198,7 +200,6 @@ export class TournamentRepository {
               id: r.id,
               displayName: r.snapshotDisplayName ?? "Player",
               riotId: r.snapshotRiotId,
-              accountId: r.snapshotAccountId,
               olympusId: r.snapshotOlympusId,
               participantRole: r.participantRole,
             }));
@@ -212,9 +213,7 @@ export class TournamentRepository {
       };
     });
 
-    const teamsFromDb = teamDetails.map((team) => team.name);
-    const teamsJson = parseTeams(t.teams);
-    const teams = teamsFromDb.length > 0 ? teamsFromDb : teamsJson;
+    const teams = teamDetails.map((team) => team.name);
 
     return {
       id: t.id,
@@ -235,6 +234,7 @@ export class TournamentRepository {
       registrationOpensAt: t.registrationOpensAt?.toISOString() ?? null,
       registrationClosesAt: t.registrationClosesAt?.toISOString() ?? null,
       bracketUrl: t.bracketUrl ?? null,
+      rulebookUrl: t.rulebookUrl ?? null,
       teams,
       teamDetails,
       placements: t.placements.map((p) => ({

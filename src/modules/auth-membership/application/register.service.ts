@@ -1,19 +1,21 @@
 import bcrypt from "bcryptjs";
 import { AUTH_RATE_LIMITS, checkRateLimit } from "@/lib/rate-limit";
 import { prisma } from "@core/database/client";
+import type { SignupStep1Input } from "../domain/schemas";
 import {
-  normalizePhone,
-  type SignupStep1Input,
-} from "../domain/schemas";
-import { generateUniqueAccountId } from "../domain/account-id";
-import { setSignupSession, clearSignupSession } from "../infrastructure/signup-session";
-import { sendEmailOtp, verifyEmailOtp } from "./email-otp.service";
+  setSignupSession,
+  clearSignupSession,
+} from "../infrastructure/signup-session";
+import { sendEmailOtp } from "./email-otp.service";
 import { linkRiotAccount } from "./riot-link.service";
+import { migrateLegacySignupUser, tryCompleteSignup } from "./game-profile.service";
 import {
-  computeSignupStep,
-  migrateLegacySignupUser,
-  tryCompleteSignup,
-} from "./game-profile.service";
+  abandonPendingSignup,
+  abandonPendingSignupByEmailPassword,
+  finalizePendingSignup,
+  getPendingSignup,
+  savePendingSignup,
+} from "./pending-signup.service";
 
 const MIN_PASSWORD = 8;
 
@@ -21,267 +23,104 @@ const SIGNUP_CONFLICT_ERROR =
   "Unable to register with these details. If you already have an account, sign in instead.";
 
 export type RegisterResult =
-  | { ok: true; userId: string; resumeStep?: 2; devOtp?: string }
+  | { ok: true; resumeStep?: 2; devOtp?: string; devOtpHint?: string }
   | { ok: false; error: string };
 
 export type SignupStatus = {
   step: 2 | null;
   email?: string;
   displayName?: string;
+  pendingVerification?: boolean;
 };
 
 export type LoginBlockResult = {
   reason: string | null;
   resumeStep?: 2;
   devOtp?: string;
+  devOtpHint?: string;
 };
-
-function isEmailVerified(user: { emailVerified: Date | null }): boolean {
-  return user.emailVerified != null;
-}
-
-type SignupUserShape = {
-  signupCompleted: boolean;
-  emailVerified: Date | null;
-};
-
-function signupResumeStep(user: SignupUserShape): 2 | null {
-  if (user.signupCompleted) return null;
-  return computeSignupStep(user);
-}
-
-function parseDateOfBirth(isoDate: string): Date {
-  return new Date(`${isoDate}T00:00:00`);
-}
-
-async function resumeIncompleteSignup(
-  userId: string,
-  email: string,
-  displayName: string,
-  phone: string,
-  passwordHash: string,
-  dateOfBirth: Date,
-  olympusId: string,
-): Promise<RegisterResult> {
-  await prisma.user.update({
-    where: { id: userId },
-    data: {
-      email,
-      name: displayName,
-      phone,
-      passwordHash,
-      dateOfBirth,
-      olympusId,
-      playerProfile: {
-        upsert: {
-          create: { displayName, town: "Mangaluru" },
-          update: { displayName },
-        },
-      },
-    },
-  });
-
-  await setSignupSession(userId);
-
-  const otp = await sendEmailOtp(email, userId);
-  if (!otp.ok) {
-    if (otp.cooldown) {
-      return { ok: true, userId, resumeStep: 2 };
-    }
-    return { ok: false, error: otp.error };
-  }
-
-  return { ok: true, userId, resumeStep: 2, devOtp: otp.devOtp };
-}
 
 export async function registerStep1(
   input: SignupStep1Input,
 ): Promise<RegisterResult> {
-  const email = input.email.trim().toLowerCase();
-  const displayName = input.displayName.trim();
-  const olympusId = input.olympusId.trim();
-  const dateOfBirth = parseDateOfBirth(input.dateOfBirth);
-  let phone: string;
-
-  try {
-    phone = normalizePhone(input.phone);
-  } catch {
-    return { ok: false, error: "Invalid phone number." };
-  }
-
   if (input.password.length < MIN_PASSWORD) {
     return { ok: false, error: `Password must be at least ${MIN_PASSWORD} characters.` };
   }
 
   const passwordHash = await bcrypt.hash(input.password, 12);
+  const saved = await savePendingSignup(input, passwordHash);
+  if (!saved.ok) return saved;
 
-  const [existingByEmail, existingByPhone] = await Promise.all([
-    prisma.user.findUnique({
-      where: { email },
-      include: { playerProfile: true },
-    }),
-    prisma.user.findUnique({ where: { phone } }),
-  ]);
+  await setSignupSession(saved.pendingId);
 
-  if (existingByEmail) {
-    const resumeStep = signupResumeStep(existingByEmail);
-    if (!resumeStep) {
-      return { ok: false, error: SIGNUP_CONFLICT_ERROR };
-    }
-
-    if (existingByPhone && existingByPhone.id !== existingByEmail.id) {
-      return { ok: false, error: SIGNUP_CONFLICT_ERROR };
-    }
-
-    if (resumeStep === 2 && existingByEmail.passwordHash) {
-      const passwordMatches = await bcrypt.compare(
-        input.password,
-        existingByEmail.passwordHash,
-      );
-      if (!passwordMatches) {
-        return { ok: false, error: SIGNUP_CONFLICT_ERROR };
-      }
-
-      await prisma.user.update({
-        where: { id: existingByEmail.id },
-        data: {
-          name: displayName,
-          phone,
-          passwordHash,
-          dateOfBirth,
-          olympusId,
-          playerProfile: {
-            upsert: {
-              create: { displayName, town: "Mangaluru" },
-              update: { displayName },
-            },
-          },
-        },
-      });
-      await setSignupSession(existingByEmail.id);
-      return { ok: true, userId: existingByEmail.id, resumeStep: 2 };
-    }
-
-    return resumeIncompleteSignup(
-      existingByEmail.id,
-      email,
-      displayName,
-      phone,
-      passwordHash,
-      dateOfBirth,
-      olympusId,
-    );
-  }
-
-  if (existingByPhone) {
-    const phoneUser = await prisma.user.findUniqueOrThrow({
-      where: { id: existingByPhone.id },
-      include: { playerProfile: true },
-    });
-    const phoneResumeStep = signupResumeStep(phoneUser);
-    if (phoneResumeStep && !existingByPhone.email) {
-      return resumeIncompleteSignup(
-        existingByPhone.id,
-        email,
-        displayName,
-        phone,
-        passwordHash,
-        dateOfBirth,
-        olympusId,
-      );
-    }
-    return { ok: false, error: SIGNUP_CONFLICT_ERROR };
-  }
-
-  const accountId = await generateUniqueAccountId();
-
-  let user;
-  try {
-    user = await prisma.user.create({
-      data: {
-        email,
-        name: displayName,
-        phone,
-        passwordHash,
-        accountId,
-        dateOfBirth,
-        olympusId,
-        signupCompleted: false,
-        playerProfile: {
-          create: { displayName, town: "Mangaluru" },
-        },
-      },
-    });
-  } catch {
-    return { ok: false, error: SIGNUP_CONFLICT_ERROR };
-  }
-
-  await setSignupSession(user.id);
-
-  const otp = await sendEmailOtp(email, user.id);
+  const email = input.email.trim().toLowerCase();
+  const otp = await sendEmailOtp(email);
   if (!otp.ok) {
     if (otp.cooldown) {
-      return { ok: true, userId: user.id, resumeStep: 2 };
+      return { ok: true, resumeStep: 2 };
     }
+    await abandonPendingSignup(saved.pendingId);
     return { ok: false, error: otp.error };
   }
 
-  return { ok: true, userId: user.id, resumeStep: 2, devOtp: otp.devOtp };
-}
-
-export async function getSignupStatus(userId: string): Promise<SignupStatus> {
-  await migrateLegacySignupUser(userId);
-
-  const user = await prisma.user.findUnique({
-    where: { id: userId },
-    include: { playerProfile: true },
-  });
-  if (!user?.email || user.signupCompleted) {
-    return { step: null };
-  }
-
-  const step = signupResumeStep(user);
-  if (!step) return { step: null };
-
   return {
-    step,
-    email: user.email,
-    displayName: user.playerProfile?.displayName ?? user.name ?? undefined,
+    ok: true,
+    resumeStep: 2,
+    devOtp: otp.devOtp,
+    devOtpHint: otp.devOtpHint,
   };
 }
 
-export async function resendOtpForSignup(
-  userId: string,
-): Promise<{ ok: true; devOtp?: string } | { ok: false; error: string }> {
-  const user = await prisma.user.findUnique({ where: { id: userId } });
-  if (!user?.email) {
-    return { ok: false, error: "Session expired. Start signup again." };
+export async function getSignupStatus(pendingId: string): Promise<SignupStatus> {
+  const pending = await getPendingSignup(pendingId);
+  if (!pending) {
+    await clearSignupSession();
+    return { step: null };
   }
 
-  const result = await sendEmailOtp(user.email, userId);
+  return {
+    step: null,
+    pendingVerification: true,
+    email: pending.email,
+    displayName: pending.displayName,
+  };
+}
+
+export async function abandonIncompleteSignup(
+  pendingId: string,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  return abandonPendingSignup(pendingId);
+}
+
+export async function abandonIncompleteSignupWithCredentials(
+  emailRaw: string,
+  password: string,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  return abandonPendingSignupByEmailPassword(emailRaw, password);
+}
+
+export async function resendOtpForSignup(
+  pendingId: string,
+): Promise<{ ok: true; devOtp?: string; devOtpHint?: string } | { ok: false; error: string }> {
+  const pending = await getPendingSignup(pendingId);
+  if (!pending) {
+    return { ok: false, error: "Signup session expired. Start signup again." };
+  }
+
+  const result = await sendEmailOtp(pending.email);
   if (!result.ok) {
-    if (result.cooldown) {
-      return { ok: true };
-    }
+    if (result.cooldown) return { ok: true };
     return { ok: false, error: result.error };
   }
 
-  return { ok: true, devOtp: result.devOtp };
+  return { ok: true, devOtp: result.devOtp, devOtpHint: result.devOtpHint };
 }
 
 export async function verifyOtpStep2(
-  userId: string,
+  pendingId: string,
   code: string,
-): Promise<{ ok: true } | { ok: false; error: string }> {
-  const user = await prisma.user.findUnique({ where: { id: userId } });
-  if (!user?.email) {
-    return { ok: false, error: "Session expired. Start signup again." };
-  }
-
-  const verified = await verifyEmailOtp(user.email, code, userId);
-  if (!verified.ok) return verified;
-
-  return tryCompleteSignup(userId);
+): Promise<{ ok: true; userId: string; email: string } | { ok: false; error: string }> {
+  return finalizePendingSignup(pendingId, code);
 }
 
 export async function linkRiotDuringSignup(
@@ -290,7 +129,7 @@ export async function linkRiotDuringSignup(
 ): Promise<{ ok: true } | { ok: false; error: string }> {
   const user = await prisma.user.findUnique({ where: { id: userId } });
   if (!user) return { ok: false, error: "Session expired. Start signup again." };
-  if (!isEmailVerified(user)) {
+  if (!user.emailVerified) {
     return { ok: false, error: "Verify your email first." };
   }
 
@@ -354,35 +193,18 @@ export async function getLoginBlockReason(
   password: string,
 ): Promise<LoginBlockResult> {
   const normalized = email.trim().toLowerCase();
-  const user = await prisma.user.findUnique({
-    where: { email: normalized },
-    include: { playerProfile: true },
-  });
-  if (!user?.passwordHash) return { reason: null };
 
-  const valid = await bcrypt.compare(password, user.passwordHash);
-  if (!valid) return { reason: null };
-
-  await migrateLegacySignupUser(user.id);
-  const refreshed = await prisma.user.findUnique({
-    where: { id: user.id },
-    include: { playerProfile: true },
-  });
-  if (!refreshed) return { reason: null };
-
-  if (!isEmailVerified(refreshed) || !refreshed.signupCompleted) {
-    const resumeStep = signupResumeStep(refreshed);
-    if (resumeStep) {
-      await setSignupSession(refreshed.id);
-      let devOtp: string | undefined;
-      if (resumeStep === 2 && refreshed.email) {
-        const otp = await sendEmailOtp(refreshed.email, refreshed.id);
-        devOtp = otp.ok ? otp.devOtp : undefined;
-      }
+  const pending = await prisma.pendingSignup.findUnique({ where: { email: normalized } });
+  if (pending) {
+    const valid = await bcrypt.compare(password, pending.passwordHash);
+    if (valid) {
+      await setSignupSession(pending.id);
+      const otp = await sendEmailOtp(pending.email);
       return {
-        reason: "Complete your signup before signing in.",
-        resumeStep,
-        devOtp,
+        reason: "Finish email verification to create your account.",
+        resumeStep: 2,
+        devOtp: otp.ok ? otp.devOtp : undefined,
+        devOtpHint: otp.ok ? otp.devOtpHint : undefined,
       };
     }
   }

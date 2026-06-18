@@ -44,10 +44,13 @@ export default function AuthForm({ mode }: Props) {
         const checkData = await check.json();
         if (checkData.blocked && checkData.resumeStep) {
           setLoading(false);
+          setError(
+            checkData.reason ??
+              "Finish email verification before signing in.",
+          );
           if (checkData.devOtp) {
             setDevOtp(checkData.devOtp);
             setResumeStep(checkData.resumeStep);
-            setError(checkData.reason ?? "Complete your signup to continue.");
             return;
           }
           router.push(`/signup?step=${checkData.resumeStep}`);
@@ -71,7 +74,7 @@ export default function AuthForm({ mode }: Props) {
   }
 
   return (
-    <div className="shine-border w-full">
+    <div className="shine-border w-full rounded-[1.5rem]">
       <div className="shine-border-inner glass-strong rounded-[1.5rem] p-7 sm:p-8">
         <form onSubmit={handleSubmit} className="space-y-4">
           <label className="block">

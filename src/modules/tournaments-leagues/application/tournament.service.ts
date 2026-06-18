@@ -7,7 +7,6 @@ import type {
 import { TournamentRepository } from "../infrastructure/tournament.repository";
 import { LeaderboardRepository } from "../infrastructure/leaderboard.repository";
 import { fetchChallongeBracket } from "@/lib/challonge-api";
-import { STATIC_TOURNAMENT_DETAIL, useStaticTournamentDetail } from "@/lib/tournament-static-detail";
 
 const tournamentRepo = new TournamentRepository();
 const leaderboardRepo = new LeaderboardRepository();
@@ -19,8 +18,7 @@ export async function listTournamentPreviews(): Promise<TournamentPreview[]> {
     previews.map(async (t) => {
       let championName = t.championName ?? null;
 
-      const staticOverlay = useStaticTournamentDetail ? STATIC_TOURNAMENT_DETAIL[t.slug] : null;
-      const bracketUrl = t.bracketUrl ?? staticOverlay?.bracketUrl ?? null;
+      const bracketUrl = t.bracketUrl ?? null;
 
       if (bracketUrl) {
         championName = null; // Strictly resolve from Challonge, no DB/static fallback

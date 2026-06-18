@@ -5,7 +5,7 @@ import {
 } from "@socials-gallery/application/moments-admin.service";
 import { serverEnv } from "@core/config/env.server";
 
-export const metadata = { title: "Admin Moments — NTG" };
+export const metadata = { title: "Admin Moments" };
 
 export default async function AdminMomentsPage() {
   const [decks, reels] = serverEnv.databaseUrl

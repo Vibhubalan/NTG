@@ -1,4 +1,5 @@
 import { guardResponse, isAuthedAdmin, requireAdmin } from "@/lib/auth-guard";
+import { logAdminAction } from "@/lib/admin-audit";
 import { isS3Configured, sanitizeUploadKey, uploadToS3, validateImageBuffer, validateImageUpload } from "@/lib/s3";
 import { serverEnv } from "@core/config/env.server";
 import { NextResponse } from "next/server";
@@ -51,6 +52,8 @@ export async function POST(req: Request) {
   if (!result.ok) {
     return NextResponse.json({ error: result.error }, { status: 500 });
   }
+
+  await logAdminAction(auth.userId, "upload.create", key, { prefix });
 
   return NextResponse.json({ ok: true, url: result.url, key: result.key });
 }

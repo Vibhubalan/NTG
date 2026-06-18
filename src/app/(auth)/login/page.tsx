@@ -4,7 +4,7 @@ import Link from "next/link";
 import { Suspense } from "react";
 
 export const metadata = {
-  title: "Sign in — NTG Lounge",
+  title: "Sign in",
 };
 
 export default function LoginPage() {

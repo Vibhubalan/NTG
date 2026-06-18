@@ -5,7 +5,7 @@ import { listTournamentPreviews } from "@tournaments-leagues/index";
 export const dynamic = "force-dynamic";
 
 export const metadata = {
-  title: "Cups — NTG Lounge",
+  title: "Cups",
 };
 
 export default async function EsportsTournamentsPage() {
@@ -16,7 +16,7 @@ export default async function EsportsTournamentsPage() {
       <PlatformHeader
         eyebrow="Tournaments"
         title="Every cup we've run"
-        subtitle="Filter by upcoming or completed — tap a cup for prizepool, results, and registration."
+        subtitle="Filter by upcoming or completed. Tap a cup for prizepool, results, and registration."
       />
       <TournamentListFiltered tournaments={tournaments} />
     </>

@@ -1,13 +1,14 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { signOut } from "next-auth/react";
 import type { ValorantRole } from "@prisma/client";
 import { computeAgeFromDateOfBirth } from "@/lib/date-age";
 import AccountInfoPanel from "@/components/platform/AccountInfoPanel";
 import GameProfilesPanel from "@/components/platform/GameProfilesPanel";
 
 type FullProfile = {
-  accountId: string | null;
+  displayName: string;
   dateOfBirth: string | null;
   olympusId: string | null;
   email: string | null;
@@ -45,6 +46,32 @@ export default function ProfileEditor() {
 
   const [pendingRiotId, setPendingRiotId] = useState("");
   const [pendingSteamUrl, setPendingSteamUrl] = useState("");
+  const [deleting, setDeleting] = useState(false);
+
+  const deleteAccount = async () => {
+    if (
+      !window.confirm(
+        "Delete your account permanently? This removes your profile and leaderboard entry.",
+      )
+    ) {
+      return;
+    }
+    setDeleting(true);
+    setError(null);
+    try {
+      const res = await fetch("/api/profile/account", { method: "DELETE" });
+      const data = await res.json();
+      if (!res.ok) {
+        setError(data.error ?? "Could not delete account.");
+        return;
+      }
+      await signOut({ callbackUrl: "/" });
+    } catch {
+      setError("Could not delete account.");
+    } finally {
+      setDeleting(false);
+    }
+  };
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -259,6 +286,27 @@ export default function ProfileEditor() {
           {saving ? "Saving…" : "Save changes"}
         </button>
       </div>
+
+      <details className="mt-8 border-t border-white/[0.06] pt-6">
+        <summary className="cursor-pointer text-[11px] uppercase tracking-[0.18em] text-white/35">
+          Delete account
+        </summary>
+        <p className="mt-3 text-xs leading-relaxed text-white/45">
+          Permanently remove your membership. See our{" "}
+          <a href="/privacy" className="text-white/60 underline-offset-2 hover:underline">
+            privacy page
+          </a>{" "}
+          for details.
+        </p>
+        <button
+          type="button"
+          onClick={deleteAccount}
+          disabled={deleting}
+          className="mt-3 rounded-lg border border-red-500/25 px-4 py-2 text-xs font-medium text-red-300/90 transition-colors hover:bg-red-500/10 disabled:opacity-50"
+        >
+          {deleting ? "Deleting…" : "Delete my account"}
+        </button>
+      </details>
     </div>
   );
 }

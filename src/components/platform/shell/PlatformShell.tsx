@@ -22,7 +22,7 @@ export default function PlatformShell({ children }: { children: React.ReactNode 
 
       <div className="mx-auto flex w-full max-w-6xl flex-1 flex-col px-5 pb-20 pt-40 sm:px-6">
         <PlatformBreadcrumb />
-        <div className="flex-1">{children}</div>
+        <div id="main-content" className="flex-1">{children}</div>
       </div>
       
       <div className="mt-auto">

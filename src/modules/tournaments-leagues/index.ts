@@ -8,7 +8,7 @@ export {
   getValorantRankings,
   recordMatchResult,
 } from "./application/tournament.service";
-export { syncUserRank, syncAllLinkedPlayers } from "./application/rank-sync.service";
+export { syncUserRank, syncAllLinkedPlayers, RANK_SYNC_MAX_BATCH_SIZE } from "./application/rank-sync.service";
 export {
   registerForTournament,
   registerFifaTeam,

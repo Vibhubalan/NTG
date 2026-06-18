@@ -20,7 +20,7 @@ export default function Arsenal() {
       >
         <div>
           <span className="text-[10px] font-medium uppercase tracking-[0.4em] text-[var(--color-brand)]/80">
-            02 — Games
+            02 · Games
           </span>
           <h2 className="mt-3 font-display text-4xl font-semibold tracking-[-0.02em] text-white sm:text-5xl">
             Every title.{" "}
@@ -28,7 +28,7 @@ export default function Arsenal() {
           </h2>
         </div>
         <p className="max-w-sm text-white/55">
-          From tactical FPS to MOBA marathons — every title in the lineup runs
+          From tactical FPS to MOBA marathons, every title in the lineup runs
           on full premium hardware, ready when you are.
         </p>
       </motion.div>

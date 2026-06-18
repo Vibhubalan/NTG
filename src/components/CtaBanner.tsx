@@ -40,7 +40,7 @@ export default function CtaBanner() {
           </h2>
           <p className="mx-auto mt-5 max-w-xl text-balance text-white/65">
             Book a station, gather your squad, and step into Mangaluru&apos;s
-            sharpest esports lounge. PC · PS5 · Tournament setups — primed for
+            sharpest esports lounge. PC · PS5 · Tournament setups, primed for
             action.
           </p>
 

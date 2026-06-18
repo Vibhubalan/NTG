@@ -169,7 +169,7 @@ export const specs = [
   { label: "Processor", value: "Ryzen 5 7600X" },
   { label: "Graphics", value: "RTX 5060" },
   { label: "Display", value: "300Hz" },
-  { label: "Peripherals", value: "Gigabyte" },
+  { label: "Peripherals", value: "Logitech & HyperX" },
 ];
 
 export const services = ["PC", "PS5", "Screening", "Birthdays", "Esports"];
@@ -178,7 +178,7 @@ export const brand = {
   name: "NTG Lounge",
   meaning: "Namma Tulunad Gaming",
   tagline: "Esport Lounge",
-  hours: "10 AM — 11 PM",
+  hours: "10 AM - 11 PM",
   address: "302, Lotus Paradise Elite, Bunts Hostel, MLR",
   // Lat/Lng of the lounge — used for the embedded map so it never
   // auto-opens Google's place info card.

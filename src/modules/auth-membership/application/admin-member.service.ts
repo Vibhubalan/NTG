@@ -1,7 +1,10 @@
 import bcrypt from "bcryptjs";
 import { prisma } from "@core/database/client";
 import { computeAgeFromDateOfBirth } from "@/lib/date-age";
-import { generateUniqueAccountId } from "../domain/account-id";
+import {
+  isUsernameTaken,
+  usernameKeyFromDisplayName,
+} from "../domain/username";
 import { linkRiotAccount, unlinkRiotAccount } from "@auth-membership/application/riot-link.service";
 import { linkSteamAccount, unlinkSteamAccount } from "@auth-membership/application/steam-link.service";
 import type { UserRole } from "@prisma/client";
@@ -13,18 +16,21 @@ export async function listMembersAdmin(opts?: { search?: string; limit?: number;
   const limit = Math.min(opts?.limit ?? 50, 100);
   const offset = opts?.offset ?? 0;
 
-  const where = search
-    ? {
-        OR: [
-          { email: { contains: search, mode: "insensitive" as const } },
-          { name: { contains: search, mode: "insensitive" as const } },
-          { phone: { contains: search, mode: "insensitive" as const } },
-          { accountId: { contains: search, mode: "insensitive" as const } },
-          { olympusId: { contains: search, mode: "insensitive" as const } },
-          { riotGameName: { contains: search, mode: "insensitive" as const } },
-        ],
-      }
-    : {};
+  const where = {
+    signupCompleted: true,
+    ...(search
+      ? {
+          OR: [
+            { email: { contains: search, mode: "insensitive" as const } },
+            { name: { contains: search, mode: "insensitive" as const } },
+            { phone: { contains: search, mode: "insensitive" as const } },
+            { olympusId: { contains: search, mode: "insensitive" as const } },
+            { playerProfile: { displayName: { contains: search, mode: "insensitive" as const } } },
+            { riotGameName: { contains: search, mode: "insensitive" as const } },
+          ],
+        }
+      : {}),
+  };
 
   const [users, total] = await Promise.all([
     prisma.user.findMany({
@@ -43,7 +49,6 @@ export async function listMembersAdmin(opts?: { search?: string; limit?: number;
       email: u.email,
       name: u.name,
       phone: u.phone,
-      accountId: u.accountId,
       dateOfBirth: u.dateOfBirth?.toISOString().slice(0, 10) ?? null,
       age: computeAgeFromDateOfBirth(u.dateOfBirth),
       olympusId: u.olympusId,
@@ -73,7 +78,6 @@ export async function getMemberAdmin(userId: string) {
     email: user.email,
     name: user.name,
     phone: user.phone,
-    accountId: user.accountId,
     dateOfBirth: user.dateOfBirth?.toISOString().slice(0, 10) ?? null,
     age: computeAgeFromDateOfBirth(user.dateOfBirth),
     olympusId: user.olympusId,
@@ -110,7 +114,9 @@ export async function createMemberAdmin(input: {
 
   const passwordHash = await bcrypt.hash(input.password, 12);
   const displayName = input.displayName?.trim() || input.name?.trim() || email.split("@")[0];
-  const accountId = await generateUniqueAccountId();
+  if (await isUsernameTaken(displayName)) {
+    return { ok: false, error: "That username is already taken." };
+  }
 
   const user = await prisma.user.create({
     data: {
@@ -119,11 +125,13 @@ export async function createMemberAdmin(input: {
       name: input.name?.trim() || null,
       phone: input.phone?.trim() || null,
       role: input.role ?? "PLAYER",
-      accountId,
       emailVerified: new Date(),
       signupCompleted: true,
       playerProfile: {
-        create: { displayName },
+        create: {
+          displayName,
+          usernameKey: usernameKeyFromDisplayName(displayName),
+        },
       },
     },
   });
@@ -160,10 +168,25 @@ export async function updateMemberAdmin(
   });
 
   if (input.displayName !== undefined) {
+    const trimmed = input.displayName.trim() || "Player";
+    if (await isUsernameTaken(trimmed, userId)) {
+      return { ok: false, error: "That username is already taken." };
+    }
     await prisma.playerProfile.upsert({
       where: { userId },
-      create: { userId, displayName: input.displayName.trim() || "Player" },
-      update: { displayName: input.displayName.trim() || "Player" },
+      create: {
+        userId,
+        displayName: trimmed,
+        usernameKey: usernameKeyFromDisplayName(trimmed),
+      },
+      update: {
+        displayName: trimmed,
+        usernameKey: usernameKeyFromDisplayName(trimmed),
+      },
+    });
+    await prisma.user.update({
+      where: { id: userId },
+      data: { name: trimmed },
     });
   }
 

@@ -1,7 +1,6 @@
 import type { GameSlug, TournamentStatus } from "@prisma/client";
 import { siCounterstrike, siEa, siValorant } from "simple-icons";
 import type { TournamentPreview } from "@core/contracts";
-import { STATIC_TOURNAMENT_DETAIL, useStaticTournamentDetail } from "./tournament-static-detail";
 
 export type TournamentDisplay = {
   id: string;
@@ -52,14 +51,6 @@ export function toTournamentDisplay(t: TournamentPreview): TournamentDisplay {
   const meta = gameMeta[t.game] ?? gameMeta.OTHER;
 
   let championName = t.championName ?? null;
-  const overlay = useStaticTournamentDetail ? STATIC_TOURNAMENT_DETAIL[t.slug] : null;
-  const hasBracket = !!(t.bracketUrl || overlay?.bracketUrl);
-
-  if (useStaticTournamentDetail && !championName && !hasBracket) {
-    if (overlay?.placements?.champion) {
-      championName = overlay.placements.champion;
-    }
-  }
 
   return {
     id: t.slug,

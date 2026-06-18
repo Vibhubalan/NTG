@@ -184,7 +184,7 @@ export default function Performance() {
       >
         <div>
           <span className="text-[10px] font-medium uppercase tracking-[0.4em] text-[var(--color-brand)]/80">
-            01 — The Arena
+            01 · The Arena
           </span>
           <h2 className="mt-3 font-display text-4xl font-semibold tracking-[-0.02em] text-white sm:text-5xl">
             Engineered{" "}

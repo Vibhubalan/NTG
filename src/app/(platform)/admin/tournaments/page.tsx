@@ -3,7 +3,7 @@ import CreateTournamentForm from "@/components/admin/CreateTournamentForm";
 import { listTournamentsAdmin } from "@tournaments-leagues/index";
 import { serverEnv } from "@core/config/env.server";
 
-export const metadata = { title: "Admin Cups — NTG" };
+export const metadata = { title: "Admin Cups" };
 
 function getStatusBadge(status: string) {
   switch (status) {

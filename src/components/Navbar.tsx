@@ -155,61 +155,131 @@ function AuthNavAction({
   );
 }
 
-function MobileNavRow({
+function HamburgerIcon({ open }: { open: boolean }) {
+  return (
+    <svg
+      className="h-5 w-5"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      aria-hidden
+    >
+      {open ? (
+        <>
+          <line x1="6" y1="6" x2="18" y2="18" />
+          <line x1="6" y1="18" x2="18" y2="6" />
+        </>
+      ) : (
+        <>
+          <line x1="4" y1="7" x2="20" y2="7" />
+          <line x1="4" y1="12" x2="20" y2="12" />
+          <line x1="4" y1="17" x2="20" y2="17" />
+        </>
+      )}
+    </svg>
+  );
+}
+
+function ChevronRightIcon() {
+  return (
+    <svg
+      className="h-4 w-4 shrink-0 text-white/35"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden
+    >
+      <polyline points="9 18 15 12 9 6" />
+    </svg>
+  );
+}
+
+function MobileMenu({
+  open,
+  onClose,
   links,
   pathname,
   platform,
 }: {
+  open: boolean;
+  onClose: () => void;
   links: typeof marketingLinks;
   pathname: string;
   platform: boolean;
 }) {
-  return (
-    <ul className="mt-2.5 flex items-stretch gap-1 overflow-x-auto border-t border-white/[0.06] pt-2.5 [-ms-overflow-style:none] [scrollbar-width:none] md:hidden [&::-webkit-scrollbar]:hidden">
-      {links.map((link) => {
-        const active = platform
-          ? pathname === link.href || pathname.startsWith(`${link.href}/`)
-          : link.href === "/esports"
-            ? pathname.startsWith("/esports")
-            : false;
+  useEffect(() => {
+    if (!open) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = prev;
+    };
+  }, [open]);
 
-        const isEsports = link.label.toLowerCase() === "esports";
-        const isLounge = link.label.toLowerCase() === "lounge";
+  if (!open) return null;
 
-        let className =
-          "flex w-full min-w-[4.25rem] shrink-0 items-center justify-center rounded-full px-2 py-2.5 text-[11px] font-medium uppercase tracking-[0.1em] transition-colors ";
+  return createPortal(
+    <div className="fixed inset-0 z-[10000] md:hidden" role="dialog" aria-modal="true" aria-label="Navigation menu">
+      <button
+        type="button"
+        className="absolute inset-0 bg-black/70 backdrop-blur-sm"
+        aria-label="Close menu"
+        onClick={onClose}
+      />
+      <div className="absolute inset-x-0 top-0 max-h-[100dvh] overflow-y-auto border-b border-white/10 bg-[#0a0a0a] shadow-2xl">
+        <div className="flex items-center justify-between border-b border-white/[0.06] px-5 py-4">
+          <span className="text-[11px] font-bold uppercase tracking-[0.28em] text-white/50">Menu</span>
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="Close menu"
+            className="flex h-10 w-10 items-center justify-center rounded-full border border-white/10 text-white/70 transition-colors hover:bg-white/10 hover:text-white"
+          >
+            <HamburgerIcon open />
+          </button>
+        </div>
+        <ul className="divide-y divide-white/[0.06] px-2 py-2">
+          {links.map((link) => {
+            const active = platform
+              ? pathname === link.href || pathname.startsWith(`${link.href}/`)
+              : link.href === "/esports"
+                ? pathname.startsWith("/esports")
+                : false;
 
-        if (active) {
-          className += "bg-white/10 font-semibold text-white";
-        } else if (isEsports) {
-          className += "text-violet-300/90";
-        } else if (isLounge) {
-          className += "text-emerald-300/90";
-        } else {
-          className += "text-white/55";
-        }
+            const rowClass = `flex w-full items-center justify-between px-4 py-4 text-left text-[13px] font-semibold uppercase tracking-[0.2em] transition-colors ${
+              active ? "text-white" : "text-white/70 hover:text-white"
+            }`;
 
-        const label = link.label;
+            const content = (
+              <>
+                <span>{link.label}</span>
+                <ChevronRightIcon />
+              </>
+            );
 
-        if (!platform && link.href.startsWith("#")) {
-          return (
-            <li key={link.href} className="flex flex-1">
-              <a href={link.href} className={className}>
-                {label}
-              </a>
-            </li>
-          );
-        }
-
-        return (
-          <li key={link.href} className="flex flex-1">
-            <Link href={link.href} className={className}>
-              {label}
-            </Link>
-          </li>
-        );
-      })}
-    </ul>
+            return (
+              <li key={link.href}>
+                {!platform && link.href.startsWith("#") ? (
+                  <a href={link.href} className={rowClass} onClick={onClose}>
+                    {content}
+                  </a>
+                ) : (
+                  <Link href={link.href} className={rowClass} onClick={onClose}>
+                    {content}
+                  </Link>
+                )}
+              </li>
+            );
+          })}
+        </ul>
+      </div>
+    </div>,
+    document.body,
   );
 }
 
@@ -217,6 +287,11 @@ function NavbarContent() {
   const pathname = usePathname();
   const { data: session, status } = useSession();
   const [isAdmin, setIsAdmin] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
+
+  useEffect(() => {
+    setMenuOpen(false);
+  }, [pathname]);
 
   useEffect(() => {
     if (status !== "authenticated") {
@@ -291,6 +366,15 @@ function NavbarContent() {
           </ul>
 
           <div className="flex items-center gap-2">
+            <button
+              type="button"
+              className="flex h-10 w-10 items-center justify-center rounded-full border border-white/10 bg-white/[0.04] text-white/80 transition-colors hover:bg-white/10 hover:text-white md:hidden"
+              aria-label={menuOpen ? "Close menu" : "Open menu"}
+              aria-expanded={menuOpen}
+              onClick={() => setMenuOpen((v) => !v)}
+            >
+              <HamburgerIcon open={menuOpen} />
+            </button>
             {status === "loading" ? (
               <span
                 className="h-9 w-[4.5rem] rounded-full bg-white/[0.06] sm:w-20"
@@ -306,7 +390,13 @@ function NavbarContent() {
           </div>
         </div>
 
-        <MobileNavRow links={links} pathname={pathname} platform={platform} />
+        <MobileMenu
+          open={menuOpen}
+          onClose={() => setMenuOpen(false)}
+          links={links}
+          pathname={pathname}
+          platform={platform}
+        />
       </nav>
     </header>
   );

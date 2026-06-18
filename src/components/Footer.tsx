@@ -1,4 +1,5 @@
 import Image from "next/image";
+import Link from "next/link";
 import BrandIcon from "./ui/BrandIcon";
 import { brand, socials } from "@/lib/data";
 
@@ -74,8 +75,14 @@ export default function Footer() {
 
         <div className="mt-8 h-px w-full bg-gradient-to-r from-[var(--color-brand)]/20 via-[var(--color-iris)]/30 to-[var(--color-brand)]/20" />
 
-        <div className="mt-4 flex items-center justify-between gap-4 text-[10px] uppercase tracking-[0.22em] text-white/40">
-          <p>© {year} {brand.name}</p>
+        <div className="mt-4 flex flex-wrap items-center justify-between gap-4 text-[10px] uppercase tracking-[0.22em] text-white/40">
+          <p>
+            © {year} {brand.name}
+            <span className="mx-2 text-white/25">·</span>
+            <Link href="/privacy" className="text-white/45 transition-colors hover:text-white/70">
+              Privacy
+            </Link>
+          </p>
           <p>
             Crafted in <span className="text-white/80">Mangaluru</span>
             <span className="mx-2 text-white/25">·</span>

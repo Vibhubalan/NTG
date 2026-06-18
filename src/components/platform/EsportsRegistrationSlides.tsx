@@ -47,11 +47,17 @@ export default function EsportsRegistrationSlides({ banners, intervalMs = 7000 }
                 : "pointer-events-none z-0 opacity-0"
             } hover:scale-[1.01] hover:ring-white/20 hover:shadow-[0_0_40px_rgba(34,211,238,0.15)] active:scale-[0.98]`}
           >
+            {banner.hubBannerUrl || (banner.hubCarouselImages && banner.hubCarouselImages.length > 0) ? (
+              <div
+                className="absolute inset-0 z-0 bg-cover bg-center opacity-50 transition-transform duration-700 group-hover/card:scale-105"
+                style={{ backgroundImage: `url('${banner.hubBannerUrl || banner.hubCarouselImages[0]}')` }}
+              />
+            ) : null}
             <div
-              className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black via-[#0A0A0A]/80 to-[#0A0A0A]/20"
+              className="pointer-events-none absolute inset-0 z-0 bg-gradient-to-t from-black via-[#0A0A0A]/80 to-[#0A0A0A]/20"
               aria-hidden
             />
-            <div className="pointer-events-none absolute -right-20 -top-20 h-64 w-64 rounded-full bg-[var(--color-brand)]/20 blur-[100px] transition-all duration-500 group-hover/card:bg-[var(--color-brand)]/30" />
+            <div className="pointer-events-none absolute z-0 -right-20 -top-20 h-64 w-64 rounded-full bg-[var(--color-brand)]/20 blur-[100px] transition-all duration-500 group-hover/card:bg-[var(--color-brand)]/30" />
             <div className="pointer-events-none absolute -bottom-32 -left-32 h-96 w-96 rounded-full bg-[var(--color-iris)]/10 blur-[100px]" />
 
             <div className="relative z-10 flex h-full w-full flex-col justify-between gap-8 sm:flex-row sm:items-end">

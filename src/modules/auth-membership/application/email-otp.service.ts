@@ -17,7 +17,7 @@ function normalizeEmail(raw: string): string {
 }
 
 type SendViaResendResult =
-  | { ok: true }
+  | { ok: true; devFallback?: boolean; fallbackReason?: string }
   | { ok: false; reason: string; resendError?: string };
 
 function logOtpDev(email: string, code: string, note: string): void {
@@ -71,9 +71,9 @@ async function sendViaResend(
     logOtpDev(
       email,
       code,
-      `Resend blocked in dev — use this code in the signup form`,
+      `Resend failed in dev — use this code in the signup form`,
     );
-    return { ok: true };
+    return { ok: true, devFallback: true, fallbackReason: resendError };
   }
 
   return {
@@ -84,7 +84,7 @@ async function sendViaResend(
 }
 
 export type SendOtpResult =
-  | { ok: true; devOtp?: string }
+  | { ok: true; devOtp?: string; devOtpHint?: string }
   | { ok: false; error: string; cooldown?: boolean };
 
 export async function sendEmailOtp(
@@ -110,7 +110,7 @@ export async function sendEmailOtp(
   const expiresAt = new Date(Date.now() + OTP_EXPIRY_MIN * 60 * 1000);
 
   await prisma.emailOtp.create({
-    data: { email, codeHash, expiresAt, userId },
+    data: { email, codeHash, expiresAt, userId: userId ?? null },
   });
 
   const sent = await sendViaResend(email, code);
@@ -120,8 +120,46 @@ export async function sendEmailOtp(
 
   return {
     ok: true,
-    ...(process.env.NODE_ENV === "development" ? { devOtp: code } : {}),
+    ...(sent.devFallback
+      ? { devOtp: code, devOtpHint: sent.fallbackReason ?? "Email could not be sent." }
+      : {}),
   };
+}
+
+export async function verifySignupOtp(
+  emailRaw: string,
+  code: string,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const email = normalizeEmail(emailRaw);
+
+  const otp = await prisma.emailOtp.findFirst({
+    where: { email, userId: null },
+    orderBy: { createdAt: "desc" },
+  });
+
+  if (!otp) {
+    return { ok: false, error: "No code found. Request a new one." };
+  }
+
+  if (otp.expiresAt < new Date()) {
+    return { ok: false, error: "Code expired. Request a new one." };
+  }
+
+  if (otp.attempts >= MAX_ATTEMPTS) {
+    return { ok: false, error: "Too many attempts. Request a new code." };
+  }
+
+  const valid = await bcrypt.compare(code, otp.codeHash);
+  await prisma.emailOtp.update({
+    where: { id: otp.id },
+    data: { attempts: otp.attempts + 1 },
+  });
+
+  if (!valid) {
+    return { ok: false, error: "Incorrect code." };
+  }
+
+  return { ok: true };
 }
 
 export async function verifyEmailOtp(

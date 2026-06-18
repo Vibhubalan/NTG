@@ -4,7 +4,7 @@ import { listActiveRegistrationBanners, listTournamentPreviews } from "@tourname
 export const dynamic = "force-dynamic";
 
 export const metadata = {
-  title: "Esports — NTG Lounge",
+  title: "Esports",
 };
 
 export default async function EsportsHubPage() {
@@ -63,7 +63,7 @@ export default async function EsportsHubPage() {
           </div>
           <div className="relative z-10 mt-auto pt-8">
             <h3 className="font-display text-2xl font-bold tracking-wide text-white">Cups Archive</h3>
-            <p className="mt-2 text-sm font-medium leading-relaxed text-white/50">{tournaments.length} tournaments — browse past events, open cups, and detailed results.</p>
+            <p className="mt-2 text-sm font-medium leading-relaxed text-white/50">{tournaments.length} tournaments. Browse past events, open cups, and detailed results.</p>
           </div>
         </Link>
 
@@ -89,7 +89,7 @@ export default async function EsportsHubPage() {
           </div>
           <div className="relative z-10 mt-auto pt-8">
             <h3 className="font-display text-2xl font-bold tracking-wide text-white">Moments</h3>
-            <p className="mt-2 text-sm font-medium leading-relaxed text-white/50">Highlights, finals nights, and the vibe — straight from our live events.</p>
+            <p className="mt-2 text-sm font-medium leading-relaxed text-white/50">Highlights, finals nights, and the vibe from our live events.</p>
           </div>
         </Link>
       </div>

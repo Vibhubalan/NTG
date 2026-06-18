@@ -14,7 +14,6 @@ import type { TournamentBracketView, FinalStandingView } from "@core/contracts/t
 type Props = {
   tournament: TournamentDetail;
   bracket: TournamentBracketView | null;
-  staticMvp?: string | null;
   isLoggedIn: boolean;
   registrationPreview?: RegistrationPreview | null;
 };
@@ -22,7 +21,6 @@ type Props = {
 export default function TournamentDetailView({
   tournament,
   bracket,
-  staticMvp,
   isLoggedIn,
   registrationPreview,
 }: Props) {
@@ -36,35 +34,17 @@ export default function TournamentDetailView({
     : "Date TBA";
 
   const isCompleted = tournament.status === "COMPLETED";
-  const mvp =
-    staticMvp ??
-    bracket?.mvp ??
-    tournament.placements.find((p) => p.role === "MVP")?.displayName ??
-    null;
+  const mvpPlacement = tournament.placements.find((p) => p.role === "MVP");
+  const adminMvp =
+    mvpPlacement?.teamLabel?.trim() ? mvpPlacement.displayName : null;
+  const mvp = bracket?.mvp ?? adminMvp ?? null;
 
   const fallbackStandings: FinalStandingView[] = [];
-  if (!tournament.bracketUrl) {
-    const champPlacement = tournament.placements.find((p) => p.role === "CHAMPION");
-    if (champPlacement) {
-      fallbackStandings.push({
-        rank: 1,
-        name: champPlacement.displayName,
-        record: "",
-      });
-    }
-    const runnerPlacement = tournament.placements.find((p) => p.role === "RUNNER_UP");
-    if (runnerPlacement) {
-      fallbackStandings.push({
-        rank: 2,
-        name: runnerPlacement.displayName,
-        record: "",
-      });
-    }
-  }
 
-  const standings = bracket?.finalStandings && bracket.finalStandings.length > 0
-    ? bracket.finalStandings
-    : fallbackStandings;
+  const standings =
+    bracket?.finalStandings && bracket.finalStandings.length > 0
+      ? bracket.finalStandings.filter((s) => s.rank === 1 || s.rank === 2)
+      : fallbackStandings;
 
   const prizeSplit =
     tournament.prizeSplit && tournament.prizeSplit.length > 0
@@ -80,7 +60,9 @@ export default function TournamentDetailView({
   const showFinalResults = standings.length > 0 || Boolean(mvp);
   const showBracket = Boolean(tournament.bracketUrl);
   const showTeams =
-    tournament.teams.length > 0 || tournament.teamDetails.length > 0 || !isCompleted;
+    tournament.teams.length > 0 ||
+    tournament.teamDetails.length > 0 ||
+    tournament.registrationOpen;
 
   const splitColors = ["text-amber-500/90", "text-slate-300/90", "text-amber-700/90"];
   const splitBadgeColors = ["bg-amber-500/20 text-amber-500", "bg-slate-300/20 text-slate-300", "bg-amber-700/20 text-amber-700"];
@@ -196,6 +178,7 @@ export default function TournamentDetailView({
                   isLoggedIn={isLoggedIn}
                   alreadyRegistered={tournament.userRegistered}
                   registrationOpen={tournament.registrationOpen}
+                  rulebookUrl={tournament.rulebookUrl}
                   preview={registrationPreview ?? null}
                 />
               </div>

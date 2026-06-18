@@ -138,9 +138,16 @@ function buildFinalStandings(
   participants: ChallongeParticipant[],
   records: Map<number, { wins: number; losses: number }>,
 ): FinalStandingView[] {
+  const seenRanks = new Set<number>();
   return participants
-    .filter((p) => p.final_rank !== null && p.final_rank >= 1 && p.final_rank <= 3)
+    .filter((p) => p.final_rank === 1 || p.final_rank === 2)
     .sort((a, b) => (a.final_rank ?? 99) - (b.final_rank ?? 99))
+    .filter((p) => {
+      const rank = p.final_rank as number;
+      if (seenRanks.has(rank)) return false;
+      seenRanks.add(rank);
+      return true;
+    })
     .map((p) => {
       const rec = records.get(p.id);
       const wins = rec?.wins ?? 0;
