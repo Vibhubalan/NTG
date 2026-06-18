@@ -34,6 +34,9 @@ export const serverEnv = {
   get henrikdevApiKey() {
     return optional("HENRIKDEV_API_KEY");
   },
+  get steamWebApiKey() {
+    return optional("STEAM_WEB_API_KEY");
+  },
   get cronSecret() {
     return optional("CRON_SECRET");
   },
@@ -67,6 +70,34 @@ export const serverEnv = {
       .split("|")
       .map((c) => c.trim())
       .filter(Boolean);
+  },
+  /** S3-compatible object storage (e.g. Cloudflare R2) — optional until credentials are set. */
+  get s3():
+    | {
+        bucket: string;
+        region: string;
+        accessKeyId: string;
+        secretAccessKey: string;
+        publicUrl: string;
+        endpoint: string;
+      }
+    | undefined {
+    const bucket = optional("S3_BUCKET");
+    const accessKeyId = optional("S3_ACCESS_KEY_ID");
+    const secretAccessKey = optional("S3_SECRET_ACCESS_KEY");
+    const publicUrl = optional("S3_PUBLIC_URL");
+    const endpoint = optional("S3_ENDPOINT");
+    if (!bucket || !accessKeyId || !secretAccessKey || !publicUrl || !endpoint) {
+      return undefined;
+    }
+    return {
+      bucket,
+      region: optional("S3_REGION") ?? "auto",
+      accessKeyId,
+      secretAccessKey,
+      publicUrl,
+      endpoint,
+    };
   },
   /** Throws if DATABASE_URL is missing — use in DB-backed routes only. */
   requireDatabaseUrl() {

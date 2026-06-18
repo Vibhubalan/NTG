@@ -6,12 +6,42 @@ import type {
 } from "@core/contracts";
 import { TournamentRepository } from "../infrastructure/tournament.repository";
 import { LeaderboardRepository } from "../infrastructure/leaderboard.repository";
+import { fetchChallongeBracket } from "@/lib/challonge-api";
+import { STATIC_TOURNAMENT_DETAIL, useStaticTournamentDetail } from "@/lib/tournament-static-detail";
 
 const tournamentRepo = new TournamentRepository();
 const leaderboardRepo = new LeaderboardRepository();
 
 export async function listTournamentPreviews(): Promise<TournamentPreview[]> {
-  return tournamentRepo.listPreviews();
+  const previews = await tournamentRepo.listPreviews();
+
+  return Promise.all(
+    previews.map(async (t) => {
+      let championName = t.championName ?? null;
+
+      const staticOverlay = useStaticTournamentDetail ? STATIC_TOURNAMENT_DETAIL[t.slug] : null;
+      const bracketUrl = t.bracketUrl ?? staticOverlay?.bracketUrl ?? null;
+
+      if (bracketUrl) {
+        championName = null; // Strictly resolve from Challonge, no DB/static fallback
+        try {
+          const bracketData = await fetchChallongeBracket(bracketUrl);
+          const champ = bracketData?.finalStandings.find((s) => s.rank === 1);
+          if (champ) {
+            championName = champ.name;
+          }
+        } catch (err) {
+          console.error(`[challonge-preview-fetch] failed for ${t.slug}:`, err);
+        }
+      }
+
+      return {
+        ...t,
+        championName,
+        bracketUrl,
+      };
+    })
+  );
 }
 
 export async function getTournamentBySlug(slug: string): Promise<TournamentPreview | null> {
@@ -24,6 +54,10 @@ export async function getTournamentDetail(slug: string, userId?: string) {
 
 export async function getActiveRegistrationBanner(): Promise<TournamentRegistrationBanner | null> {
   return tournamentRepo.findActiveRegistrationBanner();
+}
+
+export async function listActiveRegistrationBanners(): Promise<TournamentRegistrationBanner[]> {
+  return tournamentRepo.findActiveRegistrationBanners();
 }
 
 export async function getLeaderboardPreview(

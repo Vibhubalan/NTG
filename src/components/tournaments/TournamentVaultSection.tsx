@@ -1,5 +1,9 @@
 import { getHomePreviews } from "@landing-home/index";
-import { tournaments as staticTournaments, tournamentRegistration, isTournamentRegistrationLive } from "@/lib/data";
+import {
+  tournaments as staticTournaments,
+  tournamentRegistration,
+  isStaticRegistrationBannerLive,
+} from "@/lib/data";
 import { toTournamentDisplay } from "@/lib/tournament-display";
 import TournamentVault from "@/components/TournamentVault";
 import type { TournamentVaultProps } from "@/components/tournaments/types";
@@ -17,7 +21,7 @@ function staticFallback(): TournamentVaultProps {
       iconPath: t.iconPath,
       hex: t.hex,
     })),
-    registration: isTournamentRegistrationLive()
+    registration: isStaticRegistrationBannerLive()
       ? {
           active: true,
           tournamentSlug: tournamentRegistration.cupId,
@@ -26,6 +30,8 @@ function staticFallback(): TournamentVaultProps {
           message: tournamentRegistration.message,
           href: tournamentRegistration.href,
           hideAfter: tournamentRegistration.hideAfter ?? null,
+          hubBannerUrl: null,
+          hubCarouselImages: [],
         }
       : null,
   };

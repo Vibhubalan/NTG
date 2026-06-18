@@ -10,6 +10,8 @@ export type TournamentPreview = {
   status: TournamentStatus;
   startsAt: string | null;
   registrationUrl: string | null;
+  championName?: string | null;
+  bracketUrl?: string | null;
 };
 
 export type TournamentRegistrationBanner = {
@@ -20,4 +22,6 @@ export type TournamentRegistrationBanner = {
   message: string;
   href: string;
   hideAfter: string | null;
+  hubBannerUrl: string | null;
+  hubCarouselImages: string[];
 };

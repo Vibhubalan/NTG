@@ -5,41 +5,53 @@ import {
   normalizePhone,
   type SignupStep1Input,
 } from "../domain/schemas";
+import { generateUniqueAccountId } from "../domain/account-id";
 import { setSignupSession, clearSignupSession } from "../infrastructure/signup-session";
 import { sendEmailOtp, verifyEmailOtp } from "./email-otp.service";
 import { linkRiotAccount } from "./riot-link.service";
+import {
+  computeSignupStep,
+  migrateLegacySignupUser,
+  tryCompleteSignup,
+} from "./game-profile.service";
 
 const MIN_PASSWORD = 8;
 
-/** Shown when email/phone belong to a finished account or cannot be used. */
 const SIGNUP_CONFLICT_ERROR =
   "Unable to register with these details. If you already have an account, sign in instead.";
 
 export type RegisterResult =
-  | { ok: true; userId: string; resumeStep?: 2 | 3 }
+  | { ok: true; userId: string; resumeStep?: 2; devOtp?: string }
   | { ok: false; error: string };
 
 export type SignupStatus = {
-  step: 2 | 3 | null;
+  step: 2 | null;
   email?: string;
   displayName?: string;
 };
 
 export type LoginBlockResult = {
   reason: string | null;
-  resumeStep?: 2 | 3;
+  resumeStep?: 2;
+  devOtp?: string;
 };
 
 function isEmailVerified(user: { emailVerified: Date | null }): boolean {
   return user.emailVerified != null;
 }
 
-function signupResumeStep(user: {
+type SignupUserShape = {
   signupCompleted: boolean;
   emailVerified: Date | null;
-}): 2 | 3 | null {
+};
+
+function signupResumeStep(user: SignupUserShape): 2 | null {
   if (user.signupCompleted) return null;
-  return isEmailVerified(user) ? 3 : 2;
+  return computeSignupStep(user);
+}
+
+function parseDateOfBirth(isoDate: string): Date {
+  return new Date(`${isoDate}T00:00:00`);
 }
 
 async function resumeIncompleteSignup(
@@ -48,6 +60,8 @@ async function resumeIncompleteSignup(
   displayName: string,
   phone: string,
   passwordHash: string,
+  dateOfBirth: Date,
+  olympusId: string,
 ): Promise<RegisterResult> {
   await prisma.user.update({
     where: { id: userId },
@@ -56,6 +70,8 @@ async function resumeIncompleteSignup(
       name: displayName,
       phone,
       passwordHash,
+      dateOfBirth,
+      olympusId,
       playerProfile: {
         upsert: {
           create: { displayName, town: "Mangaluru" },
@@ -75,7 +91,7 @@ async function resumeIncompleteSignup(
     return { ok: false, error: otp.error };
   }
 
-  return { ok: true, userId, resumeStep: 2 };
+  return { ok: true, userId, resumeStep: 2, devOtp: otp.devOtp };
 }
 
 export async function registerStep1(
@@ -83,6 +99,8 @@ export async function registerStep1(
 ): Promise<RegisterResult> {
   const email = input.email.trim().toLowerCase();
   const displayName = input.displayName.trim();
+  const olympusId = input.olympusId.trim();
+  const dateOfBirth = parseDateOfBirth(input.dateOfBirth);
   let phone: string;
 
   try {
@@ -98,7 +116,10 @@ export async function registerStep1(
   const passwordHash = await bcrypt.hash(input.password, 12);
 
   const [existingByEmail, existingByPhone] = await Promise.all([
-    prisma.user.findUnique({ where: { email } }),
+    prisma.user.findUnique({
+      where: { email },
+      include: { playerProfile: true },
+    }),
     prisma.user.findUnique({ where: { phone } }),
   ]);
 
@@ -112,11 +133,7 @@ export async function registerStep1(
       return { ok: false, error: SIGNUP_CONFLICT_ERROR };
     }
 
-    if (resumeStep === 3) {
-      if (!existingByEmail.passwordHash) {
-        return { ok: false, error: SIGNUP_CONFLICT_ERROR };
-      }
-
+    if (resumeStep === 2 && existingByEmail.passwordHash) {
       const passwordMatches = await bcrypt.compare(
         input.password,
         existingByEmail.passwordHash,
@@ -131,6 +148,8 @@ export async function registerStep1(
           name: displayName,
           phone,
           passwordHash,
+          dateOfBirth,
+          olympusId,
           playerProfile: {
             upsert: {
               create: { displayName, town: "Mangaluru" },
@@ -140,7 +159,7 @@ export async function registerStep1(
         },
       });
       await setSignupSession(existingByEmail.id);
-      return { ok: true, userId: existingByEmail.id, resumeStep: 3 };
+      return { ok: true, userId: existingByEmail.id, resumeStep: 2 };
     }
 
     return resumeIncompleteSignup(
@@ -149,11 +168,17 @@ export async function registerStep1(
       displayName,
       phone,
       passwordHash,
+      dateOfBirth,
+      olympusId,
     );
   }
 
   if (existingByPhone) {
-    const phoneResumeStep = signupResumeStep(existingByPhone);
+    const phoneUser = await prisma.user.findUniqueOrThrow({
+      where: { id: existingByPhone.id },
+      include: { playerProfile: true },
+    });
+    const phoneResumeStep = signupResumeStep(phoneUser);
     if (phoneResumeStep && !existingByPhone.email) {
       return resumeIncompleteSignup(
         existingByPhone.id,
@@ -161,10 +186,14 @@ export async function registerStep1(
         displayName,
         phone,
         passwordHash,
+        dateOfBirth,
+        olympusId,
       );
     }
     return { ok: false, error: SIGNUP_CONFLICT_ERROR };
   }
+
+  const accountId = await generateUniqueAccountId();
 
   let user;
   try {
@@ -174,6 +203,9 @@ export async function registerStep1(
         name: displayName,
         phone,
         passwordHash,
+        accountId,
+        dateOfBirth,
+        olympusId,
         signupCompleted: false,
         playerProfile: {
           create: { displayName, town: "Mangaluru" },
@@ -194,10 +226,12 @@ export async function registerStep1(
     return { ok: false, error: otp.error };
   }
 
-  return { ok: true, userId: user.id, resumeStep: 2 };
+  return { ok: true, userId: user.id, resumeStep: 2, devOtp: otp.devOtp };
 }
 
 export async function getSignupStatus(userId: string): Promise<SignupStatus> {
+  await migrateLegacySignupUser(userId);
+
   const user = await prisma.user.findUnique({
     where: { id: userId },
     include: { playerProfile: true },
@@ -218,7 +252,7 @@ export async function getSignupStatus(userId: string): Promise<SignupStatus> {
 
 export async function resendOtpForSignup(
   userId: string,
-): Promise<{ ok: true } | { ok: false; error: string }> {
+): Promise<{ ok: true; devOtp?: string } | { ok: false; error: string }> {
   const user = await prisma.user.findUnique({ where: { id: userId } });
   if (!user?.email) {
     return { ok: false, error: "Session expired. Start signup again." };
@@ -232,7 +266,7 @@ export async function resendOtpForSignup(
     return { ok: false, error: result.error };
   }
 
-  return { ok: true };
+  return { ok: true, devOtp: result.devOtp };
 }
 
 export async function verifyOtpStep2(
@@ -244,10 +278,13 @@ export async function verifyOtpStep2(
     return { ok: false, error: "Session expired. Start signup again." };
   }
 
-  return verifyEmailOtp(user.email, code, userId);
+  const verified = await verifyEmailOtp(user.email, code, userId);
+  if (!verified.ok) return verified;
+
+  return tryCompleteSignup(userId);
 }
 
-export async function completeRiotStep3(
+export async function linkRiotDuringSignup(
   userId: string,
   riotId: string,
 ): Promise<{ ok: true } | { ok: false; error: string }> {
@@ -257,19 +294,25 @@ export async function completeRiotStep3(
     return { ok: false, error: "Verify your email first." };
   }
 
-  const linked = await linkRiotAccount(userId, riotId);
-  if (!linked.ok) return linked;
-
-  await prisma.user.update({
-    where: { id: userId },
-    data: { signupCompleted: true },
-  });
-
-  await clearSignupSession();
-  return { ok: true };
+  return linkRiotAccount(userId, riotId);
 }
 
-/** Legacy single-step register — use SignupWizard instead. */
+/** @deprecated Use linkRiotDuringSignup + completeSignupFlow */
+export async function completeRiotStep3(
+  userId: string,
+  riotId: string,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const linked = await linkRiotDuringSignup(userId, riotId);
+  if (!linked.ok) return linked;
+  return completeSignupFlow(userId);
+}
+
+export async function completeSignupFlow(
+  userId: string,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  return tryCompleteSignup(userId);
+}
+
 export async function registerMember(): Promise<RegisterResult> {
   return { ok: false, error: "Use the signup wizard at /signup." };
 }
@@ -283,18 +326,23 @@ export async function verifyCredentials(
   const limited = await checkRateLimit(normalized, AUTH_RATE_LIMITS.loginEmail);
   if (!limited.ok) return null;
 
-  const user = await prisma.user.findUnique({ where: { email: normalized } });
+  const user = await prisma.user.findUnique({
+    where: { email: normalized },
+    include: { playerProfile: true },
+  });
   if (!user?.passwordHash) return null;
 
   const valid = await bcrypt.compare(password, user.passwordHash);
   if (!valid) return null;
 
-  // Pre-wizard accounts (no phone on record) may sign in
   if (!user.phone) {
     return { id: user.id, email: user.email!, name: user.name };
   }
 
-  if (!isEmailVerified(user) || !user.signupCompleted) {
+  await migrateLegacySignupUser(user.id);
+
+  const refreshed = await prisma.user.findUnique({ where: { id: user.id } });
+  if (!refreshed?.emailVerified || !refreshed.signupCompleted) {
     return null;
   }
 
@@ -306,24 +354,37 @@ export async function getLoginBlockReason(
   password: string,
 ): Promise<LoginBlockResult> {
   const normalized = email.trim().toLowerCase();
-  const user = await prisma.user.findUnique({ where: { email: normalized } });
+  const user = await prisma.user.findUnique({
+    where: { email: normalized },
+    include: { playerProfile: true },
+  });
   if (!user?.passwordHash) return { reason: null };
 
   const valid = await bcrypt.compare(password, user.passwordHash);
   if (!valid) return { reason: null };
 
-  if (!isEmailVerified(user) || !user.signupCompleted) {
-    const resumeStep = signupResumeStep(user);
+  await migrateLegacySignupUser(user.id);
+  const refreshed = await prisma.user.findUnique({
+    where: { id: user.id },
+    include: { playerProfile: true },
+  });
+  if (!refreshed) return { reason: null };
+
+  if (!isEmailVerified(refreshed) || !refreshed.signupCompleted) {
+    const resumeStep = signupResumeStep(refreshed);
     if (resumeStep) {
-      await setSignupSession(user.id);
-      if (resumeStep === 2 && user.email) {
-        await sendEmailOtp(user.email, user.id);
+      await setSignupSession(refreshed.id);
+      let devOtp: string | undefined;
+      if (resumeStep === 2 && refreshed.email) {
+        const otp = await sendEmailOtp(refreshed.email, refreshed.id);
+        devOtp = otp.ok ? otp.devOtp : undefined;
       }
+      return {
+        reason: "Complete your signup before signing in.",
+        resumeStep,
+        devOtp,
+      };
     }
-    return {
-      reason: "Complete your signup before signing in.",
-      resumeStep: resumeStep ?? undefined,
-    };
   }
 
   return { reason: null };

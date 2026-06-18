@@ -8,6 +8,8 @@ import VisitLounge from "@/components/VisitLounge";
 import CtaBanner from "@/components/CtaBanner";
 import Footer from "@/components/Footer";
 
+export const dynamic = "force-dynamic";
+
 export default function MarketingHome() {
   return (
     <main className="relative min-h-screen">

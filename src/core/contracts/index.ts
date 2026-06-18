@@ -3,6 +3,9 @@ export type {
   TournamentDetail,
   TournamentPlacementView,
   TournamentMatchView,
+  PrizeSplitRow,
+  TournamentTeamView,
+  TournamentTeamPlayerView,
 } from "./tournament-detail";
 export type { LeaderboardPreview, LeaderboardPreviewEntry } from "./leaderboard-preview";
 export type { PublicProfile, PublicGameIdentity } from "./profile-public";
@@ -15,3 +18,10 @@ export type {
   YoutubePreview,
 } from "./moments-gallery";
 export type { RegistrationResult } from "./registration";
+export type {
+  BracketMatchSlot,
+  BracketMatchView,
+  BracketRoundView,
+  FinalStandingView,
+  TournamentBracketView,
+} from "./tournament-bracket";

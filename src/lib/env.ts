@@ -17,6 +17,13 @@ export const mapsEmbedUrl = process.env.NEXT_PUBLIC_GOOGLE_MAPS_EMBED_URL || "";
 
 export const mapsLink = process.env.NEXT_PUBLIC_GOOGLE_MAPS_LINK || "";
 
+/**
+ * Past/hosted tournament cards are non-clickable by default.
+ * Set NEXT_PUBLIC_ALLOW_PAST_TOURNAMENT_CLICKS=1 locally if you need to open them in dev.
+ */
+export const allowPastTournamentClicks =
+  process.env.NEXT_PUBLIC_ALLOW_PAST_TOURNAMENT_CLICKS === "1";
+
 export function whatsappInquiryUrl(
   message = "Hi NTG Lounge, I'd like to inquire about a slot.",
 ) {

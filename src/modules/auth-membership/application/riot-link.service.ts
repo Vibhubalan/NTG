@@ -49,3 +49,31 @@ export async function linkRiotAccount(
 
   return { ok: true };
 }
+
+export async function unlinkRiotAccount(
+  userId: string,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  await prisma.user.update({
+    where: { id: userId },
+    data: {
+      riotPuuid: null,
+      riotGameName: null,
+      riotTagLine: null,
+      riotRegion: null,
+    },
+  });
+
+  await prisma.gameIdentity.deleteMany({
+    where: {
+      profile: { userId },
+      game: GameSlug.VALORANT,
+      platform: "Riot",
+    },
+  });
+
+  await prisma.leaderboardEntry.deleteMany({
+    where: { userId, game: GameSlug.VALORANT },
+  });
+
+  return { ok: true };
+}

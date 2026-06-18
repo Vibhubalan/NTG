@@ -15,10 +15,31 @@ function normalizeEmail(raw: string): string {
   return raw.trim().toLowerCase();
 }
 
-async function sendViaResend(email: string, code: string): Promise<boolean> {
+type SendViaResendResult =
+  | { ok: true }
+  | { ok: false; reason: string; resendError?: string };
+
+function logOtpDev(email: string, code: string, note: string): void {
+  if (process.env.NODE_ENV !== "development") return;
+  console.info(
+    `[NTG OTP] ${note}\n` +
+      `  to:   ${email}\n` +
+      `  code: ${code}\n` +
+      `  (expires in ${OTP_EXPIRY_MIN} minutes)`,
+  );
+}
+
+async function sendViaResend(
+  email: string,
+  code: string,
+): Promise<SendViaResendResult> {
   const apiKey = serverEnv.resendApiKey;
   const from = serverEnv.emailFrom;
-  if (!apiKey || !from) return false;
+  if (!apiKey || !from) {
+    const reason = "Email not configured (RESEND_API_KEY or EMAIL_FROM missing).";
+    console.error(`[NTG OTP] ${reason}`);
+    return { ok: false, reason };
+  }
 
   const resend = new Resend(apiKey);
   const { error } = await resend.emails.send({
@@ -35,11 +56,34 @@ async function sendViaResend(email: string, code: string): Promise<boolean> {
     `,
   });
 
-  return !error;
+  if (!error) {
+    console.info(`[NTG OTP] Sent via Resend to ${email}`);
+    return { ok: true };
+  }
+
+  const resendError = error.message ?? "Unknown Resend error";
+  console.error(`[NTG OTP] Resend failed for ${email}: ${resendError}`);
+
+  // Resend sandbox (onboarding@resend.dev) only delivers to the account owner email.
+  // In local dev, log the code so signup can be tested without a verified domain.
+  if (process.env.NODE_ENV === "development") {
+    logOtpDev(
+      email,
+      code,
+      `Resend blocked in dev — use this code in the signup form`,
+    );
+    return { ok: true };
+  }
+
+  return {
+    ok: false,
+    reason: "Failed to send email. Try again later.",
+    resendError,
+  };
 }
 
 export type SendOtpResult =
-  | { ok: true }
+  | { ok: true; devOtp?: string }
   | { ok: false; error: string; cooldown?: boolean };
 
 export async function sendEmailOtp(
@@ -69,11 +113,14 @@ export async function sendEmailOtp(
   });
 
   const sent = await sendViaResend(email, code);
-  if (!sent) {
-    return { ok: false, error: "Failed to send email. Try again later." };
+  if (!sent.ok) {
+    return { ok: false, error: sent.reason };
   }
 
-  return { ok: true };
+  return {
+    ok: true,
+    ...(process.env.NODE_ENV === "development" ? { devOtp: code } : {}),
+  };
 }
 
 export async function verifyEmailOtp(

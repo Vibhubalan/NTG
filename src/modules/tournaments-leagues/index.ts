@@ -3,6 +3,7 @@ export {
   getTournamentBySlug,
   getTournamentDetail,
   getActiveRegistrationBanner,
+  listActiveRegistrationBanners,
   getLeaderboardPreview,
   getValorantRankings,
   recordMatchResult,
@@ -10,6 +11,30 @@ export {
 export { syncUserRank, syncAllLinkedPlayers } from "./application/rank-sync.service";
 export {
   registerForTournament,
+  registerFifaTeam,
+  getRegistrationEligibility,
   setTournamentPlacements,
   updateTournamentAdmin,
+  adminAddTournamentRegistration,
+  adminRemoveTournamentRegistration,
 } from "./application/registration.service";
+export {
+  listTournamentsAdmin,
+  getTournamentAdmin,
+  createTournament,
+  updateTournamentFull,
+  deleteTournament,
+  clearTournamentPlacement,
+  createTournamentTeam,
+  updateTournamentTeam,
+  deleteTournamentTeam,
+  createTeamPlayer,
+  updateTeamPlayer,
+  deleteTeamPlayer,
+  listTournamentRegistrationsAdmin,
+  listUnassignedPlayerRegistrations,
+  buildRegistrationsCsv,
+  parsePrizeSplit,
+  defaultPrizeSplit,
+  syncRegistrationStatus,
+} from "./application/admin-tournament.service";

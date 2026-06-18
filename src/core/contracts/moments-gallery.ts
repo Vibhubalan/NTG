@@ -2,6 +2,7 @@ export type FeaturedDeckImage = {
   src: string;
   alt: string;
   gridClass: string;
+  caption?: string;
 };
 
 export type FeaturedDeck = {
@@ -9,6 +10,7 @@ export type FeaturedDeck = {
   eyebrow: string;
   title: string;
   subtitle: string;
+  displayMode?: "BLEND" | "CAROUSEL";
   images: FeaturedDeckImage[];
 };
 
@@ -28,7 +30,7 @@ export type YoutubePreview = {
 };
 
 export type MomentsGallery = {
-  featured: FeaturedDeck;
+  featured: FeaturedDeck | null;
   reels: ReelPreview[];
   youtube: YoutubePreview | null;
 };

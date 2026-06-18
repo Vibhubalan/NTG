@@ -3,6 +3,8 @@
 import { motion, AnimatePresence } from "framer-motion";
 import Link from "next/link";
 import BrandIcon from "./ui/BrandIcon";
+import { allowPastTournamentClicks } from "@/lib/env";
+import StatusBadge from "@/components/platform/ui/StatusBadge";
 import type { TournamentVaultProps } from "./tournaments/types";
 
 export default function TournamentVault({ tournaments, registration }: TournamentVaultProps) {
@@ -105,63 +107,89 @@ export default function TournamentVault({ tournaments, registration }: Tournamen
               </span>
             </div>
 
-            <Link
-              href={`/esports/tournaments/${t.slug}`}
-              className="flex-1 overflow-hidden rounded-2xl border border-white/[0.06] bg-white/[0.02] transition-colors hover:border-white/15 hover:bg-white/[0.04]"
-            >
-              <div className="flex flex-col gap-4 px-5 py-5 sm:flex-row sm:items-center sm:justify-between sm:px-7 sm:py-6">
-                <div className="flex items-center gap-4">
-                  <span
-                    className="relative flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-[#0a1020] md:hidden"
-                    style={{
-                      color: t.hex,
-                      boxShadow: `inset 0 0 0 1px ${t.hex}55`,
-                    }}
-                  >
-                    <BrandIcon path={t.iconPath} title={t.name} className="h-5 w-5" />
-                  </span>
-                  <span className="hidden font-display text-2xl font-black tabular-nums text-white/15 sm:text-3xl md:inline">
-                    {String(i + 1).padStart(2, "0")}
-                  </span>
-                  <div>
-                    <p className="font-display text-xl font-semibold tracking-[-0.01em] text-white sm:text-2xl">
-                      {t.name}
-                    </p>
-                    <p className="mt-1 text-xs uppercase tracking-[0.22em] text-white/45">
-                      {t.game} · {t.season}
-                    </p>
-                  </div>
-                </div>
-                <div className="flex items-center gap-2 sm:gap-3">
-                  <span className="rounded-full bg-white/[0.05] px-3 py-1 text-[10px] uppercase tracking-[0.22em] text-white/55 ring-1 ring-inset ring-white/10">
-                    {t.date}
-                  </span>
-                  {t.status === "Soon" || t.status === "Open" ? (
-                    <span className="inline-flex items-center gap-1.5 rounded-full bg-[var(--color-brand)]/10 px-3 py-1 text-[10px] uppercase tracking-[0.22em] text-[var(--color-brand)] ring-1 ring-inset ring-[var(--color-brand)]/45">
-                      <span className="relative flex h-1.5 w-1.5">
-                        <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-[var(--color-brand)] opacity-75" />
-                        <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-[var(--color-brand)]" />
-                      </span>
-                      {t.status === "Open" ? "Open" : "Soon"}
-                    </span>
-                  ) : t.status === "Live" ? (
-                    <span className="inline-flex items-center gap-1.5 rounded-full bg-red-500/10 px-3 py-1 text-[10px] uppercase tracking-[0.22em] text-red-400 ring-1 ring-inset ring-red-500/45">
-                      Live
-                    </span>
-                  ) : (
+            {t.status === "Hosted" && !allowPastTournamentClicks ? (
+              <div
+                className="flex-1 cursor-default overflow-hidden rounded-2xl border border-white/[0.06] bg-white/[0.02] opacity-80"
+                aria-disabled="true"
+              >
+                <div className="flex flex-col gap-4 px-5 py-5 sm:flex-row sm:items-center sm:justify-between sm:px-7 sm:py-6">
+                  <div className="flex items-center gap-4">
                     <span
-                      className="rounded-full px-3 py-1 text-[10px] uppercase tracking-[0.22em] text-white"
+                      className="relative flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-[#0a1020] md:hidden"
                       style={{
-                        background: `${t.hex}1f`,
+                        color: t.hex,
                         boxShadow: `inset 0 0 0 1px ${t.hex}55`,
                       }}
                     >
-                      Hosted
+                      <BrandIcon path={t.iconPath} title={t.name} className="h-5 w-5" />
                     </span>
-                  )}
+                    <span className="hidden font-display text-2xl font-black tabular-nums text-white/15 sm:text-3xl md:inline">
+                      {String(i + 1).padStart(2, "0")}
+                    </span>
+                    <div>
+                      <p className="font-display text-xl font-semibold tracking-[-0.01em] text-white sm:text-2xl flex flex-wrap items-center gap-3">
+                        <span>{t.name}</span>
+                        {t.championName && (
+                          <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-400/10 px-2.5 py-0.5 text-[10px] font-black uppercase tracking-wider text-amber-300 ring-1 ring-inset ring-amber-400/30">
+                            🏆 Winner: {t.championName}
+                          </span>
+                        )}
+                      </p>
+                      <p className="mt-1 text-xs uppercase tracking-[0.22em] text-white/45">
+                        {t.game} · {t.season}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2 sm:gap-3">
+                    <span className="rounded-full bg-white/[0.05] px-3 py-1 text-[10px] uppercase tracking-[0.22em] text-white/55 ring-1 ring-inset ring-white/10">
+                      {t.date}
+                    </span>
+                    <StatusBadge status={t.status} />
+                  </div>
                 </div>
               </div>
-            </Link>
+            ) : (
+              <Link
+                href={`/esports/tournaments/${t.slug}`}
+                className="flex-1 overflow-hidden rounded-2xl border border-white/[0.06] bg-white/[0.02] transition-colors hover:border-white/15 hover:bg-white/[0.04]"
+              >
+                <div className="flex flex-col gap-4 px-5 py-5 sm:flex-row sm:items-center sm:justify-between sm:px-7 sm:py-6">
+                  <div className="flex items-center gap-4">
+                    <span
+                      className="relative flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-[#0a1020] md:hidden"
+                      style={{
+                        color: t.hex,
+                        boxShadow: `inset 0 0 0 1px ${t.hex}55`,
+                      }}
+                    >
+                      <BrandIcon path={t.iconPath} title={t.name} className="h-5 w-5" />
+                    </span>
+                    <span className="hidden font-display text-2xl font-black tabular-nums text-white/15 sm:text-3xl md:inline">
+                      {String(i + 1).padStart(2, "0")}
+                    </span>
+                    <div>
+                      <p className="font-display text-xl font-semibold tracking-[-0.01em] text-white sm:text-2xl flex flex-wrap items-center gap-3">
+                        <span>{t.name}</span>
+                        {t.championName && (
+                          <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-400/10 px-2.5 py-0.5 text-[10px] font-black uppercase tracking-wider text-amber-300 ring-1 ring-inset ring-amber-400/30">
+                            🏆 Winner: {t.championName}
+                          </span>
+                        )}
+                      </p>
+                      <p className="mt-1 text-xs uppercase tracking-[0.22em] text-white/45">
+                        {t.game} · {t.season}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2 sm:gap-3">
+                    <span className="rounded-full bg-white/[0.05] px-3 py-1 text-[10px] uppercase tracking-[0.22em] text-white/55 ring-1 ring-inset ring-white/10">
+                      {t.date}
+                    </span>
+                    <StatusBadge status={t.status} />
+                  </div>
+                </div>
+              </Link>
+            )}
           </motion.li>
         ))}
       </motion.ol>

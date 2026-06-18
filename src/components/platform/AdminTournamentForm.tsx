@@ -112,6 +112,7 @@ export default function AdminTournamentForm({ slug, initial }: Props) {
         className="w-full rounded-xl border border-white/10 bg-[#0a1020]/60 px-4 py-2.5 text-sm text-white focus:outline-none"
       >
         <option value="DRAFT" className="bg-[#0a1020]">Draft</option>
+        <option value="UPCOMING" className="bg-[#0a1020]">Upcoming</option>
         <option value="REGISTRATION_OPEN" className="bg-[#0a1020]">Registration open</option>
         <option value="IN_PROGRESS" className="bg-[#0a1020]">In progress</option>
         <option value="COMPLETED" className="bg-[#0a1020]">Completed</option>

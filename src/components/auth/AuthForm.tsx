@@ -1,5 +1,6 @@
 "use client";
 
+import DevOtpBanner from "./DevOtpBanner";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { signIn } from "next-auth/react";
@@ -17,10 +18,14 @@ export default function AuthForm({ mode }: Props) {
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [devOtp, setDevOtp] = useState<string | null>(null);
+  const [resumeStep, setResumeStep] = useState<2 | null>(null);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError("");
+    setDevOtp(null);
+    setResumeStep(null);
     setLoading(true);
 
     try {
@@ -39,6 +44,12 @@ export default function AuthForm({ mode }: Props) {
         const checkData = await check.json();
         if (checkData.blocked && checkData.resumeStep) {
           setLoading(false);
+          if (checkData.devOtp) {
+            setDevOtp(checkData.devOtp);
+            setResumeStep(checkData.resumeStep);
+            setError(checkData.reason ?? "Complete your signup to continue.");
+            return;
+          }
           router.push(`/signup?step=${checkData.resumeStep}`);
           return;
         }
@@ -98,6 +109,29 @@ export default function AuthForm({ mode }: Props) {
             <p className="rounded-lg border border-red-500/25 bg-red-500/10 px-3 py-2 text-sm text-red-300">
               {error}
             </p>
+          ) : null}
+
+          {devOtp ? (
+            <DevOtpBanner
+              code={devOtp}
+              hint={
+                resumeStep === 2
+                  ? "Use this code on the signup page to verify your email."
+                  : "Continue signup to finish your account."
+              }
+            />
+          ) : null}
+
+          {devOtp && resumeStep ? (
+            <Link
+              href={`/signup?step=${resumeStep}`}
+              onClick={() => {
+                if (devOtp) sessionStorage.setItem("ntg_dev_otp", devOtp);
+              }}
+              className="cta block w-full rounded-full py-3.5 text-center text-sm font-semibold uppercase tracking-[0.18em]"
+            >
+              Continue signup
+            </Link>
           ) : null}
 
           <button

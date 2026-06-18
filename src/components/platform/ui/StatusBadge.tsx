@@ -1,13 +1,14 @@
 type Props = {
   status: string;
-  variant?: "default" | "live" | "open" | "hosted";
+  variant?: "default" | "live" | "open" | "upcoming" | "hosted";
 };
 
 const styles: Record<NonNullable<Props["variant"]>, string> = {
   default: "bg-white/[0.05] text-white/60 ring-white/10",
-  live: "bg-red-500/10 text-red-300 ring-red-500/30",
-  open: "bg-[var(--color-brand)]/10 text-[var(--color-brand)] ring-[var(--color-brand)]/35",
-  hosted: "bg-white/[0.05] text-white/55 ring-white/12",
+  live: "bg-red-500/15 text-red-400 ring-red-500/35",
+  open: "bg-emerald-500/10 text-emerald-400 ring-emerald-500/25",
+  upcoming: "bg-cyan-500/10 text-cyan-300 ring-cyan-500/25",
+  hosted: "bg-red-950/20 text-red-400/80 ring-red-900/30",
 };
 
 export default function StatusBadge({ status, variant = "default" }: Props) {
@@ -18,20 +19,24 @@ export default function StatusBadge({ status, variant = "default" }: Props) {
         ? "live"
         : status === "Open" || status === "REGISTRATION_OPEN"
           ? "open"
-          : status === "Hosted" || status === "COMPLETED"
-            ? "hosted"
-            : "default";
+          : status === "Upcoming" || status === "UPCOMING"
+            ? "upcoming"
+            : status === "Hosted" || status === "COMPLETED"
+              ? "hosted"
+              : "default";
 
   const label =
-    status === "REGISTRATION_OPEN"
-      ? "Open"
-      : status === "IN_PROGRESS"
+    status === "REGISTRATION_OPEN" || status === "Open"
+      ? "Registration Open"
+      : status === "IN_PROGRESS" || status === "Live"
         ? "Live"
-        : status === "COMPLETED"
-          ? "Hosted"
-          : status === "DRAFT"
-            ? "Soon"
-            : status;
+        : status === "COMPLETED" || status === "Hosted"
+          ? "Completed"
+          : status === "UPCOMING" || status === "Upcoming"
+            ? "Upcoming"
+            : status === "DRAFT" || status === "Soon"
+              ? "Draft"
+              : status;
 
   return (
     <span

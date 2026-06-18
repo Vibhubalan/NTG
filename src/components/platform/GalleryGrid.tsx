@@ -2,6 +2,7 @@ import Link from "next/link";
 import type { MomentsGallery } from "@core/contracts";
 import { instagramUrl } from "@/lib/env";
 import LoungeFeaturedCollage from "./LoungeFeaturedCollage";
+import ImageCarousel from "@/components/admin/ImageCarousel";
 
 type Props = {
   gallery: MomentsGallery;
@@ -19,11 +20,40 @@ export default function GalleryGrid({ gallery }: Props) {
   const { featured, reels, youtube } = gallery;
   const hasReels = reels.length > 0;
   const hasYoutube = youtube != null;
-  const hasFeaturedImages = featured.images.length > 0;
+  const hasFeaturedImages = featured != null && featured.images.length > 0;
 
   return (
     <div className="space-y-16">
-      <LoungeFeaturedCollage deck={featured} />
+      {hasFeaturedImages && featured ? (
+        featured.displayMode === "CAROUSEL" ? (
+          <div className="relative min-h-[16rem] overflow-hidden rounded-[1.5rem] border border-white/[0.08] bg-[#070b14] sm:aspect-[21/9] sm:min-h-[18rem]">
+            <ImageCarousel
+              slides={featured.images.map((img) => ({
+                src: img.src,
+                alt: img.alt,
+                caption: img.caption,
+              }))}
+              className="absolute inset-0 h-full w-full"
+              overlay={
+                <>
+                  <div className="pointer-events-none absolute inset-0 z-20 bg-gradient-to-t from-[#070b14] via-[#070b14]/60 to-transparent" />
+                  <div className="absolute bottom-0 left-0 right-0 z-30 p-6 sm:p-8">
+                    <p className="text-[10px] uppercase tracking-[0.32em] text-[var(--color-brand)]">
+                      {featured.eyebrow}
+                    </p>
+                    <h2 className="mt-2 font-display text-2xl font-bold text-white sm:text-3xl">
+                      {featured.title}
+                    </h2>
+                    <p className="mt-1 text-sm text-white/50">{featured.subtitle}</p>
+                  </div>
+                </>
+              }
+            />
+          </div>
+        ) : (
+          <LoungeFeaturedCollage deck={featured} />
+        )
+      ) : null}
 
       {hasReels ? (
         <section>

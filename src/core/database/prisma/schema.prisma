@@ -28,6 +28,7 @@ enum GameSlug {
 
 enum TournamentStatus {
   DRAFT
+  UPCOMING
   REGISTRATION_OPEN
   IN_PROGRESS
   COMPLETED
@@ -71,20 +72,51 @@ enum RegistrationStatus {
   REJECTED
 }
 
+enum PlayedGame {
+  VALORANT
+  CS2
+}
+
+enum RegistrationParticipantRole {
+  CAPTAIN
+  PLAYER
+}
+
+enum ValorantRole {
+  DUELIST
+  INITIATOR
+  CONTROLLER
+  SENTINEL
+  FLEX
+}
+
+enum MomentsDisplayMode {
+  BLEND
+  CAROUSEL
+}
+
 // ─── @auth-membership ────────────────────────────────────────────────────────
 
 model User {
   id               String    @id @default(cuid())
+  accountId        String?   @unique
   email            String?   @unique
   emailVerified    DateTime?
   name             String?
   image            String?
   passwordHash     String?
   phone            String?   @unique
+  dateOfBirth      DateTime? @db.Date
+  olympusId        String?
   riotPuuid        String?   @unique
   riotGameName     String?
   riotTagLine      String?
   riotRegion       String?
+  steamId64        String?   @unique
+  steamProfileUrl  String?
+  steamPersonaName String?
+  cs2HoursPlayed   Float?
+  steamLinkedAt    DateTime?
   signupCompleted  Boolean   @default(false)
   role             UserRole  @default(PLAYER)
   createdAt        DateTime  @default(now())
@@ -95,10 +127,13 @@ model User {
   playerProfile PlayerProfile?
   emailOtps     EmailOtp[]
 
-  registrations TournamentRegistration[]
+  registrations       TournamentRegistration[]
+  partnerRegistrations TournamentRegistration[] @relation("RegistrationPartner")
   matchSlots    MatchParticipant[]
   placements    TournamentPlacement[]
   leaderboard   LeaderboardEntry[]
+  captainedTeams TournamentTeam[] @relation("TeamCaptain")
+  teamPlayers   TournamentTeamPlayer[]
 }
 
 model EmailOtp {
@@ -151,11 +186,15 @@ model PlayerProfile {
   id          String   @id @default(cuid())
   userId      String   @unique
   user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  displayName String
-  town        String   @default("Mangaluru")
-  bio         String?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  displayName     String
+  town            String         @default("Mangaluru")
+  bio             String?
+  playedGames     PlayedGame[]   @default([])
+  valorantRoles   ValorantRole[] @default([])
+  cs2PeakPremierRank String?
+  cs2FaceitRank      String?
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
 
   gameLinks GameIdentity[]
 }
@@ -183,44 +222,114 @@ model Season {
 }
 
 model Tournament {
-  id              String           @id @default(cuid())
-  slug            String           @unique
-  name            String
-  game            GameSlug
-  gameLabel       String?
-  seasonId        String?
-  season          Season?          @relation(fields: [seasonId], references: [id])
-  status          TournamentStatus @default(DRAFT)
-  format          BracketType?
-  prizePool       Decimal?         @db.Decimal(10, 2)
-  prizeNotes      String?
-  startsAt        DateTime?
-  endsAt          DateTime?
-  registrationUrl String?
-  hideAfter       DateTime?
-  createdAt       DateTime         @default(now())
-  updatedAt       DateTime         @updatedAt
+  id                   String           @id @default(cuid())
+  slug                 String           @unique
+  name                 String
+  game                 GameSlug
+  gameLabel            String?
+  seasonId             String?
+  season               Season?          @relation(fields: [seasonId], references: [id])
+  status               TournamentStatus @default(DRAFT)
+  format               BracketType?
+  description          String?
+  posterUrl            String?
+  hubBannerUrl         String?
+  hubCarouselImages    Json?
+  showOnEsportsHub     Boolean          @default(false)
+  prizePool            Decimal?         @db.Decimal(10, 2)
+  prizeNotes           String?
+  prizeSplit           Json?
+  startsAt             DateTime?
+  endsAt               DateTime?
+  registrationOpensAt  DateTime?
+  registrationClosesAt DateTime?
+  autoManageStatus     Boolean          @default(false)
+  registrationUrl      String?
+  hideAfter            DateTime?
+  bracketUrl           String?
+  teams                Json?
+  createdAt            DateTime         @default(now())
+  updatedAt            DateTime         @updatedAt
 
   bracket       Bracket?
+  tournamentTeams TournamentTeam[]
   registrations TournamentRegistration[]
   placements    TournamentPlacement[]
 }
 
+model TournamentTeam {
+  id                   String   @id @default(cuid())
+  tournamentId         String
+  tournament           Tournament @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
+  name                 String
+  seed                 Int?
+  sortOrder            Int      @default(0)
+  captainUserId        String?
+  captain              User?    @relation("TeamCaptain", fields: [captainUserId], references: [id], onDelete: SetNull)
+  logoUrl              String?
+  sourceRegistrationId String?  @unique
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+  players              TournamentTeamPlayer[]
+  registrations        TournamentRegistration[]
+
+  @@index([tournamentId, sortOrder])
+}
+
+model TournamentTeamPlayer {
+  id              String         @id @default(cuid())
+  teamId          String
+  team            TournamentTeam @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  userId          String?
+  user            User?          @relation(fields: [userId], references: [id], onDelete: SetNull)
+  registrationId  String?  @unique
+  registration    TournamentRegistration? @relation(fields: [registrationId], references: [id], onDelete: SetNull)
+  displayName     String
+  riotGameName    String?
+  riotTagLine     String?
+  valorantRoles   Json?
+  peakPremierRank String?
+  sortOrder       Int            @default(0)
+  createdAt       DateTime       @default(now())
+
+  @@index([teamId, sortOrder])
+  @@index([registrationId])
+}
+
 model TournamentRegistration {
-  id                  String             @id @default(cuid())
-  tournamentId        String
-  tournament          Tournament         @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
-  userId              String
-  user                User               @relation(fields: [userId], references: [id], onDelete: Cascade)
-  teamName            String?
-  partnerName         String?
-  snapshotDisplayName String?
-  snapshotRiotId      String?
-  snapshotPhone       String?
-  status              RegistrationStatus @default(PENDING)
-  createdAt           DateTime           @default(now())
+  id                    String                      @id @default(cuid())
+  tournamentId          String
+  tournament            Tournament                  @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
+  userId                String
+  user                  User                        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  participantRole       RegistrationParticipantRole @default(PLAYER)
+  teamId                String?
+  team                  TournamentTeam?             @relation(fields: [teamId], references: [id], onDelete: SetNull)
+  teamName              String?
+  partnerName           String?
+  partnerUserId         String?
+  partner               User?                       @relation("RegistrationPartner", fields: [partnerUserId], references: [id], onDelete: SetNull)
+  snapshotPartnerAccountId String?
+  snapshotOlympusId     String?
+  snapshotDateOfBirth   DateTime?                   @db.Date
+  snapshotAccountId     String?
+  snapshotDisplayName   String?
+  snapshotRiotId        String?
+  snapshotPhone         String?
+  snapshotRankTier      String?
+  snapshotRankTierId    Int?
+  snapshotValorantRoles Json?
+  snapshotCs2PeakPremier String?
+  snapshotCs2FaceitRank String?
+  snapshotSteamId64     String?
+  snapshotCs2Hours      Float?
+  status                RegistrationStatus          @default(APPROVED)
+  createdAt             DateTime                    @default(now())
+  teamPlayerRows        TournamentTeamPlayer[]
 
   @@unique([tournamentId, userId])
+  @@index([tournamentId, participantRole])
+  @@index([teamId])
 }
 
 model Bracket {
@@ -335,4 +444,41 @@ model GalleryItem {
   pinned       Boolean       @default(false)
 
   @@unique([sourceId, externalId])
+}
+
+model MomentsFeaturedDeck {
+  id          String               @id @default(cuid())
+  slug        String               @unique
+  eyebrow     String
+  title       String
+  subtitle    String
+  displayMode MomentsDisplayMode   @default(BLEND)
+  active      Boolean              @default(true)
+  sortOrder   Int                  @default(0)
+  createdAt   DateTime             @default(now())
+  updatedAt   DateTime             @updatedAt
+  images      MomentsFeaturedImage[]
+}
+
+model MomentsFeaturedImage {
+  id        String              @id @default(cuid())
+  deckId    String
+  deck      MomentsFeaturedDeck @relation(fields: [deckId], references: [id], onDelete: Cascade)
+  url       String
+  alt       String
+  caption   String?
+  sortOrder Int                 @default(0)
+
+  @@index([deckId, sortOrder])
+}
+
+model SocialReelPost {
+  id        String   @id @default(cuid())
+  reelUrl   String   @unique
+  coverUrl  String?
+  caption   String?
+  sortOrder Int      @default(0)
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }

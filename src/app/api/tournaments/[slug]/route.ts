@@ -2,6 +2,7 @@ import { getSession } from "@core/auth/session";
 import { guardResponse, isAuthedSession, requireSession } from "@/lib/auth-guard";
 import { serverEnv } from "@core/config/env.server";
 import { getTournamentDetail, registerForTournament } from "@tournaments-leagues/index";
+import { tournamentRegisterSchema } from "@auth-membership/domain/schemas";
 import { NextResponse } from "next/server";
 
 export const dynamic = "force-dynamic";
@@ -35,7 +36,23 @@ export async function POST(req: Request, { params }: Props) {
 
   const { slug } = await params;
 
-  const result = await registerForTournament(slug, auth.userId);
+  let body: unknown = { participantRole: "PLAYER" };
+  try {
+    const raw = await req.json();
+    if (raw && typeof raw === "object") body = raw;
+  } catch {
+    /* empty body defaults to player pool */
+  }
+
+  const parsed = tournamentRegisterSchema.safeParse(body);
+  if (!parsed.success) {
+    return NextResponse.json(
+      { error: parsed.error.issues[0]?.message ?? "Invalid registration." },
+      { status: 400 },
+    );
+  }
+
+  const result = await registerForTournament(slug, auth.userId, parsed.data);
 
   if (!result.ok) {
     return NextResponse.json({ error: result.error }, { status: 400 });

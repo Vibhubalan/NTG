@@ -1,6 +1,7 @@
 import type { GameSlug, TournamentStatus } from "@prisma/client";
 import { siCounterstrike, siEa, siValorant } from "simple-icons";
 import type { TournamentPreview } from "@core/contracts";
+import { STATIC_TOURNAMENT_DETAIL, useStaticTournamentDetail } from "./tournament-static-detail";
 
 export type TournamentDisplay = {
   id: string;
@@ -9,19 +10,20 @@ export type TournamentDisplay = {
   game: string;
   season: string;
   date: string;
-  status: "Hosted" | "Soon" | "Live" | "Open";
+  status: "Hosted" | "Soon" | "Live" | "Open" | "Upcoming";
   iconPath: string;
   hex: string;
+  championName?: string | null;
 };
 
 const gameMeta: Record<
   GameSlug,
   { iconPath: string; hex: string; label: string }
 > = {
-  VALORANT: { iconPath: siValorant.path, hex: `#${siValorant.hex}`, label: "Valorant" },
-  CS2: { iconPath: siCounterstrike.path, hex: `#${siCounterstrike.hex}`, label: "Counter-Strike 2" },
-  EA_FC26: { iconPath: siEa.path, hex: `#${siEa.hex}`, label: "EA FC 26" },
-  OTHER: { iconPath: siValorant.path, hex: `#${siValorant.hex}`, label: "Other" },
+  VALORANT: { iconPath: siValorant.path, hex: "#ff4655", label: "Valorant" },
+  CS2: { iconPath: siCounterstrike.path, hex: "#e65a23", label: "Counter-Strike 2" },
+  EA_FC26: { iconPath: siEa.path, hex: "#02ef5c", label: "EA FC 26" },
+  OTHER: { iconPath: siValorant.path, hex: "#ff4655", label: "Other" },
 };
 
 function formatMonthYear(iso: string | null): string {
@@ -38,6 +40,9 @@ function mapDisplayStatus(status: TournamentStatus): TournamentDisplay["status"]
       return "Live";
     case "REGISTRATION_OPEN":
       return "Open";
+    case "UPCOMING":
+      return "Upcoming";
+    case "DRAFT":
     default:
       return "Soon";
   }
@@ -45,6 +50,17 @@ function mapDisplayStatus(status: TournamentStatus): TournamentDisplay["status"]
 
 export function toTournamentDisplay(t: TournamentPreview): TournamentDisplay {
   const meta = gameMeta[t.game] ?? gameMeta.OTHER;
+
+  let championName = t.championName ?? null;
+  const overlay = useStaticTournamentDetail ? STATIC_TOURNAMENT_DETAIL[t.slug] : null;
+  const hasBracket = !!(t.bracketUrl || overlay?.bracketUrl);
+
+  if (useStaticTournamentDetail && !championName && !hasBracket) {
+    if (overlay?.placements?.champion) {
+      championName = overlay.placements.champion;
+    }
+  }
+
   return {
     id: t.slug,
     slug: t.slug,
@@ -55,6 +71,7 @@ export function toTournamentDisplay(t: TournamentPreview): TournamentDisplay {
     status: mapDisplayStatus(t.status),
     iconPath: meta.iconPath,
     hex: meta.hex,
+    championName,
   };
 }
 

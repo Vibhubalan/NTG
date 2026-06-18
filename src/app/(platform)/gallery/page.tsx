@@ -2,6 +2,8 @@ import PlatformHeader from "@/components/platform/shell/PlatformHeader";
 import GalleryGrid from "@/components/platform/GalleryGrid";
 import { getMomentsGallery } from "@socials-gallery/index";
 
+export const dynamic = "force-dynamic";
+
 export const metadata = {
   title: "Moments — NTG Lounge",
 };

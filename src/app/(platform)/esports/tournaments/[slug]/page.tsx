@@ -1,10 +1,10 @@
 import { notFound } from "next/navigation";
 import TournamentDetailView from "@/components/platform/TournamentDetailView";
-import AdminTournamentForm from "@/components/platform/AdminTournamentForm";
+import { mergeTournamentDetail, STATIC_TOURNAMENT_DETAIL, useStaticTournamentDetail } from "@/lib/tournament-static-detail";
+import { fetchChallongeBracket } from "@/lib/challonge-api";
 import { getSession } from "@core/auth/session";
 import { requireAdmin } from "@core/auth/require-admin";
-import { getTournamentDetail } from "@tournaments-leagues/index";
-import { prisma } from "@core/database/client";
+import { getTournamentDetail, getRegistrationEligibility } from "@tournaments-leagues/index";
 
 type Props = { params: Promise<{ slug: string }> };
 
@@ -18,49 +18,45 @@ export default async function TournamentDetailPage({ params }: Props) {
   const { slug } = await params;
   const session = await getSession();
   const userId = session?.user?.id;
-  const tournament = await getTournamentDetail(slug, userId);
+  const raw = await getTournamentDetail(slug, userId);
+  if (!raw) notFound();
+  const tournament = mergeTournamentDetail(raw);
+  const bracket = tournament.bracketUrl
+    ? await fetchChallongeBracket(tournament.bracketUrl)
+    : null;
 
-  if (!tournament) notFound();
+  if (bracket && tournament.teams.length === 0 && bracket.participants.length > 0) {
+    tournament.teams = bracket.participants;
+  }
+
+  const staticOverlay = useStaticTournamentDetail ? STATIC_TOURNAMENT_DETAIL[slug] : undefined;
+  const staticMvp = staticOverlay?.placements?.mvp ?? null;
+  if (bracket && staticMvp) {
+    bracket.mvp = staticMvp;
+  }
 
   const admin = await requireAdmin();
-  const placementMap = Object.fromEntries(
-    tournament.placements.map((p) => [p.role, p.displayName]),
-  );
-
-  let previewName: string | null = null;
-  let previewRiotId: string | null = null;
-  if (userId) {
-    const user = await prisma.user.findUnique({
-      where: { id: userId },
-      include: { playerProfile: true },
-    });
-    previewName = user?.playerProfile?.displayName ?? user?.name ?? null;
-    previewRiotId =
-      user?.riotGameName && user?.riotTagLine
-        ? `${user.riotGameName}#${user.riotTagLine}`
-        : null;
-  }
+  const registrationPreview = userId
+    ? await getRegistrationEligibility(slug, userId)
+    : null;
 
   return (
     <>
       <TournamentDetailView
         tournament={tournament}
+        bracket={bracket}
+        staticMvp={staticMvp}
         isLoggedIn={!!userId}
-        previewName={previewName}
-        previewRiotId={previewRiotId}
+        registrationPreview={registrationPreview}
       />
       {admin.ok ? (
-        <div className="mt-16 border-t border-white/[0.06] pt-12">
-          <AdminTournamentForm
-            slug={slug}
-            initial={{
-              champion: placementMap.CHAMPION,
-              runnerUp: placementMap.RUNNER_UP,
-              mvp: placementMap.MVP,
-              prizePool: tournament.prizePool ?? "",
-              status: tournament.status,
-            }}
-          />
+        <div className="mt-16 border-t border-white/[0.06] pt-8 text-center">
+          <a
+            href={`/admin/tournaments/${slug}`}
+            className="inline-flex rounded-full border border-amber-500/30 bg-amber-500/10 px-6 py-2.5 text-[11px] font-semibold uppercase tracking-[0.16em] text-amber-200 transition-colors hover:bg-amber-500/20"
+          >
+            Edit in admin →
+          </a>
         </div>
       ) : null}
     </>

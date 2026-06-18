@@ -2,6 +2,8 @@ import PlatformHeader from "@/components/platform/shell/PlatformHeader";
 import TournamentListFiltered from "@/components/platform/TournamentListFiltered";
 import { listTournamentPreviews } from "@tournaments-leagues/index";
 
+export const dynamic = "force-dynamic";
+
 export const metadata = {
   title: "Cups — NTG Lounge",
 };

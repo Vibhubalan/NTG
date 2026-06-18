@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Space_Grotesk, Inter } from "next/font/google";
 import Navbar from "@/components/Navbar";
 import AuthSessionProvider from "@/components/providers/SessionProvider";
+import RouteProgressBar from "@/components/providers/RouteProgressBar";
 import "./globals.css";
 
 const spaceGrotesk = Space_Grotesk({
@@ -43,6 +44,7 @@ export default function RootLayout({
     >
       <body>
         <AuthSessionProvider>
+          <RouteProgressBar />
           <Navbar />
           {children}
         </AuthSessionProvider>
