@@ -1,4 +1,5 @@
 import { guardResponse, isAuthedSession, requireSession } from "@/lib/auth-guard";
+import { AUTH_RATE_LIMITS, enforceRateLimit } from "@/lib/rate-limit";
 import { serverEnv } from "@core/config/env.server";
 import { prisma } from "@core/database/client";
 import {
@@ -22,6 +23,9 @@ export async function POST(req: Request, { params }: Props) {
 
   const auth = await requireSession();
   if (!isAuthedSession(auth)) return guardResponse(auth)!;
+
+  const limited = await enforceRateLimit(req, AUTH_RATE_LIMITS.tournamentRegister);
+  if (limited) return limited;
 
   const { slug } = await params;
 

@@ -90,6 +90,31 @@ export function validateImageUpload(
   return { ok: true };
 }
 
+export function validateImageBuffer(
+  buffer: Buffer,
+): { ok: true; contentType: string } | { ok: false; error: string } {
+  if (buffer.length >= 3 && buffer[0] === 0xff && buffer[1] === 0xd8 && buffer[2] === 0xff) {
+    return { ok: true, contentType: "image/jpeg" };
+  }
+  if (
+    buffer.length >= 8 &&
+    buffer[0] === 0x89 &&
+    buffer[1] === 0x50 &&
+    buffer[2] === 0x4e &&
+    buffer[3] === 0x47
+  ) {
+    return { ok: true, contentType: "image/png" };
+  }
+  if (
+    buffer.length >= 12 &&
+    buffer.toString("ascii", 0, 4) === "RIFF" &&
+    buffer.toString("ascii", 8, 12) === "WEBP"
+  ) {
+    return { ok: true, contentType: "image/webp" };
+  }
+  return { ok: false, error: "File content is not a valid JPEG, PNG, or WebP image." };
+}
+
 export function validateTeamLogoUpload(
   file: File,
 ): { ok: true } | { ok: false; error: string } {

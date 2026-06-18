@@ -6,7 +6,11 @@ const COOKIE_NAME = "ntg_signup_session";
 const MAX_AGE_SEC = 60 * 30; // 30 min
 
 function getSecret(): string {
-  return serverEnv.authSecret ?? "dev-signup-secret-change-me";
+  const secret = serverEnv.authSecret;
+  if (!secret && process.env.NODE_ENV === "production") {
+    throw new Error("AUTH_SECRET is required in production.");
+  }
+  return secret ?? "dev-signup-secret-change-me";
 }
 
 function sign(payload: string): string {

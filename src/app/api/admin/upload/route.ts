@@ -1,5 +1,5 @@
 import { guardResponse, isAuthedAdmin, requireAdmin } from "@/lib/auth-guard";
-import { isS3Configured, sanitizeUploadKey, uploadToS3, validateImageUpload } from "@/lib/s3";
+import { isS3Configured, sanitizeUploadKey, uploadToS3, validateImageBuffer, validateImageUpload } from "@/lib/s3";
 import { serverEnv } from "@core/config/env.server";
 import { NextResponse } from "next/server";
 
@@ -40,8 +40,13 @@ export async function POST(req: Request) {
   }
 
   const buffer = Buffer.from(await file.arrayBuffer());
+  const magic = validateImageBuffer(buffer);
+  if (!magic.ok) {
+    return NextResponse.json({ error: magic.error }, { status: 400 });
+  }
+
   const key = sanitizeUploadKey(prefix, file.name);
-  const result = await uploadToS3(key, buffer, file.type);
+  const result = await uploadToS3(key, buffer, magic.contentType);
 
   if (!result.ok) {
     return NextResponse.json({ error: result.error }, { status: 500 });

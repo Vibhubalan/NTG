@@ -1,4 +1,5 @@
 import bcrypt from "bcryptjs";
+import { randomInt } from "crypto";
 import { Resend } from "resend";
 import { prisma } from "@core/database/client";
 import { serverEnv } from "@core/config/env.server";
@@ -8,7 +9,7 @@ const MAX_ATTEMPTS = 5;
 const RESEND_COOLDOWN_MS = 60_000;
 
 function generateCode(): string {
-  return String(Math.floor(100000 + Math.random() * 900000));
+  return String(randomInt(100000, 1000000));
 }
 
 function normalizeEmail(raw: string): string {

@@ -100,6 +100,10 @@ export const AUTH_RATE_LIMITS = {
   otpSend: { prefix: "auth:otp-send", limit: 3, windowMs: 10 * 60 * 1000 },
   otpVerify: { prefix: "auth:otp-verify", limit: 15, windowMs: 10 * 60 * 1000 },
   riotLink: { prefix: "auth:riot-link", limit: 10, windowMs: 15 * 60 * 1000 },
+  steamLink: { prefix: "auth:steam-link", limit: 10, windowMs: 15 * 60 * 1000 },
+  tournamentRegister: { prefix: "app:tournament-register", limit: 10, windowMs: 15 * 60 * 1000 },
+  teamLogoUpload: { prefix: "app:team-logo-upload", limit: 10, windowMs: 60 * 60 * 1000 },
+  profilePatch: { prefix: "app:profile-patch", limit: 30, windowMs: 15 * 60 * 1000 },
 } as const satisfies Record<string, RateLimitConfig>;
 
 export function rateLimitResponse(retryAfterSec: number): NextResponse {
