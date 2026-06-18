@@ -388,14 +388,25 @@ export default function SignupWizard() {
                   onChange={(e) => setPhone(e.target.value)}
                   className={inputClass}
                 />
-                <input
-                  type="date"
-                  required
-                  value={dateOfBirth}
-                  onChange={(e) => setDateOfBirth(e.target.value)}
-                  className={inputClass}
-                  aria-label="Date of birth"
-                />
+                <div className="relative">
+                  <input
+                    id="signup-dob"
+                    type="date"
+                    required
+                    value={dateOfBirth}
+                    onChange={(e) => setDateOfBirth(e.target.value)}
+                    className={`${inputClass} ${!dateOfBirth ? "text-transparent [&::-webkit-datetime-edit]:opacity-0" : ""}`}
+                    aria-label="Date of birth"
+                  />
+                  {!dateOfBirth ? (
+                    <label
+                      htmlFor="signup-dob"
+                      className="pointer-events-none absolute inset-y-0 left-4 flex items-center text-sm text-white/30"
+                    >
+                      Date of birth
+                    </label>
+                  ) : null}
+                </div>
                 <input
                   type="text"
                   required
