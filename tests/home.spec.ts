@@ -12,7 +12,6 @@ test.describe("Production homepage", () => {
 
     await expect(page.getByRole("heading", { name: /Namma Tulunad/i })).toBeVisible();
     await expect(page.locator("#top").getByText("Gaming", { exact: true })).toBeVisible();
-    await expect(page.getByText("Mangaluru").first()).toBeVisible();
     await expect(
       page.getByRole("link", { name: /Inquire Now/i }),
     ).toBeVisible();

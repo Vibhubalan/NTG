@@ -86,7 +86,6 @@ export default function ValorantRankingsBoard({ data }: Props) {
 
   const goToPage = (newPage: number) => {
     setPage(newPage);
-    window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
   return (

@@ -31,23 +31,6 @@ export default function Hero() {
       </span>
 
       <div className="relative z-10 flex flex-col items-center px-6 text-center">
-        <span className="glass mt-16 -mb-15 flex items-center gap-2.5 rounded-full px-4 py-1.5 text-[10px] font-medium uppercase tracking-[0.4em] text-[var(--color-brand)]/90">
-          <svg
-            viewBox="0 0 24 24"
-            aria-hidden
-            className="h-3 w-3"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          >
-            <path d="M12 22s7-6.5 7-12a7 7 0 1 0-14 0c0 5.5 7 12 7 12Z" />
-            <circle cx="12" cy="10" r="2.5" />
-          </svg>
-          Mangaluru
-        </span>
-
         <h1 className="font-display font-semibold uppercase text-white mt-30">
           <span className="block text-4xl leading-[0.96] tracking-[-0.025em] sm:text-6xl md:text-7xl lg:text-[6rem]">
             Namma Tulunad
