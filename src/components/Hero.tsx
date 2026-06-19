@@ -25,7 +25,7 @@ export default function Hero() {
       {/* Watermark */}
       <span
         aria-hidden
-        className="text-outline pointer-events-none absolute left-1/2 top-[45%] sm:top-[50%] z-0 -translate-x-1/2 -translate-y-1/2 select-none whitespace-nowrap font-display text-[32vw] font-black leading-none tracking-[-0.06em] sm:text-[26vw] md:text-[22vw]"
+        className="text-outline pointer-events-none absolute left-1/2 top-[42.7%] sm:top-[48.5%] z-0 -translate-x-1/2 -translate-y-1/2 select-none whitespace-nowrap font-display text-[32vw] font-black leading-none tracking-[-0.06em] sm:text-[26vw] md:text-[24vw]"
       >
         NTG
       </span>
