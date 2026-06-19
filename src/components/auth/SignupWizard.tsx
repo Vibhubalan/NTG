@@ -389,14 +389,14 @@ export default function SignupWizard() {
                   onChange={(e) => setPhone(e.target.value)}
                   className={inputClass}
                 />
-                <div className="relative">
+                <div className="relative w-full">
                   <input
                     id="signup-dob"
                     type="date"
                     required
                     value={dateOfBirth}
                     onChange={(e) => setDateOfBirth(e.target.value)}
-                    className={`${inputClass} ${!dateOfBirth ? "text-transparent [&::-webkit-datetime-edit]:opacity-0" : ""}`}
+                    className={`${inputClass} min-w-0 ${!dateOfBirth ? "text-transparent [&::-webkit-datetime-edit]:opacity-0" : ""}`}
                     aria-label="Date of birth"
                   />
                   {!dateOfBirth ? (
@@ -485,24 +485,30 @@ export default function SignupWizard() {
                   >
                     Resend code
                   </button>
-                  <button
-                    type="button"
-                    onClick={() => startOver()}
-                    disabled={loading}
-                    className="w-full text-center text-xs text-white/35 hover:text-white/60"
-                  >
-                    Wrong email? Start over
-                  </button>
                 </div>
               </form>
             )}
 
-            <p className="mt-6 text-center text-sm text-white/40">
-              Already have an account?{" "}
-              <Link href="/login" className="text-[var(--color-brand)] hover:underline">
-                Login
-              </Link>
-            </p>
+            {step === 1 ? (
+              <p className="mt-6 text-center text-sm text-white/40">
+                Already have an account?{" "}
+                <Link href="/login" className="text-[var(--color-brand)] hover:underline">
+                  Login
+                </Link>
+              </p>
+            ) : (
+              <p className="mt-6 text-center text-sm text-white/40">
+                Wrong email?{" "}
+                <button
+                  type="button"
+                  onClick={() => startOver()}
+                  disabled={loading}
+                  className="text-[var(--color-brand)] hover:underline cursor-pointer bg-transparent border-0 p-0 font-normal focus:outline-none"
+                >
+                  Start over
+                </button>
+              </p>
+            )}
           </>
         )}
       </div>
