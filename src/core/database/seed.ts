@@ -1,11 +1,9 @@
 import { tournaments, tournamentRegistration } from "@/lib/data";
 import {
   GameSlug,
-  PrismaClient,
   TournamentStatus,
 } from "@prisma/client";
-
-const prisma = new PrismaClient();
+import { prisma } from "./client";
 
 function mapGame(game: string): GameSlug {
   if (game.includes("Valorant")) return "VALORANT";
