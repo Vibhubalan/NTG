@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { motion, useMotionValue, useSpring } from "framer-motion";
+import { motion, useMotionValue } from "framer-motion";
 
 export default function CustomCursor() {
   const [isHovered, setIsHovered] = useState(false);
@@ -10,10 +10,6 @@ export default function CustomCursor() {
 
   const cursorX = useMotionValue(-100);
   const cursorY = useMotionValue(-100);
-
-  const springConfig = { damping: 35, stiffness: 350, mass: 0.35 };
-  const cursorXSpring = useSpring(cursorX, springConfig);
-  const cursorYSpring = useSpring(cursorY, springConfig);
 
   useEffect(() => {
     // Only activate cursor on PC (devices supporting hover, fine pointer, and screen width >= 1024px)
@@ -87,8 +83,8 @@ export default function CustomCursor() {
         mixBlendMode: "difference",
         pointerEvents: "none",
         zIndex: 999999,
-        x: cursorXSpring,
-        y: cursorYSpring,
+        x: cursorX,
+        y: cursorY,
         translateX: "-50%",
         translateY: "-50%",
         display: isInput ? "none" : "block",
