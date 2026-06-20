@@ -9,6 +9,8 @@ import {
   rankAccentClass,
   rankIconUrl,
 } from "@/lib/valorant-rank";
+import BrandIcon from "@/components/ui/BrandIcon";
+import { gameMetaFor } from "@/lib/tournament-display";
 
 const PAGE_SIZE = 10;
 
@@ -182,18 +184,13 @@ export default function ValorantRankingsBoard({ data }: Props) {
           {/* Subtle glow orb inside the card */}
           <div className="absolute -top-24 -right-24 h-48 w-48 rounded-full bg-cyan-500/20 blur-[80px]" />
           
-          {/* Valorant Logo (Top Right) */}
-          <div className="absolute top-6 right-6 sm:top-8 sm:right-8 opacity-80 pointer-events-none drop-shadow-[0_0_15px_rgba(255,70,85,0.8)]">
-            <svg 
-              viewBox="0 0 100 100" 
-              className="w-20 h-20 sm:w-36 sm:h-36"
-              fill="none" 
-              stroke="#FF4655" 
-              strokeWidth="2.5" 
-              strokeLinejoin="round"
-            >
-              <path d="M99.25 48.66V10.28c0-.59-.75-.86-1.12-.39l-41.92 52.4a.627.627 0 00.49 1.02h30.29c.82 0 1.59-.37 2.1-1.01l9.57-11.96c.38-.48.59-1.07.59-1.68zM1.17 50.34L32.66 89.7c.51.64 1.28 1.01 2.1 1.01h53.46c.53 0 .82-.61.45-1.02L36.6 24.52A3.242 3.242 0 0034.07 23.4H2.23c-.76 0-1.16.89-.66 1.45l31.14 38.3c.53.64.12 1.62-.68 1.66H1.77c-.52.01-.81-.61-.45-1.02z" />
-            </svg>
+          {/* Valorant Logo (Top Right) — filled paths, not stroke (stroke breaks the V shape) */}
+          <div className="absolute top-6 right-6 sm:top-8 sm:right-8 pointer-events-none text-[#FF4655] opacity-90 drop-shadow-[0_0_15px_rgba(255,70,85,0.8)]">
+            <BrandIcon
+              path={gameMetaFor("VALORANT").iconPath}
+              title="Valorant"
+              className="h-20 w-20 sm:h-36 sm:w-36"
+            />
           </div>
           
           <div className="relative z-10">
