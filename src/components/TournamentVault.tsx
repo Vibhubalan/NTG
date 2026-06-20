@@ -1,6 +1,6 @@
 "use client";
 
-import { motion, AnimatePresence } from "framer-motion";
+import { motion } from "framer-motion";
 import Link from "next/link";
 import BrandIcon from "./ui/BrandIcon";
 import { allowPastTournamentClicks } from "@/lib/env";
@@ -33,57 +33,41 @@ export default function TournamentVault({ tournaments, registration }: Tournamen
           </h2>
         </div>
         <p className="max-w-sm text-white/55">
-          Seven cups on the board, two more loading. The NTG tournament vault:
-          every champion etched into the lounge&apos;s history.
+          Our latest five cups. Every champion etched into the lounge&apos;s history.
         </p>
       </motion.div>
 
-      <AnimatePresence>
-        {showBanner && registration ? (
-          <motion.aside
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -6 }}
-            transition={{ duration: 0.45, ease: "easeOut" }}
-            className="mb-8 flex flex-col gap-3 rounded-2xl border border-white/[0.08] bg-white/[0.03] px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-5"
-            role="status"
-            aria-live="polite"
+      {showBanner && registration ? (
+        <aside
+          className="mb-8 flex flex-col gap-3 rounded-2xl border border-white/[0.08] bg-white/[0.03] px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-5"
+          role="status"
+          aria-live="polite"
+        >
+          <div className="min-w-0">
+            <p className="text-[10px] font-medium uppercase tracking-[0.32em] text-[var(--color-brand)]/90">
+              Now registering
+            </p>
+            <p className="mt-1 font-display text-base font-medium text-white sm:text-lg">
+              {registration.message}
+            </p>
+            <p className="mt-0.5 text-xs text-white/50">
+              {registration.title} · {registration.detail}
+            </p>
+          </div>
+          <Link
+            href={registration.href}
+            className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-[var(--color-brand)]/35 bg-[var(--color-brand)]/10 px-4 py-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--color-brand)] transition-colors hover:border-[var(--color-brand)]/55 hover:bg-[var(--color-brand)]/15"
           >
-            <div className="min-w-0">
-              <p className="text-[10px] font-medium uppercase tracking-[0.32em] text-[var(--color-brand)]/90">
-                Now registering
-              </p>
-              <p className="mt-1 font-display text-base font-medium text-white sm:text-lg">
-                {registration.message}
-              </p>
-              <p className="mt-0.5 text-xs text-white/50">
-                {registration.title} · {registration.detail}
-              </p>
-            </div>
-            <Link
-              href={registration.href}
-              className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-[var(--color-brand)]/35 bg-[var(--color-brand)]/10 px-4 py-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--color-brand)] transition-colors hover:border-[var(--color-brand)]/55 hover:bg-[var(--color-brand)]/15"
-            >
-              Register
-              <svg viewBox="0 0 24 24" className="h-3 w-3" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
-                <path d="M7 17L17 7" />
-                <path d="M8 7h9v9" />
-              </svg>
-            </Link>
-          </motion.aside>
-        ) : null}
-      </AnimatePresence>
+            Register
+            <svg viewBox="0 0 24 24" className="h-3 w-3" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+              <path d="M7 17L17 7" />
+              <path d="M8 7h9v9" />
+            </svg>
+          </Link>
+        </aside>
+      ) : null}
 
-      <motion.ol
-        initial="hidden"
-        whileInView="visible"
-        viewport={{ once: true, margin: "-60px" }}
-        variants={{
-          visible: { transition: { staggerChildren: 0.06 } },
-          hidden: {},
-        }}
-        className="relative space-y-3"
-      >
+      <ol className="relative space-y-3">
         <span
           aria-hidden
           className="pointer-events-none absolute left-[1.875rem] top-2 hidden h-[calc(100%-1rem)] w-px bg-gradient-to-b from-[var(--color-brand)]/35 via-white/10 to-transparent md:block"
@@ -91,10 +75,10 @@ export default function TournamentVault({ tournaments, registration }: Tournamen
         {tournaments.map((t, i) => (
           <motion.li
             key={t.slug}
-            variants={{
-              hidden: { opacity: 0, x: -20 },
-              visible: { opacity: 1, x: 0, transition: { duration: 0.5, ease: "easeOut" } },
-            }}
+            initial={{ opacity: 0, y: 15 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true, margin: "-60px" }}
+            transition={{ duration: 0.5, delay: i * 0.05 }}
             style={{ ["--cup" as string]: t.hex }}
             className="group relative flex items-stretch gap-5"
           >
@@ -124,7 +108,7 @@ export default function TournamentVault({ tournaments, registration }: Tournamen
                       <BrandIcon path={t.iconPath} title={t.name} className="h-5 w-5" />
                     </span>
                     <span className="hidden font-display text-2xl font-black tabular-nums text-white/15 sm:text-3xl md:inline">
-                      {String(i + 1).padStart(2, "0")}
+                      {String(t.displayNumber ?? (i + 1)).padStart(2, "0")}
                     </span>
                     <div>
                       <p className="font-display text-xl font-semibold tracking-[-0.01em] text-white sm:text-2xl flex flex-wrap items-center gap-3">
@@ -165,7 +149,7 @@ export default function TournamentVault({ tournaments, registration }: Tournamen
                       <BrandIcon path={t.iconPath} title={t.name} className="h-5 w-5" />
                     </span>
                     <span className="hidden font-display text-2xl font-black tabular-nums text-white/15 sm:text-3xl md:inline">
-                      {String(i + 1).padStart(2, "0")}
+                      {String(t.displayNumber ?? (i + 1)).padStart(2, "0")}
                     </span>
                     <div>
                       <p className="font-display text-xl font-semibold tracking-[-0.01em] text-white sm:text-2xl flex flex-wrap items-center gap-3">
@@ -192,22 +176,18 @@ export default function TournamentVault({ tournaments, registration }: Tournamen
             )}
           </motion.li>
         ))}
-      </motion.ol>
+      </ol>
 
-      <motion.div
-        initial={{ opacity: 0, y: 16 }}
-        whileInView={{ opacity: 1, y: 0 }}
-        viewport={{ once: true, margin: "-60px" }}
-        transition={{ duration: 0.5, delay: 0.1 }}
-        className="mt-8 flex flex-col items-center gap-3 text-center text-sm text-white/45 sm:flex-row sm:justify-center"
-      >
+      <div className="mt-10 flex flex-col items-center gap-3 text-center text-sm text-white/45 sm:flex-row sm:justify-center">
         <span>
-          Want in on the next cup?{" "}
+          Looking for older cups?{" "}
           <Link href="/esports/tournaments" className="text-gradient-brand font-medium hover:underline">
-            Browse tournaments
+            View all tournaments
           </Link>
         </span>
-      </motion.div>
+      </div>
     </section>
   );
 }
+
+

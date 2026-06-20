@@ -13,6 +13,7 @@ export type TournamentDisplay = {
   iconPath: string;
   hex: string;
   championName?: string | null;
+  displayNumber?: number;
 };
 
 const gameMeta: Record<
