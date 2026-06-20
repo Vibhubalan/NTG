@@ -8,11 +8,11 @@ import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 
 const marketingLinks = [
-  { label: "Arena", href: "#arena" },
-  { label: "Games", href: "#games" },
-  { label: "Trophies", href: "#vault" },
+  { label: "Arena", href: "/#arena" },
+  { label: "Games", href: "/#games" },
+  { label: "Trophies", href: "/#vault" },
   { label: "Esports", href: "/esports" },
-  { label: "Visit", href: "#visit" },
+  { label: "Visit", href: "/#visit" },
 ];
 
 const platformLinks = [
@@ -411,7 +411,7 @@ export default function Navbar() {
     setMounted(true);
     if (typeof window !== "undefined") {
       window.history.scrollRestoration = "manual";
-      if (!isPlatformRoute(window.location.pathname)) {
+      if (!isPlatformRoute(window.location.pathname) && !window.location.hash) {
         window.scrollTo(0, 0);
       }
     }
