@@ -44,7 +44,20 @@ export function henrikFetch(
 
     for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
       lastRequestAt = Date.now();
-      const res = await fetch(url, init);
+      
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 8000);
+      
+      let res: Response;
+      try {
+        res = await fetch(url, { ...init, signal: controller.signal });
+      } catch (err) {
+        // If it aborted or failed, retry after a short delay
+        await sleep(2000);
+        continue;
+      } finally {
+        clearTimeout(timeoutId);
+      }
 
       if (res.status !== 429) return res;
 
@@ -53,7 +66,16 @@ export function henrikFetch(
       lastRes = res;
     }
 
-    return lastRes ?? fetch(url, init);
+    if (lastRes) return lastRes;
+    
+    // Final fallback attempt with timeout
+    const fallbackController = new AbortController();
+    const fallbackTimeoutId = setTimeout(() => fallbackController.abort(), 8000);
+    try {
+      return await fetch(url, { ...init, signal: fallbackController.signal });
+    } finally {
+      clearTimeout(fallbackTimeoutId);
+    }
   };
 
   const result = chain.then(run);

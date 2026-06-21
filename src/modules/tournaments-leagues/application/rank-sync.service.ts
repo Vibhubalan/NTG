@@ -5,8 +5,8 @@ import { mmrRegionsToTry, normalizeHenrikRegion } from "@/lib/henrik-region";
 import { GameSlug, LeaderboardScope, LeaderboardSyncSource, Prisma } from "@prisma/client";
 
 const PLATFORM = "pc";
-/** Henrik spacing (~2.1s/call) — 10 players/batch keeps cron + manual under serverless timeout. */
-export const RANK_SYNC_BATCH_SIZE = 10;
+/** Henrik spacing (~2.1s/call) — 3 players/batch keeps cron + manual well under Vercel Hobby serverless timeout (10s). */
+export const RANK_SYNC_BATCH_SIZE = 3;
 /** @deprecated use RANK_SYNC_BATCH_SIZE */
 export const RANK_SYNC_MAX_BATCH_SIZE = RANK_SYNC_BATCH_SIZE;
 export const RANK_SYNC_ADMIN_BATCH_SIZE = RANK_SYNC_BATCH_SIZE;
