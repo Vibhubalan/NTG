@@ -174,7 +174,7 @@ export async function updateAccountInfo(
       return { ok: false, error: "That Olympus ID is already registered to another account." };
     }
     data.olympusId = trimmed;
-    data.olympusIdKey = olympusIdKeyFromValue(trimmed);
+    data.olympusIdKey = olympusIdKeyFromValue(trimmed, userId);
   }
   if (Object.keys(data).length === 0) {
     return { ok: false, error: "Nothing to update." };
