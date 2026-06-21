@@ -25,11 +25,18 @@ export function formatDateOfBirthDisplay(
   dateOfBirth: string | Date | null | undefined,
 ): string | null {
   if (!dateOfBirth) return null;
-  const iso =
-    typeof dateOfBirth === "string"
-      ? dateOfBirth.slice(0, 10)
-      : dateOfBirth.toISOString().slice(0, 10);
-  const [y, m, d] = iso.split("-");
-  if (!y || !m || !d) return iso;
-  return `${d}-${m}-${y}`;
+  try {
+    if (typeof dateOfBirth !== "string" && dateOfBirth instanceof Date && Number.isNaN(dateOfBirth.getTime())) {
+      return null;
+    }
+    const iso =
+      typeof dateOfBirth === "string"
+        ? dateOfBirth.slice(0, 10)
+        : dateOfBirth.toISOString().slice(0, 10);
+    const [y, m, d] = iso.split("-");
+    if (!y || !m || !d) return iso;
+    return `${d}-${m}-${y}`;
+  } catch {
+    return null;
+  }
 }

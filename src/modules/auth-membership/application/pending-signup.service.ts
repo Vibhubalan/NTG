@@ -95,7 +95,7 @@ export async function savePendingSignup(
       displayName,
       dateOfBirth,
       olympusId,
-      olympusIdKey: olympusIdKeyFromValue(olympusId),
+      olympusIdKey: olympusIdKeyFromValue(olympusId, email),
       expiresAt,
     },
     update: {
@@ -104,7 +104,7 @@ export async function savePendingSignup(
       displayName,
       dateOfBirth,
       olympusId,
-      olympusIdKey: olympusIdKeyFromValue(olympusId),
+      olympusIdKey: olympusIdKeyFromValue(olympusId, email),
       expiresAt,
     },
   });
@@ -199,7 +199,7 @@ export async function finalizePendingSignup(
       passwordHash: pending.passwordHash,
       dateOfBirth: pending.dateOfBirth,
       olympusId: pending.olympusId,
-      olympusIdKey: olympusIdKeyFromValue(pending.olympusId),
+      olympusIdKey: olympusIdKeyFromValue(pending.olympusId, pending.email),
       emailVerified: new Date(),
       signupCompleted: true,
       playerProfile: {

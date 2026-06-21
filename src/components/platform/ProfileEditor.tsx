@@ -37,6 +37,7 @@ export default function ProfileEditor() {
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<"profile" | "games">("profile");
 
   const [dateOfBirth, setDateOfBirth] = useState("");
   const [olympusId, setOlympusId] = useState("");
@@ -223,93 +224,244 @@ export default function ProfileEditor() {
     setSaving(false);
   }
 
+  const avatarInitials = useMemo(() => {
+    if (!profile?.displayName) return "P";
+    const parts = profile.displayName.trim().split(/\s+/);
+    if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+    return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+  }, [profile?.displayName]);
+
   if (loading) {
-    return <p className="text-sm text-white/40">Loading profile…</p>;
+    return (
+      <div className="grid grid-cols-1 gap-8 lg:grid-cols-3 animate-pulse">
+        <div className="lg:col-span-1 rounded-3xl border border-white/[0.06] bg-white/[0.02] h-96" />
+        <div className="lg:col-span-2 space-y-6">
+          <div className="rounded-3xl border border-white/[0.06] bg-white/[0.02] h-48" />
+          <div className="rounded-3xl border border-white/[0.06] bg-white/[0.02] h-96" />
+        </div>
+      </div>
+    );
   }
 
   if (!profile) return null;
 
   const age = computeAgeFromDateOfBirth(dateOfBirth || profile.dateOfBirth);
+  const hasValorant = profile.playedGames.includes("VALORANT");
+  const hasCs2 = profile.playedGames.includes("CS2");
 
   return (
-    <div className="space-y-8">
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-start">
-        <AccountInfoPanel
-          profile={profile}
-          dateOfBirth={dateOfBirth}
-          olympusId={olympusId}
-          age={age}
-          onDateOfBirthChange={setDateOfBirth}
-          onOlympusIdChange={setOlympusId}
-        />
+    <div className="grid grid-cols-1 gap-8 lg:grid-cols-3 items-start">
+      {/* Left Column: Sidebar / Profile Summary */}
+      <div className="lg:col-span-1 space-y-6">
+        <div className="rounded-3xl border border-white/[0.08] bg-white/[0.02] glass-strong p-6 text-center flex flex-col items-center">
+          {/* Dynamic Avatar with name initials and a premium gradient */}
+          <div className="relative group mb-5">
+            <div className="absolute inset-0 rounded-full bg-gradient-to-tr from-[var(--color-brand)] to-violet-500 blur-md opacity-40 group-hover:opacity-60 transition-opacity duration-300" />
+            <div className="relative flex h-24 w-24 items-center justify-center rounded-full border border-white/20 bg-[#0a1020] text-3xl font-bold font-display text-white select-none">
+              {avatarInitials}
+            </div>
+          </div>
+          
+          <h3 className="font-display text-xl font-semibold text-white tracking-tight">{profile.displayName || "Player"}</h3>
+          {age !== null && (
+            <span className="mt-1.5 inline-flex items-center rounded-full bg-white/[0.06] px-2.5 py-0.5 text-xs text-white/50 border border-white/[0.05]">
+              Age: {age}
+            </span>
+          )}
+          
+          {/* Quick contact list */}
+          <div className="w-full mt-6 space-y-3 border-t border-white/[0.06] pt-6 text-left">
+            {profile.email && (
+              <div className="flex items-center gap-3 text-xs text-white/60">
+                <svg className="h-4 w-4 shrink-0 text-white/40" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                </svg>
+                <span className="truncate">{profile.email}</span>
+              </div>
+            )}
+            {profile.phone && (
+              <div className="flex items-center gap-3 text-xs text-white/60">
+                <svg className="h-4 w-4 shrink-0 text-white/40" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.94.725l.548 2.2a1 1 0 01-.321.988l-1.305.98a10.582 10.582 0 004.872 4.872l.98-1.305a1 1 0 01.988-.321l2.2.548a1 1 0 01.725.94V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
+                </svg>
+                <span>{profile.phone}</span>
+              </div>
+            )}
+          </div>
 
-        <GameProfilesPanel
-          profile={profile}
-          selectedRoles={selectedRoles}
-          cs2Premier={cs2Premier}
-          cs2Faceit={cs2Faceit}
-          pendingRiotId={pendingRiotId}
-          onPendingRiotIdChange={setPendingRiotId}
-          pendingSteamUrl={pendingSteamUrl}
-          onPendingSteamUrlChange={setPendingSteamUrl}
-          onToggleRole={(role) => {
-            setSelectedRoles((prev) => {
-              if (role === "FLEX") return prev.includes("FLEX") ? [] : ["FLEX"];
-              const withoutFlex = prev.filter((r) => r !== "FLEX");
-              let nextRoles;
-              if (withoutFlex.includes(role)) {
-                nextRoles = withoutFlex.filter((r) => r !== role);
-              } else {
-                nextRoles = [...withoutFlex, role];
-              }
-              if (nextRoles.length === 4) return ["FLEX"];
-              return nextRoles;
-            });
-          }}
-          onCs2PremierChange={setCs2Premier}
-          onCs2FaceitChange={setCs2Faceit}
-          onRefresh={load}
-        />
+          {/* Connected games badges */}
+          <div className="w-full mt-6 border-t border-white/[0.06] pt-6 text-left">
+            <h4 className="text-[10px] font-bold uppercase tracking-[0.2em] text-white/35 mb-3">Linked Platforms</h4>
+            <div className="flex flex-wrap gap-2">
+              <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[10px] font-semibold border ${
+                hasValorant 
+                  ? "bg-[#ff4655]/10 border-[#ff4655]/20 text-[#ff4655]"
+                  : "bg-white/[0.02] border-white/5 text-white/35"
+              }`}>
+                Valorant
+              </span>
+              <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[10px] font-semibold border ${
+                hasCs2
+                  ? "bg-[#e65a23]/10 border-[#e65a23]/20 text-[#e65a23]"
+                  : "bg-white/[0.02] border-white/5 text-white/35"
+              }`}>
+                CS2
+              </span>
+            </div>
+          </div>
+
+          {/* Quick Actions (Sign out, Browse cups) */}
+          <div className="w-full mt-6 border-t border-white/[0.06] pt-6 flex flex-col gap-2">
+            <a
+              href="/esports/tournaments"
+              className="w-full text-center rounded-xl border border-white/10 bg-white/5 px-4 py-2.5 text-xs font-semibold uppercase tracking-wider text-white/80 hover:bg-white/10 transition-colors hover:text-white"
+            >
+              Browse cups
+            </a>
+            <button
+              type="button"
+              onClick={() => signOut({ callbackUrl: "/" })}
+              className="w-full text-center rounded-xl border border-red-500/20 bg-red-500/[0.06] px-4 py-2.5 text-xs font-semibold uppercase tracking-wider text-red-400 hover:bg-red-500/[0.12] transition-colors hover:text-red-300"
+            >
+              Sign out
+            </button>
+          </div>
+        </div>
       </div>
 
-      {message ? <p className="text-sm text-emerald-300/90">{message}</p> : null}
-      {error ? <p className="text-sm text-red-300">{error}</p> : null}
+      {/* Right Column: Settings Panels */}
+      <div className="lg:col-span-2 space-y-6">
+        {/* Tab Headers */}
+        <div className="flex rounded-2xl bg-white/[0.03] border border-white/[0.06] p-1 mb-6 max-w-sm relative">
+          <button
+            type="button"
+            onClick={() => setActiveTab("profile")}
+            className={`flex-1 text-center py-2.5 text-xs font-bold uppercase tracking-wider rounded-xl relative z-10 cursor-pointer ${
+              activeTab === "profile" ? "text-white" : "text-white/40 hover:text-white/70"
+            }`}
+          >
+            Personal Profile
+            {activeTab === "profile" && (
+              <div
+                className="absolute inset-0 rounded-xl bg-gradient-to-r from-[var(--color-brand)]/20 to-violet-500/20 border border-[var(--color-brand)]/30 shadow-[0_0_12px_rgba(217,70,239,0.15)] z-[-1]"
+              />
+            )}
+          </button>
+          
+          <button
+            type="button"
+            onClick={() => setActiveTab("games")}
+            className={`flex-1 text-center py-2.5 text-xs font-bold uppercase tracking-wider rounded-xl relative z-10 cursor-pointer ${
+              activeTab === "games" ? "text-white" : "text-white/40 hover:text-white/70"
+            }`}
+          >
+            Game Accounts
+            {activeTab === "games" && (
+              <div
+                className="absolute inset-0 rounded-xl bg-gradient-to-r from-[var(--color-brand)]/20 to-violet-500/20 border border-[var(--color-brand)]/30 shadow-[0_0_12px_rgba(217,70,239,0.15)] z-[-1]"
+              />
+            )}
+          </button>
+        </div>
 
-      <div className="border-t border-white/[0.06] pt-6">
-        <button
-          type="button"
-          onClick={saveChanges}
-          disabled={saving}
-          className={`w-full cursor-pointer rounded-xl px-5 py-3 text-sm font-semibold transition-all duration-300 ${
-            hasChanges && canSave
-              ? "bg-emerald-500 text-emerald-950 shadow-[0_0_24px_rgba(16,185,129,0.5)] hover:bg-emerald-400 hover:shadow-[0_0_32px_rgba(16,185,129,0.7)] hover:scale-[1.01]"
-              : "border border-white/10 bg-white/10 text-white/90 hover:bg-white/15"
-          } disabled:opacity-60 disabled:hover:scale-100`}
-        >
-          {saving ? "Saving…" : "Save changes"}
-        </button>
+        <div className="space-y-6">
+          {activeTab === "profile" ? (
+            <div className="space-y-6">
+              <AccountInfoPanel
+                profile={profile}
+                dateOfBirth={dateOfBirth}
+                olympusId={olympusId}
+                age={age}
+                onDateOfBirthChange={setDateOfBirth}
+                onOlympusIdChange={setOlympusId}
+              />
+
+              <details className="group mt-6 border-t border-white/[0.06] pt-6">
+                <summary className="cursor-pointer text-[10px] font-bold uppercase tracking-[0.2em] text-white/35 hover:text-white/60 transition-colors select-none">
+                  Danger Zone — Delete Account
+                </summary>
+                <div className="mt-4 rounded-2xl border border-red-500/20 bg-red-500/[0.02] p-5">
+                  <p className="text-xs leading-relaxed text-red-200/70">
+                    Permanently remove your membership. This removes your profile and leaderboard entries. This action is irreversible. See our{" "}
+                    <a href="/privacy" className="text-red-300 underline underline-offset-2 hover:text-red-200">
+                      privacy page
+                    </a>{" "}
+                    for details.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={deleteAccount}
+                    disabled={deleting}
+                    className="mt-4 rounded-xl bg-red-500/10 border border-red-500/25 px-4 py-2.5 text-xs font-semibold text-red-400 transition-all hover:bg-red-500/20 hover:border-red-500/40 hover:text-red-300 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {deleting ? "Deleting Account…" : "Delete Account"}
+                  </button>
+                </div>
+              </details>
+            </div>
+          ) : (
+            <GameProfilesPanel
+              profile={profile}
+              selectedRoles={selectedRoles}
+              cs2Premier={cs2Premier}
+              cs2Faceit={cs2Faceit}
+              pendingRiotId={pendingRiotId}
+              onPendingRiotIdChange={setPendingRiotId}
+              pendingSteamUrl={pendingSteamUrl}
+              onPendingSteamUrlChange={setPendingSteamUrl}
+              onToggleRole={(role) => {
+                setSelectedRoles((prev) => {
+                  if (role === "FLEX") return prev.includes("FLEX") ? [] : ["FLEX"];
+                  const withoutFlex = prev.filter((r) => r !== "FLEX");
+                  let nextRoles;
+                  if (withoutFlex.includes(role)) {
+                    nextRoles = withoutFlex.filter((r) => r !== role);
+                  } else {
+                    nextRoles = [...withoutFlex, role];
+                  }
+                  if (nextRoles.length === 4) return ["FLEX"];
+                  return nextRoles;
+                });
+              }}
+              onCs2PremierChange={setCs2Premier}
+              onCs2FaceitChange={setCs2Faceit}
+              onRefresh={load}
+            />
+          )}
+        </div>
+
+        {message && (
+          <div className="flex items-center gap-3 rounded-xl border border-emerald-500/20 bg-emerald-500/[0.08] px-4 py-3 text-sm text-emerald-300">
+            <svg className="h-5 w-5 shrink-0 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            <span>{message}</span>
+          </div>
+        )}
+        {error && (
+          <div className="flex items-center gap-3 rounded-xl border border-red-500/20 bg-red-500/[0.08] px-4 py-3 text-sm text-red-300">
+            <svg className="h-5 w-5 shrink-0 text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+            </svg>
+            <span>{error}</span>
+          </div>
+        )}
+
+        <div className="border-t border-white/[0.06] pt-6">
+          <button
+            type="button"
+            onClick={saveChanges}
+            disabled={saving}
+            className={`w-full cursor-pointer rounded-xl px-5 py-3.5 text-sm font-semibold transition-all duration-300 ${
+              hasChanges && canSave
+                ? "bg-gradient-to-r from-[var(--color-brand)] to-violet-500 text-white shadow-[0_0_24px_rgba(217,70,239,0.3)] hover:shadow-[0_0_32px_rgba(217,70,239,0.5)] hover:scale-[1.01] hover:brightness-110"
+                : "border border-white/10 bg-white/5 text-white/40 cursor-not-allowed"
+            } disabled:opacity-60 disabled:hover:scale-100`}
+          >
+            {saving ? "Saving…" : "Save changes"}
+          </button>
+        </div>
       </div>
-
-      <details className="mt-8 border-t border-white/[0.06] pt-6">
-        <summary className="cursor-pointer text-[11px] uppercase tracking-[0.18em] text-white/35">
-          Delete account
-        </summary>
-        <p className="mt-3 text-xs leading-relaxed text-white/45">
-          Permanently remove your membership. See our{" "}
-          <a href="/privacy" className="text-white/60 underline-offset-2 hover:underline">
-            privacy page
-          </a>{" "}
-          for details.
-        </p>
-        <button
-          type="button"
-          onClick={deleteAccount}
-          disabled={deleting}
-          className="mt-3 rounded-lg border border-red-500/25 px-4 py-2 text-xs font-medium text-red-300/90 transition-colors hover:bg-red-500/10 disabled:opacity-50"
-        >
-          {deleting ? "Deleting…" : "Delete my account"}
-        </button>
-      </details>
     </div>
   );
 }

@@ -10,8 +10,18 @@ export function usernameKeyFromDisplayName(name: string): string {
   return normalizeIdentityKey(name);
 }
 
-export function olympusIdKeyFromValue(olympusId: string): string {
-  return normalizeIdentityKey(olympusId);
+export function isOlympusIdSpecialNA(olympusId: string): boolean {
+  const normalized = olympusId.trim().toLowerCase();
+  return normalized === "na" || normalized === "n/a" || normalized === "n.a" || normalized === "none";
+}
+
+export function olympusIdKeyFromValue(olympusId: string, uniqueSuffix?: string): string {
+  const trimmed = olympusId.trim();
+  if (isOlympusIdSpecialNA(trimmed)) {
+    const suffix = uniqueSuffix || Math.random().toString(36).substring(2, 15);
+    return `na-${suffix.toLowerCase()}`;
+  }
+  return normalizeIdentityKey(trimmed);
 }
 
 export async function isUsernameTaken(
@@ -47,6 +57,7 @@ export async function isOlympusIdTaken(
   olympusId: string,
   excludeUserId?: string,
 ): Promise<boolean> {
+  if (isOlympusIdSpecialNA(olympusId)) return false;
   const olympusIdKey = olympusIdKeyFromValue(olympusId);
   const user = await prisma.user.findUnique({
     where: { olympusIdKey },
@@ -61,6 +72,7 @@ export async function isOlympusIdReservedByPendingSignup(
   olympusId: string,
   excludeEmail?: string,
 ): Promise<boolean> {
+  if (isOlympusIdSpecialNA(olympusId)) return false;
   const olympusIdKey = olympusIdKeyFromValue(olympusId);
   const pending = await prisma.pendingSignup.findFirst({
     where: {
