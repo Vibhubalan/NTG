@@ -6,7 +6,6 @@ import { prisma } from "@core/database/client";
 import { rankIconUrl } from "@/lib/valorant-rank";
 import { formatMonthYear, sortTournamentsByHostingOrder, sortTournamentsByHostingOrderNewestFirst, toTournamentDisplay } from "@/lib/tournament-display";
 import EsportsRegistrationSlides from "@/components/platform/EsportsRegistrationSlides";
-import CompetitiveScheduleScroll from "@/components/platform/CompetitiveScheduleScroll";
 
 export const dynamic = "force-dynamic";
 
@@ -332,7 +331,7 @@ export default async function EsportsHubPage() {
             <p className="mt-1 text-sm text-white/40">Keep track of ongoing, upcoming, and completed tournament stages</p>
           </div>
 
-          <CompetitiveScheduleScroll>
+          <div className="relative border-l border-white/10 pl-6 space-y-8 ml-2">
             {scheduleTournaments.map((t) => {
               const display = toTournamentDisplay(t);
               let badgeColor = "text-white/40 bg-white/5 border-white/10";
@@ -390,7 +389,7 @@ export default async function EsportsHubPage() {
                 </div>
               );
             })}
-          </CompetitiveScheduleScroll>
+          </div>
         </div>
       )}
 
