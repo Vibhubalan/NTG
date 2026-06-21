@@ -68,6 +68,30 @@ function PodiumCard({
         alt=""
         className="absolute inset-0 h-full w-full object-cover object-top pointer-events-none"
       />
+      {/* Glass Pane & Shimmer effect for Rank 1 */}
+      {rank === 1 && (
+        <>
+          <style>{`
+            @keyframes glass-shimmer-sweep {
+              0% { transform: translateX(-150%) skewX(-20deg); }
+              35%, 100% { transform: translateX(150%) skewX(-20deg); }
+            }
+          `}</style>
+          {/* Glass frosting overlay */}
+          <div className="absolute inset-0 bg-gradient-to-tr from-white/0 via-white/[0.04] to-white/[0.12] pointer-events-none z-0 mix-blend-overlay" />
+          {/* Animated diagonal glass sheen */}
+          <div className="absolute inset-0 pointer-events-none overflow-hidden z-10">
+            <div 
+              className="absolute inset-0 w-[200%] h-full bg-gradient-to-r from-transparent via-white/25 to-transparent"
+              style={{
+                animation: 'glass-shimmer-sweep 4s cubic-bezier(0.25, 1, 0.5, 1) infinite',
+              }}
+            />
+          </div>
+          {/* Extra glass highlight top edge */}
+          <div className="absolute inset-0 border border-white/20 rounded-2xl sm:rounded-[2rem] pointer-events-none z-10 shadow-[inset_0_1px_1px_rgba(255,255,255,0.2)]" />
+        </>
+      )}
       {/* Dark gradient overlay at the bottom */}
       <div className="absolute inset-0 bg-gradient-to-t from-black via-black/50 to-transparent pointer-events-none" />
 
@@ -322,9 +346,12 @@ export default function ValorantRankingsBoard({ data }: Props) {
       {/* Intro Podium Screen */}
       {!introComplete && (
         <div 
-          className="fixed inset-0 z-30 flex flex-col items-center justify-center bg-transparent pointer-events-none transition-opacity duration-700 ease-in-out"
+          className="fixed inset-0 z-30 flex flex-col items-center justify-center bg-transparent pointer-events-none transition-opacity duration-700 ease-in-out pb-10 sm:pb-12"
           style={{ opacity: showRest ? 0 : 1 }}
         >
+          {/* Spacing to clear the fixed navbar */}
+          <div className="h-16 sm:h-20 shrink-0" />
+
           {/* Rankings Header text at the top of intro screen */}
           <div className="mb-8 sm:mb-12 text-center select-none">
             <h1 className="font-display text-4xl sm:text-6xl font-black text-transparent bg-gradient-to-b from-white to-white/60 bg-clip-text tracking-wider uppercase drop-shadow-md">
@@ -341,7 +368,7 @@ export default function ValorantRankingsBoard({ data }: Props) {
             <PodiumCard
               entry={sorted[1]}
               rank={2}
-              widthClass="w-[105px] sm:w-[155px]"
+              widthClass="w-[105px] sm:w-[160px] md:w-[200px]"
               borderColor="border-slate-300/40"
               glowColor="shadow-[0_0_20px_rgba(203,213,225,0.1)]"
               ringColor="border-[#cbd5e1]"
@@ -351,7 +378,7 @@ export default function ValorantRankingsBoard({ data }: Props) {
             <PodiumCard
               entry={sorted[0]}
               rank={1}
-              widthClass="w-[120px] sm:w-[180px]"
+              widthClass="w-[120px] sm:w-[185px] md:w-[230px]"
               borderColor="border-amber-500/60"
               glowColor="shadow-[0_0_30px_rgba(245,158,11,0.25)]"
               ringColor="border-amber-500"
@@ -361,7 +388,7 @@ export default function ValorantRankingsBoard({ data }: Props) {
             <PodiumCard
               entry={sorted[2]}
               rank={3}
-              widthClass="w-[95px] sm:w-[138px]"
+              widthClass="w-[95px] sm:w-[142px] md:w-[175px]"
               borderColor="border-[#b48464]/40"
               glowColor="shadow-[0_0_20px_rgba(180,132,100,0.1)]"
               ringColor="border-[#b48464]"
