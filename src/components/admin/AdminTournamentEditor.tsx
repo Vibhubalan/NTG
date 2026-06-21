@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useEffect, useRef, useState, useMemo } from "react";
+import { useEffect, useRef, useState } from "react";
 import ImageUploadField from "@/components/admin/ImageUploadField";
 import RulebookUploadField from "@/components/admin/RulebookUploadField";
 import { AdminSection } from "@/components/admin/AdminSection";
@@ -56,7 +56,6 @@ type TournamentData = {
   name: string;
   game: string;
   gameLabel: string | null;
-  registrationFormat: string | null;
   seasonId: string | null;
   status: string;
   description: string | null;
@@ -78,11 +77,7 @@ type TournamentData = {
   tournamentTeams: Team[];
   registrations: RegistrationRow[];
   poolPlayers: PoolPlayer[];
-  placements: {
-    role: string;
-    teamLabel: string | null;
-    user: { id: string; name: string } | null;
-  }[];
+  placements: { role: string; teamLabel: string | null }[];
 };
 
 function toLocalDatetime(iso: string | null): string {
@@ -106,8 +101,6 @@ const inputClass =
 const checkboxLabelClass =
   "flex items-center gap-3 rounded-xl border border-white/[0.05] bg-[#0a1020]/30 px-4 py-3 text-sm text-white/70 hover:bg-white/[0.02] cursor-pointer transition-colors";
 
-const SUPPORTS_FORMAT = ["VALORANT", "CS2"];
-
 type CupFields = Omit<
   TournamentData,
   "slug" | "tournamentTeams" | "registrations" | "poolPlayers" | "placements" | "hideAfter"
@@ -126,10 +119,7 @@ export default function AdminTournamentEditor({
 }) {
   const router = useRouter();
   const { openDeleteConfirm, DeleteConfirmDialog } = useAdminDeleteConfirm();
-
-  const initialFormState: TournamentData = useMemo(() => ({ ...initial, seasonId: null }), [initial]);
-
-  const [form, setForm] = useState<TournamentData>(initialFormState);
+  const [form, setForm] = useState(initial);
   const [listVersion, setListVersion] = useState(0);
   const registrations = initial.registrations;
   const tournamentTeams = initial.tournamentTeams;
@@ -137,33 +127,13 @@ export default function AdminTournamentEditor({
   const [activeTab, setActiveTab] = useState<
     "general" | "media" | "prizes" | "standings" | "registrations" | "teams"
   >("general");
-  const initialMvpRole = initial.placements.find((p) => p.role === "MVP");
-  const initialMvpUser = initialMvpRole?.user;
-  
-  const [mvpEnabled, setMvpEnabled] = useState(!!initialMvpRole);
-
-  const [mvpSearch, setMvpSearch] = useState(
-    initialMvpUser ? initialMvpUser.name : (initialMvpRole?.teamLabel ?? "")
+  const [mvp, setMvp] = useState(
+    initial.placements.find((p) => p.role === "MVP")?.teamLabel ?? "",
   );
-  const [mvpResults, setMvpResults] = useState<
-    { id: string; email: string | null; name: string | null; displayName: string | null }[]
-  >([]);
-  const [selectedMvp, setSelectedMvp] = useState<{ id: string; label: string } | null>(
-    initialMvpUser ? { id: initialMvpUser.id, label: initialMvpUser.name } : null
+  const savedMvpRef = useRef(
+    initial.placements.find((p) => p.role === "MVP")?.teamLabel?.trim() ?? "",
   );
-
-  const savedMvpRef = useRef({
-    enabled: !!initialMvpRole,
-    userId: initialMvpUser?.id ?? null,
-  });
-
   const [loading, setLoading] = useState(false);
-  const isDirty = useMemo(() => {
-    const formDirty = JSON.stringify(form) !== JSON.stringify(initialFormState);
-    const mvpDirty = mvpEnabled !== savedMvpRef.current.enabled || (mvpEnabled && selectedMvp?.id !== savedMvpRef.current.userId);
-    return formDirty || mvpDirty;
-  }, [form, initialFormState, mvpEnabled, selectedMvp]);
-  const [savedStatus, setSavedStatus] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [newTeamName, setNewTeamName] = useState("");
   const [newPlayerNames, setNewPlayerNames] = useState<Record<string, string>>({});
@@ -203,16 +173,9 @@ export default function AdminTournamentEditor({
 
   useEffect(() => {
     if (listVersion === 0) return;
-    const role = initial.placements.find((p) => p.role === "MVP");
-    const user = role?.user;
-    
-    savedMvpRef.current = {
-      enabled: !!role,
-      userId: user?.id ?? null,
-    };
-    setMvpEnabled(!!role);
-    setSelectedMvp(user ? { id: user.id, label: user.name } : null);
-    setMvpSearch(user ? user.name : (role?.teamLabel ?? ""));
+    savedMvpRef.current =
+      initial.placements.find((p) => p.role === "MVP")?.teamLabel?.trim() ?? "";
+    setMvp(savedMvpRef.current);
   }, [listVersion, initial.placements]);
 
   function applySavedCupFields(fields: CupFields) {
@@ -243,24 +206,6 @@ export default function AdminTournamentEditor({
 
     return () => clearTimeout(timer);
   }, [memberSearch]);
-
-  useEffect(() => {
-    const q = mvpSearch.trim();
-    if (q.length < 2) {
-      setMvpResults([]);
-      return;
-    }
-
-    const timer = setTimeout(async () => {
-      const res = await fetch(`/api/admin/members?search=${encodeURIComponent(q)}&limit=8`);
-      const data = await res.json();
-      if (res.ok && Array.isArray(data.users)) {
-        setMvpResults(data.users);
-      }
-    }, 300);
-
-    return () => clearTimeout(timer);
-  }, [mvpSearch]);
 
   async function addMemberRegistration() {
     if (!selectedMember) return;
@@ -368,10 +313,10 @@ export default function AdminTournamentEditor({
           name: form.name.trim(),
           game: form.game,
           gameLabel: emptyToNull(form.gameLabel),
-          seasonId: null,
+          seasonId: form.seasonId || null,
           status: form.status,
-          description: null,
-          posterUrl: emptyToNull(form.hubBannerUrl),
+          description: emptyToNull(form.description),
+          posterUrl: emptyToNull(form.posterUrl),
           hubBannerUrl: emptyToNull(form.hubBannerUrl),
           hubCarouselImages: form.hubCarouselImages,
           showOnEsportsHub: form.showOnEsportsHub,
@@ -385,7 +330,6 @@ export default function AdminTournamentEditor({
           hideAfter: null,
           bracketUrl: emptyToNull(form.bracketUrl),
           rulebookUrl: emptyToNull(form.rulebookUrl),
-          registrationFormat: SUPPORTS_FORMAT.includes(form.game) ? (form.registrationFormat ?? "AUCTION") : null,
         }),
       });
       const data = await res.json();
@@ -398,13 +342,12 @@ export default function AdminTournamentEditor({
         applySavedCupFields(data.tournament as CupFields);
       }
 
-      const mvpChanged =
-        mvpEnabled !== savedMvpRef.current.enabled ||
-        (mvpEnabled && selectedMvp?.id !== savedMvpRef.current.userId);
+      const mvpValue = mvp.trim();
+      const mvpChanged = mvpValue !== savedMvpRef.current;
 
       if (mvpChanged) {
-        const placements = (mvpEnabled && selectedMvp) ? [{ role: "MVP" as const, userId: selectedMvp.id }] : [];
-        const clearRoles = ["CHAMPION", "RUNNER_UP", "THIRD", "MVP"];
+        const placements = mvpValue ? [{ role: "MVP" as const, teamLabel: mvpValue }] : [];
+        const clearRoles = ["CHAMPION", "RUNNER_UP", "THIRD", ...(mvpValue ? [] : (["MVP"] as const))];
 
         const pRes = await fetch(`/api/admin/tournaments/${form.slug}/placements`, {
           method: "POST",
@@ -416,12 +359,10 @@ export default function AdminTournamentEditor({
           setMessage(d.error ?? "MVP save failed.");
           return;
         }
-        savedMvpRef.current = { enabled: mvpEnabled, userId: selectedMvp?.id ?? null };
+        savedMvpRef.current = mvpValue;
       }
 
       setMessage("All changes successfully saved.");
-      setSavedStatus(true);
-      setTimeout(() => setSavedStatus(false), 2500);
     } catch {
       setMessage("Something went wrong.");
     } finally {
@@ -599,22 +540,13 @@ export default function AdminTournamentEditor({
     <div className="space-y-6">
       {/* Save Notification alert */}
       {message ? (
-        (() => {
-          const isError = message.toLowerCase().includes("fail") || message.toLowerCase().includes("error");
-          return (
-            <div className={`rounded-xl px-4 py-3 text-sm flex items-center justify-between shadow-md ${
-              isError 
-                ? "bg-rose-500/10 border border-rose-500/30 text-rose-200" 
-                : "bg-emerald-500/10 border border-emerald-500/30 text-emerald-200"
-            }`}>
-              <span className="flex items-center gap-2">
-                <span className={`h-1.5 w-1.5 rounded-full ${isError ? "bg-rose-400" : "bg-emerald-400"}`} />
-                {message}
-              </span>
-              <button type="button" onClick={() => setMessage(null)} className={isError ? "text-rose-400/50 hover:text-rose-400" : "text-emerald-400/50 hover:text-emerald-400"}>✕</button>
-            </div>
-          );
-        })()
+        <div className="rounded-xl bg-white/[0.04] border border-white/[0.08] px-4 py-3 text-sm text-white/70 flex items-center justify-between shadow-md">
+          <span className="flex items-center gap-2">
+            <span className="h-1.5 w-1.5 rounded-full bg-amber-400" />
+            {message}
+          </span>
+          <button type="button" onClick={() => setMessage(null)} className="text-white/40 hover:text-white">✕</button>
+        </div>
       ) : null}
 
       {/* Sticky Top Editor Header bar */}
@@ -656,12 +588,8 @@ export default function AdminTournamentEditor({
           <button
             type="button"
             onClick={saveAll}
-            disabled={loading || !isDirty}
-            className={`rounded-xl px-5 py-2 text-xs font-bold transition-all ${
-              isDirty
-                ? "bg-emerald-600 text-white hover:bg-emerald-500 shadow-[0_0_15px_-3px_rgba(16,185,129,0.3)]"
-                : "bg-white/[0.05] text-white/30 cursor-not-allowed"
-            }`}
+            disabled={loading}
+            className="rounded-xl bg-amber-500 px-5 py-2 text-xs font-bold text-black hover:bg-amber-400 disabled:opacity-50 transition-all shadow-[0_0_15px_-3px_rgba(245,158,11,0.4)]"
           >
             {loading ? "Saving…" : "Save all"}
           </button>
@@ -728,42 +656,43 @@ export default function AdminTournamentEditor({
                 </div>
               </div>
 
+              <div className="space-y-1">
+                <label className="text-[10px] font-bold uppercase tracking-wider text-white/40">Season</label>
+                <select
+                  className={inputClass}
+                  value={form.seasonId ?? ""}
+                  onChange={(e) =>
+                    setForm({ ...form, seasonId: e.target.value ? e.target.value : null })
+                  }
+                >
+                  <option value="" className="bg-[#0a1020]">No season</option>
+                  {seasons.map((season) => (
+                    <option key={season.id} value={season.id} className="bg-[#0a1020]">
+                      {season.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
 
+              <div className="space-y-1">
+                <label className="text-[10px] font-bold uppercase tracking-wider text-white/40">Game Subtitle / Format</label>
+                <input
+                  className={inputClass}
+                  value={form.gameLabel ?? ""}
+                  onChange={(e) => setForm({ ...form, gameLabel: e.target.value || null })}
+                  placeholder="e.g. Auction Draft, 5v5 Competitive"
+                />
+              </div>
 
-              {/* Registration Format — only for Valorant & CS2 */}
-              {SUPPORTS_FORMAT.includes(form.game) && (
-                <div className="space-y-2">
-                  <label className="text-[10px] font-bold uppercase tracking-wider text-white/40">Registration Format</label>
-                  <div className="grid grid-cols-2 gap-2">
-                    <button
-                      type="button"
-                      onClick={() => setForm({ ...form, registrationFormat: "AUCTION" })}
-                      className={`rounded-xl border px-4 py-3 text-left transition-all ${
-                        form.registrationFormat === "AUCTION" || !form.registrationFormat
-                          ? "border-cyan-500/40 bg-cyan-500/[0.08] text-cyan-200"
-                          : "border-white/10 bg-white/[0.02] text-white/50 hover:border-white/20"
-                      }`}
-                    >
-                      <p className="text-sm font-semibold">Auction Draft</p>
-                      <p className="mt-0.5 text-[10px] leading-relaxed text-white/40">Captains register team name. Players register individually. Admin assigns teams.</p>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setForm({ ...form, registrationFormat: "STANDARD" })}
-                      className={`rounded-xl border px-4 py-3 text-left transition-all ${
-                        form.registrationFormat === "STANDARD"
-                          ? "border-indigo-500/40 bg-indigo-500/[0.08] text-indigo-200"
-                          : "border-white/10 bg-white/[0.02] text-white/50 hover:border-white/20"
-                      }`}
-                    >
-                      <p className="text-sm font-semibold">Standard (5v5)</p>
-                      <p className="mt-0.5 text-[10px] leading-relaxed text-white/40">Captain registers full 5-player team upfront. All 5 must have NTG accounts.</p>
-                    </button>
-                  </div>
-                </div>
-              )}
-
-
+              <div className="space-y-1">
+                <label className="text-[10px] font-bold uppercase tracking-wider text-white/40">Description (displayed on Cup page)</label>
+                <textarea
+                  className={`${inputClass} min-h-[6rem] resize-y`}
+                  value={form.description ?? ""}
+                  onChange={(e) => setForm({ ...form, description: e.target.value || null })}
+                  placeholder="Detail cup rules, timings, formats, and other relevant information..."
+                />
+              </div>
             </AdminSection>
 
             <AdminSection
@@ -964,9 +893,59 @@ export default function AdminTournamentEditor({
                   }}
                 />
 
+                <div className="border-t border-white/[0.04] pt-5">
+                  <ImageUploadField
+                    label="Cup Page Hero Poster"
+                    hint="Large landscape banner displayed at the top of the individual cup details page"
+                    prefix={`tournaments/${form.slug}/poster`}
+                    currentUrl={form.posterUrl}
+                    onUploaded={(url) => setForm({ ...form, posterUrl: url })}
+                    onUploadedComplete={async (url) => {
+                      await patchField({ posterUrl: url }, "Cup page poster image saved.");
+                    }}
+                    onClear={async () => {
+                      setForm({ ...form, posterUrl: null });
+                      await patchField({ posterUrl: null }, "Cup page poster removed.");
+                    }}
+                  />
+                </div>
 
+                <div className="border-t border-white/[0.04] pt-5">
+                  <ImageUploadField
+                    label="Additional Carousel Slides (Optional)"
+                    hint="Upload multiple images to rotate as a slideshow on the Esports Hub. Overrides background image."
+                    prefix={`tournaments/${form.slug}/carousel`}
+                    onUploaded={(url) => {
+                      const next = [...form.hubCarouselImages, url];
+                      setForm({ ...form, hubCarouselImages: next });
+                      void patchField({ hubCarouselImages: next }, "Carousel slide added.");
+                    }}
+                  />
 
-                {/* Carousel slides section removed — hub banner is sufficient */}
+                  {form.hubCarouselImages.length > 0 ? (
+                    <div className="mt-4 space-y-1">
+                      <p className="text-[10px] font-bold uppercase tracking-wider text-white/40">Active Slides ({form.hubCarouselImages.length})</p>
+                      <div className="flex flex-wrap gap-3 pt-1">
+                        {form.hubCarouselImages.map((url, idx) => (
+                          <div key={url} className="relative group rounded-xl overflow-hidden border border-white/10 shadow-lg">
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img src={url} alt={`Slide ${idx + 1}`} className="h-20 w-32 object-cover" />
+                            <button
+                              type="button"
+                              onClick={() => requestRemoveCarouselSlide(url)}
+                              className="absolute right-1.5 top-1.5 rounded-full bg-red-600/90 hover:bg-red-500 p-1 text-white shadow-md transition-colors"
+                              title="Delete slide"
+                            >
+                              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                              </svg>
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ) : null}
+                </div>
               </div>
             </AdminSection>
           </div>
@@ -1064,64 +1043,17 @@ export default function AdminTournamentEditor({
                   </p>
                 </div>
 
-                <div className="border-t border-white/[0.04] pt-5 space-y-3">
-                  <div className="flex items-center justify-between">
-                    <label className="text-[10px] font-bold uppercase tracking-wider text-cyan-400">Tournament MVP</label>
-                    <label className="flex items-center gap-2 text-xs font-medium text-white/60 hover:text-white cursor-pointer transition-colors">
-                      <input
-                        type="checkbox"
-                        checked={!mvpEnabled}
-                        onChange={(e) => setMvpEnabled(!e.target.checked)}
-                        className="rounded border-white/20 bg-white/5 text-[var(--color-iris)] focus:ring-[var(--color-iris)] focus:ring-offset-0 cursor-pointer"
-                      />
-                      N/A (Clear MVP)
-                    </label>
-                  </div>
-
-                  {mvpEnabled ? (
-                    <div className="space-y-2 relative">
-                      <input
-                        className={inputClass}
-                        value={mvpSearch}
-                        onChange={(e) => {
-                          setMvpSearch(e.target.value);
-                          setSelectedMvp(null);
-                        }}
-                        placeholder="Search for a registered user..."
-                      />
-                      {mvpResults.length > 0 && !selectedMvp ? (
-                        <ul className="absolute z-10 w-full max-h-40 overflow-y-auto rounded-xl border border-white/[0.06] bg-[#0a1020] shadow-xl mt-1">
-                          {mvpResults.map((m) => {
-                            const label = m.displayName ?? m.name ?? m.email ?? "Member";
-                            return (
-                              <li key={m.id}>
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    setSelectedMvp({ id: m.id, label });
-                                    setMvpSearch(label);
-                                    setMvpResults([]);
-                                  }}
-                                  className="w-full px-3 py-2 text-left text-xs text-white/75 hover:bg-white/[0.04]"
-                                >
-                                  <span className="font-medium text-white/90">{label}</span>
-                                  {m.email ? (
-                                    <span className="ml-2 text-white/40">{m.email}</span>
-                                  ) : null}
-                                </button>
-                              </li>
-                            );
-                          })}
-                        </ul>
-                      ) : null}
-                    </div>
-                  ) : (
-                    <p className="text-xs italic text-white/30 rounded-lg border border-white/5 bg-white/5 px-4 py-3">
-                      MVP is disabled. Saving will remove the MVP from the tournament results.
-                    </p>
-                  )}
-                  <p className="text-[10px] text-white/40">
-                    Optional. Shown on the cup page below the Challonge results.
+                <div className="border-t border-white/[0.04] pt-5 space-y-1">
+                  <label className="text-[10px] font-bold uppercase tracking-wider text-cyan-400">MVP player</label>
+                  <input
+                    className={inputClass}
+                    value={mvp}
+                    onChange={(e) => setMvp(e.target.value)}
+                    placeholder="MVP player or username"
+                  />
+                  <p className="text-xs text-white/40">
+                    Optional. Shown on the cup page below the Challonge results. Click{" "}
+                    <strong className="text-white/55">Save all</strong> to publish.
                   </p>
                 </div>
               </div>
@@ -1137,20 +1069,17 @@ export default function AdminTournamentEditor({
               showsOn="Player sign-ups with profile snapshots at registration time"
             >
               <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
-                <p className="text-sm text-white/45">{registrations.length} registered</p>
+                <p className="text-sm text-white/45">{registrations.length} total</p>
                 <a
                   href={`/api/admin/tournaments/${form.slug}/registrations/export`}
-                  className="rounded-xl border border-white/15 bg-white/[0.03] px-4 py-2 text-xs font-semibold text-white/65 hover:bg-white/[0.06] hover:text-white transition-colors"
+                  className="rounded-xl border border-amber-500/25 bg-amber-500/10 px-4 py-2 text-xs font-semibold text-amber-200 hover:bg-amber-500/20"
                 >
                   Export CSV
                 </a>
               </div>
 
               <div className="mb-6 space-y-3 rounded-xl border border-white/[0.06] bg-white/[0.02] p-4">
-                <div className="flex items-center justify-between gap-2">
-                  <p className="text-[10px] font-bold uppercase tracking-wider text-indigo-300">Add existing member to cup</p>
-                  <p className="text-[10px] text-white/35">Search by name or email. Only NTG-registered accounts can be added.</p>
-                </div>
+                <p className="text-[10px] font-bold uppercase tracking-wider text-amber-300">Add member</p>
                 <div className="space-y-2">
                   <input
                     className={inputClass}
@@ -1220,7 +1149,7 @@ export default function AdminTournamentEditor({
                     !selectedMember ||
                     (addRole === "CAPTAIN" && !addTeamName.trim())
                   }
-                  className="rounded-xl bg-indigo-600 px-5 py-2.5 text-xs font-bold text-white hover:bg-indigo-500 disabled:opacity-50 transition-colors"
+                  className="rounded-xl bg-amber-500 px-5 py-2.5 text-xs font-bold text-black hover:bg-amber-400 disabled:opacity-50"
                 >
                   {addingMember ? "Adding…" : "Add to cup"}
                 </button>
@@ -1319,12 +1248,24 @@ export default function AdminTournamentEditor({
               viewHref={cupUrl}
             >
               <div className="space-y-6">
-                {/* Read-only notice — teams are created automatically from captain registrations */}
-                <div className="rounded-xl border border-white/[0.06] bg-white/[0.02] px-4 py-3">
-                  <p className="text-xs text-white/50">
-                    <span className="font-semibold text-white/70">Teams are auto-created</span> when captains register.
-                    To manually assign players, use the <span className="font-semibold text-white/70">Registrations</span> tab to add a member as Captain with a team name.
-                  </p>
+                {/* Team Creation Form */}
+                <div className="rounded-xl border border-white/[0.05] bg-white/[0.01] p-4 space-y-3">
+                  <p className="text-[10px] font-bold uppercase tracking-wider text-amber-300">Add New Team Roster</p>
+                  <div className="flex gap-2">
+                    <input
+                      className={inputClass}
+                      value={newTeamName}
+                      onChange={(e) => setNewTeamName(e.target.value)}
+                      placeholder="Enter new team name"
+                    />
+                    <button
+                      type="button"
+                      onClick={addTeam}
+                      className="shrink-0 rounded-xl bg-amber-500 px-5 text-xs font-semibold text-black hover:bg-amber-400 transition-colors"
+                    >
+                      Add Team
+                    </button>
+                  </div>
                 </div>
 
                 {/* Team Lists */}
@@ -1358,30 +1299,61 @@ export default function AdminTournamentEditor({
 
                         {/* Player lists inside team */}
                         <ul className="space-y-1.5 min-h-[3rem]">
-                          {(() => {
-                            const matchingRegs = form.registrations.filter(
-                              (r) =>
-                                r.teamName?.toLowerCase() === team.name.toLowerCase() ||
-                                r.teamId === team.id
-                            );
-                            if (matchingRegs.length === 0 && team.players.length === 0) {
-                              return <p className="text-xs text-white/30 italic">No players registered for this roster.</p>;
-                            }
-                            
-                            const displayPlayers = matchingRegs.length > 0 
-                              ? matchingRegs.map(r => ({ id: r.id, name: r.displayName, role: r.participantRole }))
-                              : team.players.map(p => ({ id: p.id, name: p.displayName, role: "Player" }));
-
-                            return displayPlayers.map((p) => (
+                          {team.players.length === 0 ? (
+                            <p className="text-xs text-white/30 italic">No players added to this roster.</p>
+                          ) : (
+                            team.players.map((p) => (
                               <li key={p.id} className="flex items-center justify-between rounded-lg bg-white/[0.02] border border-white/[0.03] px-3 py-1.5 text-xs text-white/70">
-                                <div>
-                                  <span className="font-medium">{p.name}</span>
-                                  <span className="ml-2 text-white/40 text-[10px] uppercase">{p.role}</span>
-                                </div>
+                                <span className="font-medium">{p.displayName}</span>
+                                <button
+                                  type="button"
+                                  onClick={() => requestRemovePlayer(team.id, p.id, p.displayName)}
+                                  className="text-red-400 hover:text-red-300 font-semibold"
+                                >
+                                  Remove
+                                </button>
                               </li>
-                            ));
-                          })()}
+                            ))
+                          )}
                         </ul>
+
+                        {/* Add Player to this team */}
+                        <div className="space-y-2 pt-2 border-t border-white/[0.04]">
+                          {poolPlayers.length > 0 ? (
+                            <select
+                              className={`${inputClass} text-xs py-2 px-3`}
+                              value={poolPick[team.id] ?? ""}
+                              onChange={(e) =>
+                                setPoolPick((prev) => ({ ...prev, [team.id]: e.target.value }))
+                              }
+                            >
+                              <option value="">Assign from player pool…</option>
+                              {poolPlayers.map((p) => (
+                                <option key={p.id} value={p.id}>
+                                  {p.displayName}
+                                  {p.riotId ? ` (${p.riotId})` : p.steamId64 ? ` (${p.steamId64})` : ""}
+                                </option>
+                              ))}
+                            </select>
+                          ) : null}
+                          <div className="flex gap-2">
+                            <input
+                              className={`${inputClass} text-xs py-2 px-3`}
+                              value={newPlayerNames[team.id] ?? ""}
+                              onChange={(e) =>
+                                setNewPlayerNames((prev) => ({ ...prev, [team.id]: e.target.value }))
+                              }
+                              placeholder="Or type player name"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => addPlayer(team.id)}
+                              className="shrink-0 rounded-xl bg-white/10 hover:bg-white/15 px-3.5 text-xs font-semibold text-white/80 transition-colors"
+                            >
+                              + Add
+                            </button>
+                          </div>
+                        </div>
                       </div>
                     ))}
                   </div>

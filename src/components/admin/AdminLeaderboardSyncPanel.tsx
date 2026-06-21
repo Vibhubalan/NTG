@@ -288,7 +288,7 @@ export default function AdminLeaderboardSyncPanel() {
           </div>
         </div>
 
-        <div className="mt-4 overflow-x-auto overflow-y-auto max-h-[420px] rounded-xl border border-white/[0.06]">
+        <div className="mt-4 overflow-x-auto rounded-xl border border-white/[0.06]">
           <table className="min-w-full text-left text-xs">
             <thead className="bg-white/[0.03] text-[10px] uppercase tracking-wider text-white/40">
               <tr>

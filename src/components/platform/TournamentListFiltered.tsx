@@ -86,7 +86,7 @@ export default function TournamentListFiltered({ tournaments }: Props) {
                       )}
                     </p>
                     <p className="mt-1.5 text-xs uppercase tracking-[0.2em] text-white/40">
-                      {t.game}{t.format ? ` · ${t.format}` : ""}
+                      {t.game} · {t.season}
                     </p>
                   </div>
                 </div>
@@ -125,7 +125,7 @@ export default function TournamentListFiltered({ tournaments }: Props) {
                       )}
                     </p>
                     <p className="mt-1.5 text-xs uppercase tracking-[0.2em] text-white/40">
-                      {t.game}{t.format ? ` · ${t.format}` : ""}
+                      {t.game} · {t.season}
                     </p>
                   </div>
                 </div>

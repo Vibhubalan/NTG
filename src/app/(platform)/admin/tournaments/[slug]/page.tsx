@@ -50,7 +50,6 @@ export default async function AdminTournamentEditPage({ params }: Props) {
     registrationClosesAt: t.registrationClosesAt?.toISOString() ?? null,
     autoManageStatus: t.autoManageStatus,
     hideAfter: t.hideAfter?.toISOString() ?? null,
-    registrationFormat: (t.registrationFormat as string | null) ?? null,
     bracketUrl: t.bracketUrl,
     rulebookUrl: t.rulebookUrl,
     tournamentTeams: t.tournamentTeams.map((team) => ({
@@ -89,16 +88,7 @@ export default async function AdminTournamentEditPage({ params }: Props) {
       teamId: r.teamId,
     })),
     poolPlayers,
-    placements: t.placements.map((p) => ({
-      role: p.role,
-      teamLabel: p.teamLabel,
-      user: p.user
-        ? {
-            id: p.user.id,
-            name: p.user.playerProfile?.displayName ?? p.user.name ?? "",
-          }
-        : null,
-    })),
+    placements: t.placements.map((p) => ({ role: p.role, teamLabel: p.teamLabel })),
   };
 
   return (

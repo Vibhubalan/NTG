@@ -22,7 +22,6 @@ export type CreateTournamentInput = {
   seasonId?: string;
   status?: TournamentStatus;
   format?: BracketType;
-  registrationFormat?: "AUCTION" | "STANDARD" | null;
   description?: string;
   startsAt?: string;
   endsAt?: string;
@@ -74,7 +73,6 @@ export type UpdateTournamentInput = Partial<
   prizePool?: number | null;
   hideAfter?: string | null;
   teams?: string[];
-  registrationFormat?: "AUCTION" | "STANDARD" | null;
 };
 
 function parsePrizeSplit(value: unknown): PrizeSplitRow[] | null {
@@ -187,7 +185,6 @@ export async function createTournament(
         ? (input.hubCarouselImages as unknown as Prisma.InputJsonValue)
         : undefined,
       showOnEsportsHub: input.showOnEsportsHub ?? false,
-      registrationFormat: (input.registrationFormat as import("@prisma/client").TournamentFormat | null) ?? null,
     },
   });
 
@@ -269,17 +266,9 @@ export async function updateTournamentFull(
   if (input.game !== undefined) data.game = input.game;
   if (input.gameLabel !== undefined) data.gameLabel = input.gameLabel?.trim() || null;
   if (input.seasonId !== undefined) {
-    if (input.seasonId) {
-      const parsedNumber = parseInt(input.seasonId.replace(/\D/g, ""), 10);
-      const label = isNaN(parsedNumber) ? input.seasonId : `Season ${parsedNumber.toString().padStart(2, '0')}`;
-      let season = await prisma.season.findFirst({ where: { label } });
-      if (!season) {
-        season = await prisma.season.create({ data: { label } });
-      }
-      data.season = { connect: { id: season.id } };
-    } else {
-      data.season = { disconnect: true };
-    }
+    data.season = input.seasonId
+      ? { connect: { id: input.seasonId } }
+      : { disconnect: true };
   }
   if (input.status !== undefined) data.status = input.status;
   if (input.format !== undefined) data.format = input.format ?? null;
@@ -321,9 +310,6 @@ export async function updateTournamentFull(
       : Prisma.JsonNull;
   }
   if (input.showOnEsportsHub !== undefined) data.showOnEsportsHub = input.showOnEsportsHub;
-  if (input.registrationFormat !== undefined) {
-    data.registrationFormat = (input.registrationFormat as import("@prisma/client").TournamentFormat | null) ?? null;
-  }
   if (input.hideAfter !== undefined) {
     data.hideAfter =
       input.hideAfter === null ? null : input.hideAfter ? new Date(input.hideAfter) : undefined;

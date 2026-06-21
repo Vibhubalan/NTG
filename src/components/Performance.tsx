@@ -5,7 +5,7 @@ import { AnimatePresence, motion, useInView } from "framer-motion";
 import { useEffect, useRef, useState } from "react";
 import ReviewCarousel from "./ReviewCarousel";
 
-const defaultChampionshipSlides = [
+const championshipSlides = [
   "/arena/arena-tournament.png",
   "/arena/arena-finals.png",
   "/arena/arena-focus.png",
@@ -84,23 +84,22 @@ function ChampionshipCard({
   body,
   className = "",
   imgClassName = "min-h-[360px] md:min-h-full md:aspect-auto",
-  slides = defaultChampionshipSlides,
-}: ChampionshipCardProps & { slides?: string[] }) {
+}: ChampionshipCardProps) {
   const [index, setIndex] = useState(0);
   const ref = useRef<HTMLElement>(null);
   const inView = useInView(ref, { margin: "-80px", once: false });
 
   useEffect(() => {
-    slides.slice(1).forEach((src) => {
+    championshipSlides.slice(1).forEach((src) => {
       const img = new window.Image();
       img.src = src;
     });
-  }, [slides]);
+  }, []);
 
   useEffect(() => {
     if (!inView) return;
     const timer = setInterval(() => {
-      setIndex((current) => (current + 1) % slides.length);
+      setIndex((current) => (current + 1) % championshipSlides.length);
     }, 5000);
     return () => clearInterval(timer);
   }, [inView]);
@@ -117,7 +116,7 @@ function ChampionshipCard({
       <div className={`relative h-full w-full ${imgClassName}`}>
         <AnimatePresence mode="sync" initial={false}>
           <motion.div
-            key={slides[index]}
+            key={championshipSlides[index]}
             initial={{ opacity: 0, scale: 1.03 }}
             animate={{ opacity: 1, scale: 1 }}
             exit={{ opacity: 0 }}
@@ -125,7 +124,7 @@ function ChampionshipCard({
             className="absolute inset-0"
           >
             <Image
-              src={slides[index]}
+              src={championshipSlides[index]}
               alt={`${title} — slide ${index + 1}`}
               fill
               sizes="(max-width: 768px) 100vw, 55vw"
@@ -141,7 +140,7 @@ function ChampionshipCard({
         <div className="absolute inset-0 bg-[radial-gradient(120%_80%_at_50%_120%,rgba(124,58,237,0.22),transparent_60%)]" />
 
         <div className="absolute right-4 top-4 flex gap-1.5">
-          {slides.map((slide, i) => (
+          {championshipSlides.map((slide, i) => (
             <button
               key={slide}
               type="button"
@@ -173,13 +172,7 @@ function ChampionshipCard({
   );
 }
 
-export default function Performance({
-  championshipSlides,
-  auctionNightsImage,
-}: {
-  championshipSlides?: string[];
-  auctionNightsImage?: string;
-}) {
+export default function Performance() {
   return (
     <section id="arena" className="relative mx-auto w-full max-w-6xl scroll-mt-28 px-5 py-20 sm:py-28">
       <motion.div
@@ -211,11 +204,10 @@ export default function Performance({
           title="Championship Arena"
           body="Where the AUC Cup finals are won. Pro-grade stations built for clutch moments and total focus."
           className="md:row-span-2"
-          slides={championshipSlides?.length ? championshipSlides : defaultChampionshipSlides}
         />
 
         <ImageCard
-          src={auctionNightsImage || "/arena/auction-nights.png"}
+          src="/arena/auction-nights.png"
           kicker="The Vibe"
           title="Auction Nights"
           body="Neon-soaked energy, packed houses, and a crowd that lives for the play."

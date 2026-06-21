@@ -8,7 +8,7 @@ function minimalDetail(overrides: Partial<TournamentDetail> = {}): TournamentDet
     name: "FC26 Cup 1",
     game: "EA_FC26",
     gameLabel: "EA FC 26",
-    registrationFormat: null,
+    seasonLabel: null,
     status: "REGISTRATION_OPEN",
     description: null,
     posterUrl: null,

@@ -40,11 +40,6 @@ enum BracketType {
   DOUBLE_ELIMINATION
 }
 
-enum TournamentFormat {
-  AUCTION  // Captain/Player split — players register individually, admin assigns teams
-  STANDARD // Captain registers full team roster upfront (5 players for Valorant/CS2)
-}
-
 enum MatchStatus {
   SCHEDULED
   LIVE
@@ -256,7 +251,6 @@ model Tournament {
   season               Season?          @relation(fields: [seasonId], references: [id])
   status               TournamentStatus @default(DRAFT)
   format               BracketType?
-  registrationFormat   TournamentFormat?
   description          String?
   posterUrl            String?
   hubBannerUrl         String?
@@ -557,11 +551,4 @@ model AdminAuditLog {
 
   @@index([adminId, createdAt])
   @@index([action, createdAt])
-}
-
-/** Singleton row for editable homepage content. */
-model HomepageContent {
-  id        String   @id @default("singleton")
-  content   Json
-  updatedAt DateTime @updatedAt
 }

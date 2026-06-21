@@ -6,7 +6,7 @@ export type TournamentPreview = {
   name: string;
   game: GameSlug;
   gameLabel: string | null;
-  registrationFormat: string | null;
+  seasonLabel: string | null;
   status: TournamentStatus;
   startsAt: string | null;
   registrationUrl: string | null;
