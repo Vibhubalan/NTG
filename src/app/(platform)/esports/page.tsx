@@ -4,6 +4,7 @@ import { getPlayerGameProfile } from "@auth-membership/index";
 import { listActiveRegistrationBanners, listTournamentPreviews, getValorantRankings } from "@tournaments-leagues/index";
 import { prisma } from "@core/database/client";
 import { rankIconUrl } from "@/lib/valorant-rank";
+import { formatMonthYear, sortTournamentsByHostingOrder, toTournamentDisplay } from "@/lib/tournament-display";
 import EsportsRegistrationSlides from "@/components/platform/EsportsRegistrationSlides";
 
 export const dynamic = "force-dynamic";
@@ -60,39 +61,13 @@ export default async function EsportsHubPage() {
         )?.name ?? "—";
 
   const completedTournaments = tournaments.filter((t) => t.status === "COMPLETED");
-  const latestCompleted = completedTournaments
+  const latestCompleted = sortTournamentsByHostingOrder(completedTournaments)
     .filter((t) => t.championName)
-    .sort((a, b) => {
-      const dateA = a.startsAt ? new Date(a.startsAt).getTime() : 0;
-      const dateB = b.startsAt ? new Date(b.startsAt).getTime() : 0;
-      return dateB - dateA;
-    })[0];
+    .at(-1);
 
-  const priorityMap: Record<string, number> = {
-    IN_PROGRESS: 0,
-    REGISTRATION_OPEN: 1,
-    UPCOMING: 2,
-    COMPLETED: 3,
-    DRAFT: 4,
-    CANCELLED: 5,
-  };
-
-  // Always show all non-draft, non-cancelled events — showOnEsportsHub ones sort first
-  const timelineTournaments = tournaments.filter(
-    (t) => t.status !== "DRAFT" && t.status !== "CANCELLED"
+  const scheduleTournaments = sortTournamentsByHostingOrder(
+    tournaments.filter((t) => t.status !== "DRAFT" && t.status !== "CANCELLED"),
   );
-
-  const sortedTimeline = [...timelineTournaments]
-    .sort((a, b) => {
-      const prioDiff = (priorityMap[a.status] ?? 99) - (priorityMap[b.status] ?? 99);
-      if (prioDiff !== 0) return prioDiff;
-      // Within same status, featured (showOnEsportsHub) comes first
-      if (a.showOnEsportsHub !== b.showOnEsportsHub) return a.showOnEsportsHub ? -1 : 1;
-      const dateA = a.startsAt ? new Date(a.startsAt).getTime() : 0;
-      const dateB = b.startsAt ? new Date(b.startsAt).getTime() : 0;
-      return dateA - dateB;
-    })
-    .slice(0, 6);
 
   const activeUserRegistrations = userRegistrations.filter(
     (reg) => reg.tournament.status !== "COMPLETED" && reg.tournament.status !== "CANCELLED"
@@ -324,7 +299,10 @@ export default async function EsportsHubPage() {
 
       {/* Champion Highlight Box */}
       {latestCompleted && (
-        <div className="rounded-[2rem] border border-amber-500/15 bg-gradient-to-br from-[#1E170A]/50 via-[#0A0A0A]/50 to-[#0A0A0A]/50 p-6 backdrop-blur-md sm:p-8 relative overflow-hidden group">
+        <Link
+          href={`/esports/tournaments/${latestCompleted.slug}`}
+          className="block rounded-[2rem] border border-amber-500/15 bg-gradient-to-br from-[#1E170A]/50 via-[#0A0A0A]/50 to-[#0A0A0A]/50 p-6 backdrop-blur-md sm:p-8 relative overflow-hidden group transition-transform hover:scale-[1.01] active:scale-[0.99]"
+        >
           <div className="absolute right-0 top-0 h-40 w-40 -translate-y-8 translate-x-8 rounded-full bg-amber-500/5 blur-[60px]" />
           <div className="flex flex-col gap-6 md:flex-row md:items-center">
             <div className="relative flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl bg-amber-500/10 text-amber-500 ring-1 ring-inset ring-amber-500/20">
@@ -338,20 +316,15 @@ export default async function EsportsHubPage() {
                 {latestCompleted.championName} crowned champion of {latestCompleted.name}!
               </h3>
               <p className="mt-1 text-sm text-white/45">
-                Shoutout to the winners of our most recently hosted tournament. View brackets and rosters to see how the matches played out.
+                Shoutout to the winners of our most recently hosted tournament. Tap to view brackets and rosters.
               </p>
             </div>
-            <div className="md:ml-auto shrink-0">
-              <Link href={`/esports/tournaments/${latestCompleted.slug}`} className="rounded-full bg-amber-500 px-5 py-3 text-xs font-bold uppercase tracking-wider text-black transition-transform hover:scale-[1.03] active:scale-[0.98]">
-                View Bracket
-              </Link>
-            </div>
           </div>
-        </div>
+        </Link>
       )}
 
       {/* Timeline Schedule Section */}
-      {sortedTimeline.length > 0 && (
+      {scheduleTournaments.length > 0 && (
         <div className="rounded-[2rem] border border-white/[0.06] bg-[#0A0A0A]/40 p-6 backdrop-blur-md sm:p-8">
           <div className="mb-8">
             <h2 className="font-display text-2xl font-bold tracking-tight text-white sm:text-3xl">Competitive Schedule</h2>
@@ -359,7 +332,8 @@ export default async function EsportsHubPage() {
           </div>
 
           <div className="relative border-l border-white/10 pl-6 space-y-8 ml-2">
-            {sortedTimeline.map((t) => {
+            {scheduleTournaments.map((t) => {
+              const display = toTournamentDisplay(t);
               let badgeColor = "text-white/40 bg-white/5 border-white/10";
               let pingColor = "";
               if (t.status === "IN_PROGRESS") {
@@ -391,9 +365,9 @@ export default async function EsportsHubPage() {
                         <span className={`rounded-full border px-2.5 py-0.5 text-[9px] font-black uppercase tracking-wider ${badgeColor}`}>
                           {t.status.replace("_", " ")}
                         </span>
-                        {t.gameLabel && (
+                        {display.game && (
                           <span className="text-[10px] font-medium text-white/30 uppercase tracking-widest">
-                            {t.gameLabel}
+                            {display.game}
                           </span>
                         )}
                       </div>
@@ -401,7 +375,7 @@ export default async function EsportsHubPage() {
                         {t.name}
                       </h3>
                       <p className="mt-1 text-xs text-white/40">
-                        {t.startsAt ? new Date(t.startsAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : "Date TBA"}
+                        {formatMonthYear(t.startsAt)}
                       </p>
                     </div>
 

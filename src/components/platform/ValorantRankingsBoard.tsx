@@ -616,11 +616,12 @@ export default function ValorantRankingsBoard({ data }: Props) {
 
             {/* Static User Overview Banner */}
             {userEntry && (
-              <div 
-                className="mt-auto flex justify-center pb-8 pt-12 cursor-pointer transition-transform hover:scale-[1.02]"
-                onClick={handleJumpToMe}
-              >
-                <div className="flex items-center gap-4 sm:gap-6 rounded-2xl border border-white/20 bg-white/[0.03] p-5 px-8 sm:px-10 shadow-[0_0_40px_rgba(255,255,255,0.05)] backdrop-blur-md">
+              <div className="mt-auto flex justify-center pb-8 pt-12">
+                <button
+                  type="button"
+                  onClick={handleJumpToMe}
+                  className="flex items-center gap-4 sm:gap-6 rounded-2xl border border-white/20 bg-white/[0.03] p-5 px-8 sm:px-10 shadow-[0_0_40px_rgba(255,255,255,0.05)] backdrop-blur-md transition-transform hover:scale-[1.02] cursor-pointer"
+                >
                   <div className="flex flex-col items-end border-r border-white/10 pr-4 sm:pr-6">
                     <span className="text-[10px] font-black text-white/50 uppercase tracking-widest">Your Rank</span>
                     <span className="font-display text-4xl font-black text-white drop-shadow-[0_0_15px_rgba(255,255,255,0.4)]">#{userEntry.rank}</span>
@@ -643,7 +644,7 @@ export default function ValorantRankingsBoard({ data }: Props) {
                       </span>
                     </div>
                   </div>
-                </div>
+                </button>
               </div>
             )}
           </div>
