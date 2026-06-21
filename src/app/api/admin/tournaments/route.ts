@@ -1,7 +1,7 @@
 import { guardResponse, isAuthedAdmin, requireAdmin } from "@/lib/auth-guard";
 import { serverEnv } from "@core/config/env.server";
 import { createTournament, listTournamentsAdmin } from "@tournaments-leagues/index";
-import type { GameSlug } from "@prisma/client";
+import type { GameSlug, TournamentFormat } from "@prisma/client";
 import { NextResponse } from "next/server";
 
 export const dynamic = "force-dynamic";
@@ -44,6 +44,7 @@ export async function POST(req: Request) {
     game: GameSlug;
     gameLabel?: string;
     seasonId?: string;
+    registrationFormat?: TournamentFormat | null;
   };
 
   try {
@@ -62,6 +63,7 @@ export async function POST(req: Request) {
     game: body.game ?? "VALORANT",
     gameLabel: body.gameLabel,
     seasonId: body.seasonId,
+    registrationFormat: body.registrationFormat ?? null,
   });
 
   if (!result.ok) {

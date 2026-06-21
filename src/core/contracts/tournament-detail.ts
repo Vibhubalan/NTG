@@ -4,6 +4,12 @@ export type TournamentPlacementView = {
   role: PlacementRole;
   displayName: string;
   teamLabel: string | null;
+  user?: {
+    id: string;
+    riotId: string | null;
+    username: string;
+    rankTier: string | null;
+  } | null;
 };
 
 export type TournamentMatchView = {
@@ -21,7 +27,7 @@ export type TournamentDetail = {
   name: string;
   game: GameSlug;
   gameLabel: string | null;
-  seasonLabel: string | null;
+  registrationFormat: string | null;
   status: TournamentStatus;
   description: string | null;
   posterUrl: string | null;

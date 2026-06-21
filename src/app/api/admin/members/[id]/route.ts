@@ -94,6 +94,19 @@ export async function PATCH(req: Request, { params }: Props) {
     return NextResponse.json({ ok: true });
   }
 
+  if (body.role !== undefined) {
+    const targetMember = await getMemberAdmin(id);
+    const isSuperadmin = auth.session.user.email === (process.env.SUPERADMIN_EMAIL ?? "vibhubalan123@gmail.com");
+    if (!isSuperadmin) {
+      if (body.role === "ADMIN" && targetMember?.role !== "ADMIN") {
+        return NextResponse.json({ error: "Only the superadmin can grant ADMIN role." }, { status: 403 });
+      }
+      if (targetMember?.role === "ADMIN" && body.role !== "ADMIN") {
+        return NextResponse.json({ error: "Only the superadmin can revoke ADMIN role." }, { status: 403 });
+      }
+    }
+  }
+
   const result = await updateMemberAdmin(id, {
     name: body.name as string | undefined,
     phone: body.phone as string | undefined,
@@ -121,6 +134,13 @@ export async function DELETE(_req: Request, { params }: Props) {
   if (!isAuthedAdmin(auth)) return guardResponse(auth)!;
 
   const { id } = await params;
+  
+  const targetMember = await getMemberAdmin(id);
+  const isSuperadmin = auth.session.user.email === (process.env.SUPERADMIN_EMAIL ?? "vibhubalan123@gmail.com");
+  if (targetMember?.role === "ADMIN" && !isSuperadmin) {
+    return NextResponse.json({ error: "Only the superadmin can delete an admin." }, { status: 403 });
+  }
+
   const result = await deleteMemberAdmin(id);
   if (!result.ok) {
     return NextResponse.json({ error: result.error }, { status: 400 });

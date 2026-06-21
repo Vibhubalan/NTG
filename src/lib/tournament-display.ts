@@ -7,7 +7,7 @@ export type TournamentDisplay = {
   slug: string;
   name: string;
   game: string;
-  season: string;
+  format: string;
   date: string;
   status: "Hosted" | "Soon" | "Live" | "Open" | "Upcoming";
   iconPath: string;
@@ -57,8 +57,8 @@ export function toTournamentDisplay(t: TournamentPreview): TournamentDisplay {
     id: t.slug,
     slug: t.slug,
     name: t.name,
-    game: t.gameLabel ?? meta.label,
-    season: t.seasonLabel ?? "—",
+    game: meta.label,
+    format: t.registrationFormat === "AUCTION" ? "Auction Draft" : (t.registrationFormat === "STANDARD" ? "Standard (5v5)" : ""),
     date: formatMonthYear(t.startsAt),
     status: mapDisplayStatus(t.status),
     iconPath: meta.iconPath,

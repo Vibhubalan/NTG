@@ -35,8 +35,15 @@ export default function TournamentDetailView({
 
   const isCompleted = tournament.status === "COMPLETED";
   const mvpPlacement = tournament.placements.find((p) => p.role === "MVP");
-  const adminMvp =
-    mvpPlacement?.teamLabel?.trim() ? mvpPlacement.displayName : null;
+  const adminMvp = mvpPlacement?.user
+    ? {
+        displayName: mvpPlacement.user.username,
+        riotId: mvpPlacement.user.riotId,
+        rankTier: mvpPlacement.user.rankTier,
+      }
+    : mvpPlacement?.teamLabel?.trim()
+      ? mvpPlacement.displayName
+      : null;
   const mvp = bracket?.mvp ?? adminMvp ?? null;
 
   const fallbackStandings: FinalStandingView[] = [];
@@ -92,15 +99,19 @@ export default function TournamentDetailView({
                 {tournament.name}
               </h1>
               <div className="mt-4 flex flex-wrap items-center gap-3 text-sm font-medium uppercase tracking-[0.2em] text-white/60">
-                <span>{tournament.gameLabel ?? meta.label}</span>
-                <span className="h-1 w-1 rounded-full bg-white/20" />
-                <span>{dateStr}</span>
-                {tournament.seasonLabel ? (
+                <span>{meta.label}</span>
+                {tournament.registrationFormat && (
                   <>
                     <span className="h-1 w-1 rounded-full bg-white/20" />
-                    <span style={{ color: meta.hex }}>{tournament.seasonLabel}</span>
+                    <span>{tournament.registrationFormat === "AUCTION" ? "Auction Draft" : "Standard (5v5)"}</span>
                   </>
-                ) : null}
+                )}
+                {dateStr && (
+                  <>
+                    <span className="h-1 w-1 rounded-full bg-white/20" />
+                    <span>{dateStr}</span>
+                  </>
+                )}
               </div>
             </div>
           </div>

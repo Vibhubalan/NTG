@@ -120,7 +120,7 @@ export default function TournamentVault({ tournaments, registration }: Tournamen
                         )}
                       </p>
                       <p className="mt-1 text-xs uppercase tracking-[0.22em] text-white/45">
-                        {t.game} · {t.season}
+                        {t.game}{t.format ? ` · ${t.format}` : ""}
                       </p>
                     </div>
                   </div>
@@ -161,7 +161,7 @@ export default function TournamentVault({ tournaments, registration }: Tournamen
                         )}
                       </p>
                       <p className="mt-1 text-xs uppercase tracking-[0.22em] text-white/45">
-                        {t.game} · {t.season}
+                        {t.game}{t.format ? ` · ${t.format}` : ""}
                       </p>
                     </div>
                   </div>
