@@ -533,7 +533,7 @@ export default function ValorantRankingsBoard({ data }: Props) {
                       className={`group relative flex items-center rounded-xl border ${rowBgClass} px-5 sm:px-6 h-[90px] sm:h-[110px] backdrop-blur-sm transition-all duration-300 ease-out hover:scale-[1.02] hover:-translate-y-1 hover:z-30 hover:border-white/20 hover:bg-white/[0.04] hover:shadow-[0_20px_40px_rgba(0,0,0,0.4)]`}
                     >
                       {/* Left Edge Tier Highlight */}
-                      <div className={`absolute left-0 top-0 bottom-0 w-2 rounded-l-xl transition-all duration-300 ${
+                      <div className={`absolute left-0 top-0 bottom-0 w-2 rounded-l-xl transition-all duration-300 [clip-path:inset(0px_-100px)] ${
                         isUser ? "bg-white shadow-[0_0_12px_rgba(255,255,255,0.8)]" : edgeColorClass
                       }`} />
                       {/* Grid Layout for Row */}
