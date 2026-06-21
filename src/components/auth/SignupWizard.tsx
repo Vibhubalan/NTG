@@ -18,6 +18,7 @@ export default function SignupWizard() {
   const [phone, setPhone] = useState("");
   const [password, setPassword] = useState("");
   const [dateOfBirth, setDateOfBirth] = useState("");
+  const [displayDob, setDisplayDob] = useState("");
   const [olympusId, setOlympusId] = useState("");
   const [otp, setOtp] = useState(["", "", "", "", "", ""]);
   const [error, setError] = useState("");
@@ -27,6 +28,57 @@ export default function SignupWizard() {
   const [pendingVerification, setPendingVerification] = useState(false);
   const [restoring, setRestoring] = useState(true);
   const otpRefs = useRef<(HTMLInputElement | null)[]>([]);
+  const datePickerRef = useRef<HTMLInputElement | null>(null);
+
+  const handleDobTextChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const rawDigits = e.target.value.replace(/\D/g, "");
+    const digits = rawDigits.slice(0, 8);
+    
+    let formatted = digits;
+    if (digits.length >= 5) {
+      formatted = `${digits.slice(0, 2)}/${digits.slice(2, 4)}/${digits.slice(4)}`;
+    } else if (digits.length >= 3) {
+      formatted = `${digits.slice(0, 2)}/${digits.slice(2)}`;
+    } else if (e.target.value.endsWith("/") && digits.length === 2) {
+      formatted = `${digits}/`;
+    } else if (e.target.value.endsWith("/") && digits.length === 4) {
+      formatted = `${digits.slice(0, 2)}/${digits.slice(2, 4)}/`;
+    }
+    
+    setDisplayDob(formatted);
+
+    if (digits.length === 8) {
+      const d = digits.slice(0, 2);
+      const m = digits.slice(2, 4);
+      const y = digits.slice(4, 8);
+      setDateOfBirth(`${y}-${m}-${d}`);
+    } else {
+      setDateOfBirth("");
+    }
+  };
+
+  const handleDatePickerChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const val = e.target.value;
+    if (!val) {
+      setDateOfBirth("");
+      setDisplayDob("");
+      return;
+    }
+    setDateOfBirth(val);
+    const [y, m, d] = val.split("-");
+    if (y && m && d) {
+      setDisplayDob(`${d}/${m}/${y}`);
+    }
+  };
+
+  const triggerDatePicker = () => {
+    try {
+      datePickerRef.current?.showPicker();
+    } catch (err) {
+      console.warn("showPicker is not supported in this browser:", err);
+      datePickerRef.current?.focus();
+    }
+  };
 
   useEffect(() => {
     const stepParam = searchParams.get("step");
@@ -208,6 +260,7 @@ export default function SignupWizard() {
     setPhone("");
     setPassword("");
     setDateOfBirth("");
+    setDisplayDob("");
     setOlympusId("");
     setDevOtp(null);
     setDevOtpHint(null);
@@ -391,31 +444,45 @@ export default function SignupWizard() {
                 />
                 <div className="relative w-full">
                   <input
-                    id="signup-dob"
-                    type="date"
+                    type="text"
                     required
-                    value={dateOfBirth}
-                    onChange={(e) => setDateOfBirth(e.target.value)}
-                    className={`${inputClass} min-w-0 ${!dateOfBirth ? "text-transparent [&::-webkit-datetime-edit]:opacity-0" : ""}`}
-                    aria-label="Date of birth"
+                    placeholder="Date of birth (DD/MM/YYYY)"
+                    value={displayDob}
+                    onChange={handleDobTextChange}
+                    className={`${inputClass} pr-11`}
                   />
-                  {!dateOfBirth ? (
-                    <label
-                      htmlFor="signup-dob"
-                      className="pointer-events-none absolute inset-y-0 left-4 flex items-center text-sm text-white/30"
-                    >
-                      Date of birth
-                    </label>
-                  ) : null}
+                  <input
+                    ref={datePickerRef}
+                    type="date"
+                    onChange={handleDatePickerChange}
+                    value={dateOfBirth}
+                    className="absolute opacity-0 pointer-events-none w-0 h-0 right-0 top-0"
+                    tabIndex={-1}
+                  />
+                  <button
+                    type="button"
+                    onClick={triggerDatePicker}
+                    className="absolute inset-y-0 right-3 flex items-center text-white/30 hover:text-white/60 transition-colors cursor-pointer"
+                    title="Open calendar picker"
+                  >
+                    <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                    </svg>
+                  </button>
                 </div>
-                <input
-                  type="text"
-                  required
-                  placeholder="Olympus ID"
-                  value={olympusId}
-                  onChange={(e) => setOlympusId(e.target.value)}
-                  className={inputClass}
-                />
+                <div className="space-y-1">
+                  <input
+                    type="text"
+                    required
+                    placeholder="Olympus ID"
+                    value={olympusId}
+                    onChange={(e) => setOlympusId(e.target.value)}
+                    className={inputClass}
+                  />
+                  <p className="text-[11px] text-white/40 pl-1">
+                    Required. If you don't have an Olympus ID, you can enter <strong className="text-white/60">NA</strong>.
+                  </p>
+                </div>
                 <PasswordField
                   required
                   minLength={8}
