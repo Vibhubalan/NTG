@@ -385,6 +385,13 @@ export default function AdminTournamentEditor({
     return true;
   }
 
+  /** Hub banner doubles as cup detail hero — persist both fields on upload. */
+  async function patchCupBannerImage(url: string | null, successMsg: string) {
+    const ok = await patchField({ hubBannerUrl: url, posterUrl: url }, successMsg);
+    if (ok) router.refresh();
+    return ok;
+  }
+
   async function saveAll() {
     setLoading(true);
     setMessage(null);
@@ -1010,13 +1017,13 @@ export default function AdminTournamentEditor({
                   hint="Banner background overlay behind registration open cards on /esports"
                   prefix={`tournaments/${form.slug}/hub`}
                   currentUrl={form.hubBannerUrl}
-                  onUploaded={(url) => setForm({ ...form, hubBannerUrl: url })}
+                  onUploaded={(url) => setForm({ ...form, hubBannerUrl: url, posterUrl: url })}
                   onUploadedComplete={async (url) => {
-                    await patchField({ hubBannerUrl: url }, "Hub background image saved.");
+                    await patchCupBannerImage(url, "Hub background image saved.");
                   }}
                   onClear={async () => {
-                    setForm({ ...form, hubBannerUrl: null });
-                    await patchField({ hubBannerUrl: null }, "Hub background image removed.");
+                    setForm({ ...form, hubBannerUrl: null, posterUrl: null });
+                    await patchCupBannerImage(null, "Hub background image removed.");
                   }}
                 />
 
