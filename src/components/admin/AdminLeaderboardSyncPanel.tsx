@@ -288,9 +288,10 @@ export default function AdminLeaderboardSyncPanel() {
           </div>
         </div>
 
-        <div className="mt-4 overflow-x-auto rounded-xl border border-white/[0.06]">
-          <table className="min-w-full text-left text-xs">
-            <thead className="bg-white/[0.03] text-[10px] uppercase tracking-wider text-white/40">
+        <div className="mt-4 overflow-hidden rounded-xl border border-white/[0.06]">
+          <div className="max-h-[min(28rem,60vh)] overflow-auto">
+            <table className="min-w-full text-left text-xs">
+              <thead className="sticky top-0 z-10 bg-[#0c1424] text-[10px] uppercase tracking-wider text-white/40 shadow-[0_1px_0_0_rgba(255,255,255,0.06)]">
               <tr>
                 <th className="px-3 py-2.5 font-semibold">When (IST)</th>
                 <th className="px-3 py-2.5 font-semibold">Player</th>
@@ -358,6 +359,7 @@ export default function AdminLeaderboardSyncPanel() {
               )}
             </tbody>
           </table>
+          </div>
         </div>
       </div>
     </section>

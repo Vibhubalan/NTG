@@ -48,7 +48,9 @@ export async function PATCH(req: Request, { params }: Props) {
     return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
   }
 
-  const result = await updateTournamentFull(slug, {
+  let result;
+  try {
+    result = await updateTournamentFull(slug, {
     name: body.name as string | undefined,
     game: body.game as GameSlug | undefined,
     gameLabel: normalizeOptionalString(body.gameLabel),
@@ -75,7 +77,12 @@ export async function PATCH(req: Request, { params }: Props) {
     hideAfter: body.hideAfter as string | null | undefined,
     teams: body.teams as string[] | undefined,
     registrationFormat: body.registrationFormat as "AUCTION" | "STANDARD" | null | undefined,
-  });
+    });
+  } catch (err) {
+    console.error("[admin/tournaments PATCH]", err);
+    const message = err instanceof Error ? err.message : "Save failed.";
+    return NextResponse.json({ error: message }, { status: 500 });
+  }
 
   if (!result.ok) {
     return NextResponse.json({ error: result.error }, { status: 400 });

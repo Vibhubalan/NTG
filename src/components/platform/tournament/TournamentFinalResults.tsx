@@ -128,7 +128,7 @@ export default function TournamentFinalResults({ standings, mvp }: Props) {
             </div>
 
             {/* Name */}
-            <h3 className="font-display text-2xl sm:text-3xl font-black tracking-tight text-white drop-shadow-lg group-hover:bg-gradient-to-r group-hover:from-white group-hover:to-[var(--color-iris)] group-hover:bg-clip-text group-hover:text-transparent transition-all duration-500">
+            <h3 className="font-display text-2xl sm:text-3xl font-black uppercase tracking-tight text-white drop-shadow-lg group-hover:bg-gradient-to-r group-hover:from-white group-hover:to-[var(--color-iris)] group-hover:bg-clip-text group-hover:text-transparent transition-all duration-500">
               {typeof mvp === "string" ? mvp : mvp?.displayName}
             </h3>
 

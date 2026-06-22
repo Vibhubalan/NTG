@@ -38,7 +38,7 @@ export default function AdminAuditLogPanel() {
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch("/api/admin/audit-log?limit=10");
+      const res = await fetch("/api/admin/audit-log?limit=all");
       const data = await res.json();
       if (res.ok) {
         setRows(data.logs ?? []);
@@ -62,7 +62,13 @@ export default function AdminAuditLogPanel() {
         <div>
           <p className="text-[10px] font-bold uppercase tracking-widest text-violet-400/90">Admin Audit</p>
           <h2 className="mt-1 font-display text-lg font-bold text-white">Action Log</h2>
-          <p className="mt-0.5 text-xs text-white/40">Last 10 admin actions performed on the platform.</p>
+          <p className="mt-0.5 text-xs text-white/40">
+            {loading
+              ? "Loading all admin actions…"
+              : rows.length > 0
+                ? `${rows.length} admin action${rows.length === 1 ? "" : "s"} recorded.`
+                : "All admin actions performed on the platform."}
+          </p>
         </div>
         <button
           type="button"
@@ -74,7 +80,7 @@ export default function AdminAuditLogPanel() {
         </button>
       </div>
 
-      <div className="mt-4 max-h-[360px] overflow-y-auto overflow-x-auto rounded-xl border border-white/[0.06]">
+      <div className="mt-4 max-h-[min(28rem,60vh)] overflow-y-auto overflow-x-auto rounded-xl border border-white/[0.06]">
         <table className="min-w-full text-left text-xs">
           <thead className="sticky top-0 bg-[#0c1424] text-[10px] uppercase tracking-wider text-white/40 border-b border-white/[0.06]">
             <tr>

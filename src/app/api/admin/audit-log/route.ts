@@ -14,11 +14,13 @@ export async function GET(req: Request) {
   if (!isAuthedAdmin(auth)) return guardResponse(auth)!;
 
   const url = new URL(req.url);
-  const limit = Math.min(Number(url.searchParams.get("limit") ?? "10"), 50);
+  const limitParam = url.searchParams.get("limit");
+  const fetchAll = !limitParam || limitParam === "all";
+  const take = fetchAll ? undefined : Math.min(Math.max(Number(limitParam) || 50, 1), 5000);
 
   const rows = await prisma.adminAuditLog.findMany({
     orderBy: { createdAt: "desc" },
-    take: limit,
+    ...(take !== undefined ? { take } : {}),
     include: {
       admin: {
         select: { name: true, email: true },

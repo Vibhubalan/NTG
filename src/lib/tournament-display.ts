@@ -26,7 +26,7 @@ const gameMeta: Record<
   OTHER: { iconPath: siValorant.path, hex: "#ff4655", label: "Other" },
 };
 
-function formatMonthYear(iso: string | null): string {
+export function formatMonthYear(iso: string | null): string {
   if (!iso) return "TBA";
   const d = new Date(iso);
   return d.toLocaleDateString("en-IN", { month: "long", year: "numeric" });
@@ -46,6 +46,23 @@ function mapDisplayStatus(status: TournamentStatus): TournamentDisplay["status"]
     default:
       return "Soon";
   }
+}
+
+export function sortTournamentsByHostingOrder<T extends { startsAt: string | null }>(
+  tournaments: T[],
+): T[] {
+  return [...tournaments].sort((a, b) => {
+    const timeA = a.startsAt ? new Date(a.startsAt).getTime() : 0;
+    const timeB = b.startsAt ? new Date(b.startsAt).getTime() : 0;
+    if (timeA !== timeB) return timeA - timeB;
+    return tournaments.indexOf(a) - tournaments.indexOf(b);
+  });
+}
+
+export function sortTournamentsByHostingOrderNewestFirst<T extends { startsAt: string | null }>(
+  tournaments: T[],
+): T[] {
+  return sortTournamentsByHostingOrder(tournaments).reverse();
 }
 
 export function toTournamentDisplay(t: TournamentPreview): TournamentDisplay {

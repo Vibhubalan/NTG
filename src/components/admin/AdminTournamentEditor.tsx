@@ -117,6 +117,49 @@ function applyCupFields(form: TournamentData, fields: CupFields): TournamentData
   return { ...form, ...fields };
 }
 
+/** Normalized cup fields compared against the last saved state (matches saveAll payload). */
+function getSavePayload(form: TournamentData) {
+  const poolDefault = form.prizePool ? defaultSplit(Number(form.prizePool)) : [];
+  return {
+    name: form.name.trim(),
+    game: form.game,
+    gameLabel: emptyToNull(form.gameLabel),
+    status: form.status,
+    hubBannerUrl: emptyToNull(form.hubBannerUrl),
+    hubCarouselImages: form.hubCarouselImages,
+    showOnEsportsHub: form.showOnEsportsHub,
+    prizePool: form.prizePool ? Number(form.prizePool) : null,
+    prizeNotes: emptyToNull(form.prizeNotes),
+    prizeSplit: prizeSplitForSave(form.prizePool, form.prizeSplit, poolDefault),
+    startsAt: form.startsAt || null,
+    endsAt: form.endsAt || null,
+    registrationOpensAt: form.registrationOpensAt || null,
+    autoManageStatus: form.autoManageStatus,
+    bracketUrl: emptyToNull(form.bracketUrl),
+    rulebookUrl: emptyToNull(form.rulebookUrl),
+    registrationFormat: SUPPORTS_FORMAT.includes(form.game)
+      ? (form.registrationFormat ?? "AUCTION")
+      : null,
+  };
+}
+
+function savePayloadsEqual(
+  a: ReturnType<typeof getSavePayload>,
+  b: ReturnType<typeof getSavePayload>,
+): boolean {
+  return JSON.stringify(a) === JSON.stringify(b);
+}
+
+async function readJsonResponse(res: Response): Promise<Record<string, unknown>> {
+  const text = await res.text();
+  if (!text) return {};
+  try {
+    return JSON.parse(text) as Record<string, unknown>;
+  } catch {
+    return { error: text.slice(0, 200) || `Request failed (${res.status})` };
+  }
+}
+
 export default function AdminTournamentEditor({
   initial,
   seasons,
@@ -157,12 +200,16 @@ export default function AdminTournamentEditor({
     userId: initialMvpUser?.id ?? null,
   });
 
+  const savedCupBaselineRef = useRef(getSavePayload(initialFormState));
+
   const [loading, setLoading] = useState(false);
   const isDirty = useMemo(() => {
-    const formDirty = JSON.stringify(form) !== JSON.stringify(initialFormState);
-    const mvpDirty = mvpEnabled !== savedMvpRef.current.enabled || (mvpEnabled && selectedMvp?.id !== savedMvpRef.current.userId);
-    return formDirty || mvpDirty;
-  }, [form, initialFormState, mvpEnabled, selectedMvp]);
+    const cupDirty = !savePayloadsEqual(getSavePayload(form), savedCupBaselineRef.current);
+    const mvpDirty =
+      mvpEnabled !== savedMvpRef.current.enabled ||
+      (mvpEnabled && selectedMvp?.id !== savedMvpRef.current.userId);
+    return cupDirty || mvpDirty;
+  }, [form, mvpEnabled, selectedMvp]);
   const [savedStatus, setSavedStatus] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [newTeamName, setNewTeamName] = useState("");
@@ -216,7 +263,11 @@ export default function AdminTournamentEditor({
   }, [listVersion, initial.placements]);
 
   function applySavedCupFields(fields: CupFields) {
-    setForm((current) => applyCupFields(current, fields));
+    setForm((current) => {
+      const next = applyCupFields(current, fields);
+      savedCupBaselineRef.current = getSavePayload(next);
+      return next;
+    });
   }
 
   function refreshLists() {
@@ -323,9 +374,9 @@ export default function AdminTournamentEditor({
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(fields),
     });
-    const data = await res.json();
+    const data = await readJsonResponse(res);
     if (!res.ok) {
-      setMessage(data.error ?? "Save failed.");
+      setMessage(String(data.error ?? "Save failed."));
       return false;
     }
     if (data.tournament) {
@@ -388,9 +439,9 @@ export default function AdminTournamentEditor({
           registrationFormat: SUPPORTS_FORMAT.includes(form.game) ? (form.registrationFormat ?? "AUCTION") : null,
         }),
       });
-      const data = await res.json();
+      const data = await readJsonResponse(res);
       if (!res.ok) {
-        setMessage(data.error ?? "Save failed.");
+        setMessage(String(data.error ?? "Save failed."));
         return;
       }
 
@@ -403,17 +454,17 @@ export default function AdminTournamentEditor({
         (mvpEnabled && selectedMvp?.id !== savedMvpRef.current.userId);
 
       if (mvpChanged) {
-        const placements = (mvpEnabled && selectedMvp) ? [{ role: "MVP" as const, userId: selectedMvp.id }] : [];
-        const clearRoles = ["CHAMPION", "RUNNER_UP", "THIRD", "MVP"];
+        const placements = mvpEnabled && selectedMvp ? [{ role: "MVP" as const, userId: selectedMvp.id }] : [];
+        const clearRoles = ["MVP"] as const;
 
         const pRes = await fetch(`/api/admin/tournaments/${form.slug}/placements`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ placements, clearRoles }),
         });
+        const d = await readJsonResponse(pRes);
         if (!pRes.ok) {
-          const d = await pRes.json();
-          setMessage(d.error ?? "MVP save failed.");
+          setMessage(String(d.error ?? "MVP save failed."));
           return;
         }
         savedMvpRef.current = { enabled: mvpEnabled, userId: selectedMvp?.id ?? null };
@@ -422,8 +473,8 @@ export default function AdminTournamentEditor({
       setMessage("All changes successfully saved.");
       setSavedStatus(true);
       setTimeout(() => setSavedStatus(false), 2500);
-    } catch {
-      setMessage("Something went wrong.");
+    } catch (err) {
+      setMessage(err instanceof Error ? err.message : "Something went wrong.");
     } finally {
       setLoading(false);
     }
@@ -600,7 +651,10 @@ export default function AdminTournamentEditor({
       {/* Save Notification alert */}
       {message ? (
         (() => {
-          const isError = message.toLowerCase().includes("fail") || message.toLowerCase().includes("error");
+          const isError =
+            message.toLowerCase().includes("fail") ||
+            message.toLowerCase().includes("error") ||
+            message.toLowerCase().includes("wrong");
           return (
             <div className={`rounded-xl px-4 py-3 text-sm flex items-center justify-between shadow-md ${
               isError 
@@ -657,10 +711,13 @@ export default function AdminTournamentEditor({
             type="button"
             onClick={saveAll}
             disabled={loading || !isDirty}
+            aria-disabled={loading || !isDirty}
             className={`rounded-xl px-5 py-2 text-xs font-bold transition-all ${
-              isDirty
-                ? "bg-emerald-600 text-white hover:bg-emerald-500 shadow-[0_0_15px_-3px_rgba(16,185,129,0.3)]"
-                : "bg-white/[0.05] text-white/30 cursor-not-allowed"
+              loading
+                ? "bg-white/[0.06] text-white/40 cursor-wait"
+                : isDirty
+                  ? "bg-emerald-600 text-white hover:bg-emerald-500 shadow-[0_0_15px_-3px_rgba(16,185,129,0.3)]"
+                  : "border border-white/[0.08] bg-white/[0.03] text-white/25 cursor-not-allowed"
             }`}
           >
             {loading ? "Saving…" : "Save all"}

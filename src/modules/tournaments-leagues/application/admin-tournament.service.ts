@@ -206,6 +206,7 @@ export type AdminCupFieldsSnapshot = {
   game: GameSlug;
   gameLabel: string | null;
   seasonId: string | null;
+  registrationFormat: string | null;
   status: TournamentStatus;
   description: string | null;
   posterUrl: string | null;
@@ -237,6 +238,7 @@ export function toAdminCupFieldsSnapshot(
     game: t.game,
     gameLabel: t.gameLabel,
     seasonId: t.seasonId,
+    registrationFormat: t.registrationFormat,
     status: t.status,
     description: t.description,
     posterUrl: t.posterUrl,
