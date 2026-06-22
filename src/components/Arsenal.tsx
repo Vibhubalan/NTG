@@ -1,6 +1,7 @@
 "use client";
 
 import { motion } from "framer-motion";
+import Image from "next/image";
 import BrandIcon from "./ui/BrandIcon";
 import { games, platforms, services } from "@/lib/data";
 
@@ -53,13 +54,25 @@ export default function Arsenal() {
             style={{ ["--game" as string]: g.hex }}
             className="group relative flex items-center gap-4 overflow-hidden rounded-2xl border border-white/[0.06] bg-white/[0.02] p-5 transition-all hover:border-white/15 hover:bg-white/[0.04]"
           >
-            <div className="absolute inset-0 -z-10 bg-[radial-gradient(60%_80%_at_0%_50%,var(--game),transparent_70%)] opacity-[0.18] mix-blend-soft-light md:opacity-0 md:transition-opacity md:duration-500 md:group-hover:opacity-100" />
+            {/* Background art image (only for cards that have one) */}
+            {g.bgImage && (
+              <Image
+                src={g.bgImage}
+                alt=""
+                fill
+                sizes="(max-width: 640px) 50vw, 33vw"
+                className="object-cover origin-right scale-100 opacity-20 brightness-75 transition-all duration-500 ease-out group-hover:scale-110 group-hover:opacity-45 group-hover:brightness-110"
+                style={{ objectPosition: g.bgPosition || "right 15%" }}
+                loading="lazy"
+              />
+            )}
+            <div className="absolute inset-0 bg-[radial-gradient(60%_80%_at_0%_50%,var(--game),transparent_70%)] opacity-[0.18] mix-blend-soft-light md:opacity-0 md:transition-opacity md:duration-500 md:group-hover:opacity-100" />
             <span
-              className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-white/[0.04] text-[var(--game)] ring-1 ring-inset ring-[var(--game)]/35 transition-all duration-500 max-md:scale-105 md:text-white/85 md:ring-white/10 md:group-hover:scale-105 md:group-hover:text-[var(--game)] md:group-hover:ring-[var(--game)]/40"
+              className="relative z-10 flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-white/[0.04] text-[var(--game)] ring-1 ring-inset ring-[var(--game)]/35 transition-all duration-500 max-md:scale-105 md:text-white/85 md:ring-white/10 md:group-hover:scale-105 md:group-hover:text-[var(--game)] md:group-hover:ring-[var(--game)]/40"
             >
               <BrandIcon path={g.path} title={g.name} className="h-6 w-6" />
             </span>
-            <div className="min-w-0">
+            <div className="relative z-10 min-w-0">
               <p className="truncate font-display text-base font-medium text-white">
                 {g.name}
               </p>
