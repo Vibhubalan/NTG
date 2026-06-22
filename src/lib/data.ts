@@ -27,17 +27,19 @@ export type GameIcon = {
   hex: string;
   path: string;
   category: "FPS" | "MOBA" | "Battle Royale" | "Sports" | "Other";
+  bgImage?: string;
+  bgPosition?: string;
 };
 
 export const games: GameIcon[] = [
-  { name: "Valorant", slug: "valorant", hex: `#${siValorant.hex}`, path: siValorant.path, category: "FPS" },
-  { name: "Counter-Strike", slug: "cs2", hex: `#${siCounterstrike.hex}`, path: siCounterstrike.path, category: "FPS" },
-  { name: "The Finals", slug: "finals", hex: `#${siThefinals.hex}`, path: siThefinals.path, category: "FPS" },
-  { name: "League of Legends", slug: "lol", hex: `#${siLeagueoflegends.hex}`, path: siLeagueoflegends.path, category: "MOBA" },
-  { name: "Dota 2", slug: "dota2", hex: `#${siDota2.hex}`, path: siDota2.path, category: "MOBA" },
-  { name: "Fortnite", slug: "fortnite", hex: `#${siFortnite.hex}`, path: siFortnite.path, category: "Battle Royale" },
-  { name: "PUBG", slug: "pubg", hex: `#${siPubg.hex}`, path: siPubg.path, category: "Battle Royale" },
-  { name: "EA FC 25", slug: "fc25", hex: `#${siEa.hex}`, path: siEa.path, category: "Sports" },
+  { name: "Valorant", slug: "valorant", hex: `#${siValorant.hex}`, path: siValorant.path, category: "FPS", bgImage: "/games/valorant-bg.jpg" },
+  { name: "Counter-Strike", slug: "cs2", hex: `#${siCounterstrike.hex}`, path: siCounterstrike.path, category: "FPS", bgImage: "/games/cs-bg.avif" },
+  { name: "The Finals", slug: "finals", hex: `#${siThefinals.hex}`, path: siThefinals.path, category: "FPS", bgImage: "/games/finals-bg.jpg" },
+  { name: "League of Legends", slug: "lol", hex: `#${siLeagueoflegends.hex}`, path: siLeagueoflegends.path, category: "MOBA", bgImage: "/games/lol-bg.jpg" },
+  { name: "Dota 2", slug: "dota2", hex: `#${siDota2.hex}`, path: siDota2.path, category: "MOBA", bgImage: "/games/dota2-bg.jpg" },
+  { name: "Fortnite", slug: "fortnite", hex: "#1B90DD", path: siFortnite.path, category: "Battle Royale", bgImage: "/games/fortnite-bg.webp", bgPosition: "center 30%" },
+  { name: "PUBG", slug: "pubg", hex: `#${siPubg.hex}`, path: siPubg.path, category: "Battle Royale", bgImage: "/games/pubg-bg-v2.jpg" },
+  { name: "EA FC 26", slug: "fc26", hex: "#00FF87", path: siEa.path, category: "Sports", bgImage: "/games/fc26-bg.jpg", bgPosition: "center top" },
 ];
 
 export type Platform = { name: string; hex: string; path: string };
