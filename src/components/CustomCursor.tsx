@@ -4,6 +4,8 @@ import { useEffect, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
 import { motion, useMotionValue } from "framer-motion";
 
+const CURSOR_STYLE_ID = "ntg-custom-cursor-style";
+
 export default function CustomCursor() {
   const [isHovered, setIsHovered] = useState(false);
   const [isInput, setIsInput] = useState(false);
@@ -18,6 +20,35 @@ export default function CustomCursor() {
 
   const excludedPaths = ["/login", "/signup", "/profile", "/admin"];
   const isExcluded = excludedPaths.some((path) => pathname?.startsWith(path));
+
+  // Only hide the native cursor while the custom dot is actually visible.
+  useEffect(() => {
+    if (!isActive || isExcluded) return;
+
+    let style = document.getElementById(CURSOR_STYLE_ID) as HTMLStyleElement | null;
+    if (!style) {
+      style = document.createElement("style");
+      style.id = CURSOR_STYLE_ID;
+      document.head.appendChild(style);
+    }
+
+    if (isVisible) {
+      style.textContent = `
+        * {
+          cursor: none !important;
+        }
+        input, textarea, select, option, iframe {
+          cursor: auto !important;
+        }
+      `;
+    } else {
+      style.textContent = "";
+    }
+
+    return () => {
+      style?.remove();
+    };
+  }, [isActive, isExcluded, isVisible]);
 
   useEffect(() => {
     if (isExcluded) return;
@@ -88,17 +119,23 @@ export default function CustomCursor() {
     };
 
     const handleVisibilityChange = () => {
-      if (document.hidden) hideCursor();
+      if (document.hidden) {
+        hideCursor();
+      } else {
+        showCursorFromLast();
+      }
     };
 
     const handleWindowFocus = () => showCursorFromLast();
     const handleDocumentMouseEnter = (e: MouseEvent) => showCursorAt(e.clientX, e.clientY);
-    const handlePointerEnter = (e: PointerEvent) => showCursorAt(e.clientX, e.clientY);
+    const handlePointerEnter = (e: PointerEvent) => {
+      if (e.pointerType !== "mouse") return;
+      showCursorAt(e.clientX, e.clientY);
+    };
 
     window.addEventListener("mousemove", handleMouseMove, { passive: true });
     window.addEventListener("pointermove", handlePointerMove, { passive: true });
     window.addEventListener("mouseover", handleMouseOver);
-    window.addEventListener("blur", hideCursor);
     window.addEventListener("focus", handleWindowFocus);
     document.addEventListener("mouseleave", hideCursor);
     document.addEventListener("mouseenter", handleDocumentMouseEnter);
@@ -106,34 +143,28 @@ export default function CustomCursor() {
     document.addEventListener("pointerenter", handlePointerEnter);
     document.addEventListener("visibilitychange", handleVisibilityChange);
 
-    const style = document.createElement("style");
-    style.innerHTML = `
-      * {
-        cursor: none !important;
-      }
-      input, textarea, select, option, iframe {
-        cursor: auto !important;
-      }
-    `;
-    document.head.appendChild(style);
-
     return () => {
       window.removeEventListener("mousemove", handleMouseMove);
       window.removeEventListener("pointermove", handlePointerMove);
       window.removeEventListener("mouseover", handleMouseOver);
-      window.removeEventListener("blur", hideCursor);
       window.removeEventListener("focus", handleWindowFocus);
       document.removeEventListener("mouseleave", hideCursor);
       document.removeEventListener("mouseenter", handleDocumentMouseEnter);
       document.removeEventListener("pointerleave", hideCursor);
       document.removeEventListener("pointerenter", handlePointerEnter);
       document.removeEventListener("visibilitychange", handleVisibilityChange);
-      document.body.style.cursor = "auto";
-      style.remove();
+      document.getElementById(CURSOR_STYLE_ID)?.remove();
       setIsActive(false);
       setIsVisible(false);
     };
   }, [cursorX, cursorY, isExcluded]);
+
+  // Restore custom cursor after in-app navigation without waiting for mousemove.
+  useEffect(() => {
+    if (isExcluded || !isActive || document.hidden) return;
+    isVisibleRef.current = true;
+    setIsVisible(true);
+  }, [pathname, isExcluded, isActive]);
 
   if (isExcluded || !isActive || !isVisible) return null;
 
