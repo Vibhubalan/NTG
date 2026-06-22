@@ -10,6 +10,7 @@ import {
   rankIconUrl,
 } from "@/lib/valorant-rank";
 import BrandIcon from "@/components/ui/BrandIcon";
+import LeaderboardPlayerCardBackdrop from "@/components/platform/LeaderboardPlayerCardBackdrop";
 import { gameMetaFor } from "@/lib/tournament-display";
 
 function PodiumCard({
@@ -525,9 +526,15 @@ export default function ValorantRankingsBoard({ data }: Props) {
                     <li
                       id={`row-${e.displayName}`}
                       key={`${e.rank}-${e.riotId ?? e.displayName}`}
-                      style={{ isolation: 'isolate' }}
-                      className={`group relative flex items-center rounded-xl border ${rowBgClass} px-5 sm:px-6 h-[90px] sm:h-[110px] backdrop-blur-sm transition-all duration-300 ease-out hover:scale-[1.02] hover:-translate-y-1 hover:z-30 hover:border-white/20 hover:bg-white/[0.04]`}
+                      style={{ isolation: "isolate" }}
+                      className={`group relative flex items-center overflow-hidden rounded-xl border ${rowBgClass} px-5 sm:px-6 h-[90px] sm:h-[110px] backdrop-blur-sm transition-all duration-300 ease-out hover:scale-[1.02] hover:-translate-y-1 hover:z-30 hover:border-white/20 hover:bg-white/[0.04]`}
                     >
+                      <LeaderboardPlayerCardBackdrop
+                        riotPlayerCard={e.riotPlayerCard}
+                        riotPlayerCardWide={e.riotPlayerCardWide}
+                        featured={isTop3}
+                        shimmer={isRank1}
+                      />
                       {/* Left Edge Tier Highlight — clip-path clips glow vertically to prevent bleed onto adjacent rows */}
                       <div
                         style={{ clipPath: 'inset(0px -200px)' }}

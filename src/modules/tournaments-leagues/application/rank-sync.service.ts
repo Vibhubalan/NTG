@@ -2,6 +2,7 @@ import { prisma } from "@core/database/client";
 import { serverEnv } from "@core/config/env.server";
 import { sortValorantBoardEntries } from "@/lib/leaderboard-sort";
 import { henrikFetch, henrikHeaders } from "@/lib/henrik-client";
+import { normalizeRiotPlayerCardUrls } from "@/lib/valorant-player-card";
 import { mmrRegionsToTry, normalizeHenrikRegion } from "@/lib/henrik-region";
 import { GameSlug, LeaderboardScope, LeaderboardSyncSource, Prisma } from "@prisma/client";
 
@@ -372,24 +373,22 @@ export async function syncUserRank(
 
   let cardLarge: string | undefined;
   let cardWide: string | undefined;
-  if (!user.riotPlayerCard) {
-    try {
-      const name = resolvedGameName || user.riotGameName;
-      const tag = resolvedTagLine || user.riotTagLine;
-      const encodedName = encodeURIComponent(name);
-      const encodedTag = encodeURIComponent(tag);
-      const res = await henrikFetch(
-        `https://api.henrikdev.xyz/valorant/v1/account/${encodedName}/${encodedTag}`,
-        { headers: henrikHeaders(), next: { revalidate: 0 } },
-      );
-      if (res.ok) {
-        const accData = (await res.json()) as { data?: { card?: { large?: string; wide?: string } } };
-        cardLarge = accData.data?.card?.large;
-        cardWide = accData.data?.card?.wide;
-      }
-    } catch (e) {
-      console.error("Failed to fetch player card on rank sync:", e);
+  try {
+    const name = resolvedGameName || user.riotGameName;
+    const tag = resolvedTagLine || user.riotTagLine;
+    const encodedName = encodeURIComponent(name);
+    const encodedTag = encodeURIComponent(tag);
+    const res = await henrikFetch(
+      `https://api.henrikdev.xyz/valorant/v1/account/${encodedName}/${encodedTag}`,
+      { headers: henrikHeaders(), next: { revalidate: 0 } },
+    );
+    if (res.ok) {
+      const accData = (await res.json()) as { data?: { card?: { large?: string; wide?: string } } };
+      cardLarge = accData.data?.card?.large;
+      cardWide = accData.data?.card?.wide;
     }
+  } catch (e) {
+    console.error("Failed to fetch player card on rank sync:", e);
   }
 
   const userUpdateData: Prisma.UserUpdateInput = {};
@@ -401,9 +400,10 @@ export async function syncUserRank(
     userUpdateData.riotRegion = resolvedRegion;
   }
   if (cardLarge) {
-    userUpdateData.riotPlayerCard = cardLarge;
-  }
-  if (cardWide) {
+    const cards = normalizeRiotPlayerCardUrls(cardLarge, cardWide);
+    if (cards.large) userUpdateData.riotPlayerCard = cards.large;
+    if (cards.wide) userUpdateData.riotPlayerCardWide = cards.wide;
+  } else if (cardWide) {
     userUpdateData.riotPlayerCardWide = cardWide;
   }
 

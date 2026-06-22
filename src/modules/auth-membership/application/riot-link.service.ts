@@ -2,6 +2,7 @@ import { prisma } from "@core/database/client";
 import { GameSlug } from "@prisma/client";
 import { linkGameIdentity } from "./profile.service";
 import { normalizeHenrikRegion } from "@/lib/henrik-region";
+import { normalizeRiotPlayerCardUrls } from "@/lib/valorant-player-card";
 import { parseRiotId, resolveRiotAccount } from "./riot-henrik.service";
 
 /** Link Riot ID only — rank sync runs in background via route `after()`. */
@@ -32,6 +33,8 @@ export async function linkRiotAccount(
     return { ok: false, error: "This Riot account is already linked to another user." };
   }
 
+  const cards = normalizeRiotPlayerCardUrls(account.cardLarge, account.cardWide);
+
   await prisma.user.update({
     where: { id: userId },
     data: {
@@ -39,8 +42,8 @@ export async function linkRiotAccount(
       riotGameName: account.gameName,
       riotTagLine: account.tagLine,
       riotRegion: normalizeHenrikRegion(account.region),
-      riotPlayerCard: account.cardLarge,
-      riotPlayerCardWide: account.cardWide,
+      riotPlayerCard: cards.large,
+      riotPlayerCardWide: cards.wide,
     },
   });
 
