@@ -1,6 +1,6 @@
 import { prisma } from "@core/database/client";
 import type { TournamentDetail, PrizeSplitRow, TournamentTeamView } from "@core/contracts";
-import type { GameSlug, TournamentStatus } from "@prisma/client";
+import type { GameSlug, TournamentFormat, TournamentStatus } from "@prisma/client";
 import { gameMetaFor } from "@/lib/tournament-display";
 import { syncRegistrationStatus } from "../application/admin-tournament.service";
 import { isTournamentRegistrationLive } from "../domain/registration-window";
@@ -317,6 +317,7 @@ export class TournamentRepository {
     name: string;
     game: GameSlug;
     gameLabel: string | null;
+    registrationFormat: TournamentFormat | null;
     status: TournamentStatus;
     startsAt: Date | null;
     registrationUrl: string | null;
