@@ -12,6 +12,7 @@ const ACTION_LABELS: Record<string, string> = {
   "upload.create": "Uploaded an image",
   "upload.rulebook": "Uploaded a rulebook",
   "leaderboard.sync": "Refreshed the Valorant leaderboard",
+  "leaderboard.setAct": "Set current Valorant act",
 };
 
 const CATEGORY_LABELS: Record<string, string> = {
@@ -101,6 +102,10 @@ export function formatAuditTargetLabel(
     return "All linked players";
   }
 
+  if (action === "leaderboard.setAct") {
+    return "Valorant season act";
+  }
+
   return target.length > 24 ? `${target.slice(0, 21)}…` : target;
 }
 
@@ -119,6 +124,16 @@ export function formatAuditOperation(action: string, metadata: unknown): string 
 
   if (action === "member.syncRank" && typeof m.riotId === "string" && m.riotId.trim()) {
     return `${base} for ${m.riotId.trim()}`;
+  }
+
+  if (action === "leaderboard.setAct") {
+    const label =
+      typeof m.actLabel === "string" && m.actLabel.trim()
+        ? m.actLabel.trim()
+        : typeof m.actKey === "string"
+          ? m.actKey.toUpperCase()
+          : null;
+    if (label) return `${base} to ${label}`;
   }
 
   if (Array.isArray(m.fields) && m.fields.length > 0) {

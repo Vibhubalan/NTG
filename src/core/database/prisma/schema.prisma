@@ -144,6 +144,7 @@ model User {
   captainedTeams TournamentTeam[] @relation("TeamCaptain")
   teamPlayers   TournamentTeamPlayer[]
   adminAuditLogs AdminAuditLog[]
+  platformSettingsUpdated PlatformSetting[] @relation("PlatformSettingUpdatedBy")
 }
 
 model EmailOtp {
@@ -564,4 +565,15 @@ model AdminAuditLog {
 
   @@index([adminId, createdAt])
   @@index([action, createdAt])
+}
+
+/** Platform-wide settings (e.g. current Valorant act for rank sync). */
+model PlatformSetting {
+  key         String   @id
+  value       String
+  updatedAt   DateTime @updatedAt
+  updatedById String?
+  updatedBy   User?    @relation("PlatformSettingUpdatedBy", fields: [updatedById], references: [id], onDelete: SetNull)
+
+  @@index([updatedAt])
 }

@@ -1,5 +1,11 @@
 import { guardResponse, isAuthedAdmin, requireAdmin } from "@/lib/auth-guard";
 import { logAdminAction } from "@/lib/admin-audit";
+import {
+  getSavedValorantActKeyForSync,
+  requireSavedValorantActKey,
+  SYNC_ACT_NOT_CONFIGURED,
+} from "@/lib/valorant-act-settings";
+import { isSuperAdminEmail } from "@/lib/superadmin";
 import { serverEnv } from "@core/config/env.server";
 import {
   deleteMemberAdmin,
@@ -12,7 +18,6 @@ import {
   linkMemberSteamAdmin,
 } from "@auth-membership/application/admin-member.service";
 import { syncUserRank } from "@tournaments-leagues/application/rank-sync.service";
-import { parseValorantActSeasonKey } from "@/lib/valorant-act";
 import type { UserRole } from "@prisma/client";
 import { NextResponse } from "next/server";
 import { after } from "next/server";
@@ -65,21 +70,20 @@ export async function PATCH(req: Request, { params }: Props) {
   if (body.action === "linkRiot") {
     const result = await linkMemberRiotAdmin(id, String(body.riotId ?? ""));
     if (!result.ok) return NextResponse.json({ error: result.error }, { status: 400 });
-    const actOverride =
-      parseValorantActSeasonKey(String(body.currentAct ?? "")) ??
-      serverEnv.valorantCurrentAct?.trim() ??
-      null;
-    after(() => {
-      syncUserRank(id, {
-        tryAllRegions: true,
-        skipPlayerCard: false,
-        context: {
-          source: "admin_member",
-          adminId: auth.userId,
-          currentActOverride: actOverride,
-        },
-      }).catch(console.error);
-    });
+    const savedAct = await getSavedValorantActKeyForSync();
+    if (savedAct) {
+      after(() => {
+        syncUserRank(id, {
+          tryAllRegions: true,
+          skipPlayerCard: false,
+          context: {
+            source: "admin_member",
+            adminId: auth.userId,
+            currentActOverride: savedAct,
+          },
+        }).catch(console.error);
+      });
+    }
     await logAdminAction(auth.userId, "member.linkRiot", id, {
       riotId: String(body.riotId ?? "").trim(),
     });
@@ -95,10 +99,12 @@ export async function PATCH(req: Request, { params }: Props) {
       return NextResponse.json({ error: "Link a Riot ID before refreshing rank." }, { status: 400 });
     }
 
-    const actOverride =
-      parseValorantActSeasonKey(String(body.currentAct ?? "")) ??
-      serverEnv.valorantCurrentAct?.trim() ??
-      null;
+    let currentActOverride: string;
+    try {
+      currentActOverride = await requireSavedValorantActKey();
+    } catch {
+      return NextResponse.json({ error: SYNC_ACT_NOT_CONFIGURED }, { status: 400 });
+    }
 
     const result = await syncUserRank(id, {
       tryAllRegions: true,
@@ -106,7 +112,7 @@ export async function PATCH(req: Request, { params }: Props) {
       context: {
         source: "admin_member",
         adminId: auth.userId,
-        currentActOverride: actOverride,
+        currentActOverride,
       },
     });
 
@@ -145,7 +151,7 @@ export async function PATCH(req: Request, { params }: Props) {
 
   if (body.role !== undefined) {
     const targetMember = await getMemberAdmin(id);
-    const isSuperadmin = auth.session.user.email === (process.env.SUPERADMIN_EMAIL ?? "vibhubalan123@gmail.com");
+    const isSuperadmin = isSuperAdminEmail(auth.session.user.email);
     if (!isSuperadmin) {
       if (body.role === "ADMIN" && targetMember?.role !== "ADMIN") {
         return NextResponse.json({ error: "Only the superadmin can grant ADMIN role." }, { status: 403 });
@@ -185,7 +191,7 @@ export async function DELETE(_req: Request, { params }: Props) {
   const { id } = await params;
   
   const targetMember = await getMemberAdmin(id);
-  const isSuperadmin = auth.session.user.email === (process.env.SUPERADMIN_EMAIL ?? "vibhubalan123@gmail.com");
+  const isSuperadmin = isSuperAdminEmail(auth.session.user.email);
   if (targetMember?.role === "ADMIN" && !isSuperadmin) {
     return NextResponse.json({ error: "Only the superadmin can delete an admin." }, { status: 403 });
   }

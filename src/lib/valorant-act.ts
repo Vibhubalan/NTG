@@ -25,6 +25,21 @@ export function parseValorantActSeasonKey(input: string): string | null {
   return raw;
 }
 
+/** Split a saved act key into episode / act parts for admin UI. */
+export function parseActKeyParts(
+  actKey: string,
+): { prefix: "e" | "s"; episode: number; act: number } | null {
+  const parsed = parseValorantActSeasonKey(actKey);
+  if (!parsed) return null;
+  const match = /^([es])(\d+)a(\d+)$/.exec(parsed);
+  if (!match) return null;
+  return {
+    prefix: match[1] as "e" | "s",
+    episode: Number.parseInt(match[2]!, 10),
+    act: Number.parseInt(match[3]!, 10),
+  };
+}
+
 /** s26a4 ↔ e26a4 style aliases for Henrik by_season lookup. */
 export function actSeasonKeyVariants(season: string): string[] {
   const k = normalizeActSeasonKey(season);

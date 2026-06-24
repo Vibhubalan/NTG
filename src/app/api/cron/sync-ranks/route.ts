@@ -4,6 +4,10 @@ import {
   isLeaderboardSyncNotifyEnabled,
   notifyLeaderboardSyncComplete,
 } from "@/lib/leaderboard-sync-notify";
+import {
+  getSavedValorantActKeyForSync,
+  SYNC_ACT_NOT_CONFIGURED,
+} from "@/lib/valorant-act-settings";
 import { serverEnv } from "@core/config/env.server";
 import {
   RANK_SYNC_BATCH_SIZE,
@@ -101,6 +105,7 @@ function readRunTotals(searchParams: URLSearchParams): RunTotals {
     pending: Number(searchParams.get("pending") ?? "0") || 0,
   };
 }
+
 async function sendSyncNotify(
   runStartedAt: Date,
   totals: RunTotals,
@@ -133,6 +138,24 @@ export async function GET(req: Request) {
     return NextResponse.json({ error: "Database not configured." }, { status: 503 });
   }
 
+  const savedAct = await getSavedValorantActKeyForSync();
+  if (!savedAct) {
+    if (!req.url.includes("runStartedAt=")) {
+      await notifyLeaderboardSyncComplete({
+        runStartedAt: new Date(),
+        finishedAt: new Date(),
+        synced: 0,
+        failed: 0,
+        skipped: 0,
+        batches: 0,
+        pending: 0,
+        status: "error",
+        errorMessage: SYNC_ACT_NOT_CONFIGURED,
+      }).catch(() => {});
+    }
+    return NextResponse.json({ error: SYNC_ACT_NOT_CONFIGURED }, { status: 503 });
+  }
+
   const { searchParams } = new URL(req.url);
   const userId = searchParams.get("userId");
 
@@ -143,7 +166,7 @@ export async function GET(req: Request) {
         skipPlayerCard: false,
         context: {
           source: "cron",
-          currentActOverride: serverEnv.valorantCurrentAct?.trim() || null,
+          currentActOverride: savedAct,
         },
       });
       return NextResponse.json({
@@ -166,14 +189,13 @@ export async function GET(req: Request) {
 
   try {
     const runId = runStartedAt.toISOString();
-    const cronAct = serverEnv.valorantCurrentAct?.trim() || null;
     const result = await syncAllLinkedPlayers({
       fullRefreshBefore: runStartedAt,
       maxBatchSize: RANK_SYNC_BATCH_SIZE,
       tryAllRegions: false,
       skipPlayerCard: false,
       snapshotRanks: !isContinuation,
-      context: { source: "cron", runId, currentActOverride: cronAct },
+      context: { source: "cron", runId, currentActOverride: savedAct },
     });
 
     const totals = accumulate(priorTotals, result);
@@ -190,6 +212,7 @@ export async function GET(req: Request) {
         notifyEmail: getLeaderboardSyncNotifyEmail(),
         notifySent: false,
         notifyReason: "continuing_via_http",
+        currentAct: savedAct,
         ...result,
       });
     }
@@ -215,6 +238,7 @@ export async function GET(req: Request) {
       notifyEmail: getLeaderboardSyncNotifyEmail(),
       notifySent: notify.sent,
       notifyReason: notify.reason,
+      currentAct: savedAct,
       ...result,
       hasMore: false,
       pending: 0,

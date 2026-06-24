@@ -1,7 +1,11 @@
 import { guardResponse, isAuthedAdmin, requireAdmin } from "@/lib/auth-guard";
 import { logAdminAction } from "@/lib/admin-audit";
-import { parseValorantActSeasonKey, formatValorantActLabel } from "@/lib/valorant-act";
-import { serverEnv } from "@core/config/env.server";
+import { isSuperAdminEmail } from "@/lib/superadmin";
+import {
+  getValorantActSettingResponse,
+  requireSavedValorantActKey,
+  SYNC_ACT_NOT_CONFIGURED,
+} from "@/lib/valorant-act-settings";
 import {
   getLeaderboardSyncStats,
   RANK_SYNC_BATCH_SIZE,
@@ -17,20 +21,7 @@ export const maxDuration = 60;
 type SyncBatchBody = {
   runStartedAt?: string;
   totals?: SyncRunTotals;
-  /** Act to sync against (e11a3 / s26a4). Required for manual full refresh. */
-  currentAct?: string;
 };
-
-function parseCurrentActInput(raw: string | undefined): string | null {
-  if (raw == null) return null;
-  const trimmed = raw.trim();
-  if (!trimmed) return null;
-  const parsed = parseValorantActSeasonKey(trimmed);
-  if (!parsed) {
-    throw new Error('Invalid act format. Use something like e11a3 or s26a4.');
-  }
-  return parsed;
-}
 
 function accumulateTotals(prev: SyncRunTotals | undefined, batch: SyncRunTotals): SyncRunTotals {
   return {
@@ -42,20 +33,18 @@ function accumulateTotals(prev: SyncRunTotals | undefined, batch: SyncRunTotals)
 }
 
 export async function GET() {
-  if (!serverEnv.databaseUrl) {
-    return NextResponse.json({ error: "Database not configured" }, { status: 503 });
-  }
-
   const auth = await requireAdmin();
   if (!isAuthedAdmin(auth)) return guardResponse(auth)!;
 
   try {
-    const stats = await getLeaderboardSyncStats();
-    const defaultCurrentAct = serverEnv.valorantCurrentAct?.trim() || null;
+    const [stats, act] = await Promise.all([
+      getLeaderboardSyncStats(),
+      getValorantActSettingResponse(),
+    ]);
     return NextResponse.json({
       stats,
-      defaultCurrentAct,
-      defaultCurrentActLabel: formatValorantActLabel(defaultCurrentAct),
+      act,
+      canEditAct: isSuperAdminEmail(auth.session.user.email),
     });
   } catch (err) {
     console.error("[admin/leaderboard/sync GET]", err);
@@ -65,10 +54,6 @@ export async function GET() {
 
 /** Run one batch of the full leaderboard sync. Client loops until complete. */
 export async function POST(req: Request) {
-  if (!serverEnv.databaseUrl) {
-    return NextResponse.json({ error: "Database not configured" }, { status: 503 });
-  }
-
   const auth = await requireAdmin();
   if (!isAuthedAdmin(auth)) return guardResponse(auth)!;
 
@@ -89,24 +74,11 @@ export async function POST(req: Request) {
 
   const isNewRun = !body.runStartedAt;
 
-  let currentActOverride: string | null = null;
+  let currentActOverride: string;
   try {
-    const parsed = parseCurrentActInput(body.currentAct);
-    if (isNewRun && !parsed) {
-      return NextResponse.json(
-        {
-          error:
-            "Enter the current Valorant act (e.g. e11a3) before refreshing ranks.",
-        },
-        { status: 400 },
-      );
-    }
-    currentActOverride = parsed;
-  } catch (err) {
-    return NextResponse.json(
-      { error: err instanceof Error ? err.message : "Invalid act." },
-      { status: 400 },
-    );
+    currentActOverride = await requireSavedValorantActKey();
+  } catch {
+    return NextResponse.json({ error: SYNC_ACT_NOT_CONFIGURED }, { status: 400 });
   }
 
   try {
@@ -139,7 +111,7 @@ export async function POST(req: Request) {
       const usersRefreshed = totals.synced;
       await logAdminAction(auth.userId, "leaderboard.sync", undefined, {
         runStartedAt: runStartedAt.toISOString(),
-        currentAct: currentActOverride ?? undefined,
+        currentAct: currentActOverride,
         usersRefreshed,
         ...totals,
       });
