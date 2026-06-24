@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { parseApiJson } from "@/lib/parse-api-json";
 import { formatValorantActLabel } from "@/lib/valorant-act";
 
@@ -10,6 +10,20 @@ type SyncStats = {
   rankedOnLeaderboard: number;
   lastSyncedAt: string | null;
   cronScheduleIst: string;
+};
+
+type CronRunStatus = {
+  phase: "running" | "complete" | "error";
+  runStartedAt: string;
+  finishedAt: string | null;
+  synced: number;
+  failed: number;
+  skipped: number;
+  pending: number;
+  totalPlayers: number;
+  currentAct: string | null;
+  errorMessage: string | null;
+  updatedAt: string;
 };
 
 type SyncTotals = {
@@ -78,6 +92,10 @@ export default function AdminLeaderboardSyncPanel() {
   const [auditRows, setAuditRows] = useState<AuditRow[]>([]);
   const [auditChangedOnly, setAuditChangedOnly] = useState(true);
   const [auditLoading, setAuditLoading] = useState(false);
+  const [cronRun, setCronRun] = useState<CronRunStatus | null>(null);
+  const [dismissedCronRunId, setDismissedCronRunId] = useState<string | null>(null);
+  const [cronFlash, setCronFlash] = useState<string | null>(null);
+  const prevCronPhaseRef = useRef<string | null>(null);
 
   const loadStats = useCallback(async () => {
     const res = await fetch("/api/admin/leaderboard/sync");
@@ -93,6 +111,27 @@ export default function AdminLeaderboardSyncPanel() {
     setCurrentAct((data.currentAct as string | null) ?? null);
     setCurrentActLabel((data.currentActLabel as string | null) ?? null);
     setEnvConfigured(Boolean(data.envConfigured));
+
+    const nextCron = (data.cronRun as CronRunStatus | null) ?? null;
+    setCronRun(nextCron);
+
+    if (nextCron) {
+      const prev = prevCronPhaseRef.current;
+      const key = `${nextCron.runStartedAt}:${nextCron.phase}`;
+      if (prev !== key) {
+        if (nextCron.phase === "running" && !prev?.endsWith(":running")) {
+          setCronFlash("Daily cron started — refreshing all linked players…");
+          setDismissedCronRunId(null);
+        } else if (nextCron.phase === "complete" && !prev?.endsWith(":complete")) {
+          setCronFlash(
+            `Daily cron finished — ${nextCron.synced} refreshed${nextCron.failed > 0 ? `, ${nextCron.failed} failed` : ""}.`,
+          );
+        } else if (nextCron.phase === "error" && !prev?.endsWith(":error")) {
+          setCronFlash(nextCron.errorMessage ?? "Daily cron failed.");
+        }
+        prevCronPhaseRef.current = key;
+      }
+    }
   }, []);
 
   const loadAudit = useCallback(async () => {
@@ -114,6 +153,25 @@ export default function AdminLeaderboardSyncPanel() {
   useEffect(() => {
     loadStats();
   }, [loadStats]);
+
+  useEffect(() => {
+    const ms = cronRun?.phase === "running" ? 4000 : 12000;
+    const id = setInterval(() => {
+      void loadStats();
+    }, ms);
+    return () => clearInterval(id);
+  }, [loadStats, cronRun?.phase]);
+
+  useEffect(() => {
+    if (cronRun?.phase !== "complete") return;
+    void loadAudit();
+  }, [cronRun?.phase, cronRun?.runStartedAt, loadAudit]);
+
+  useEffect(() => {
+    if (!cronFlash) return;
+    const id = setTimeout(() => setCronFlash(null), 12000);
+    return () => clearTimeout(id);
+  }, [cronFlash]);
 
   useEffect(() => {
     loadAudit();
@@ -187,6 +245,16 @@ export default function AdminLeaderboardSyncPanel() {
   const progressPct =
     progressTotal > 0 ? Math.min(100, Math.round((progressDone / progressTotal) * 100)) : 0;
 
+  const cronProcessed = cronRun
+    ? cronRun.synced + cronRun.failed + cronRun.skipped
+    : 0;
+  const cronProgressPct =
+    cronRun && cronRun.totalPlayers > 0
+      ? Math.min(100, Math.round((cronProcessed / cronRun.totalPlayers) * 100))
+      : 0;
+  const showCronBanner =
+    cronRun != null && cronRun.runStartedAt !== dismissedCronRunId;
+
   return (
     <section className="rounded-2xl border border-white/[0.06] bg-[#0c1424]/40 p-6 shadow-xl backdrop-blur-sm">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
@@ -197,7 +265,7 @@ export default function AdminLeaderboardSyncPanel() {
           <h2 className="mt-1 font-display text-xl font-bold text-white">Rank sync</h2>
           <p className="mt-1 max-w-lg text-sm text-white/45">
             Ranks sync when members link Riot on profile or register for a cup. The automatic daily
-            refresh ({stats?.cronScheduleIst ?? "2:50 AM IST"}) updates rank, MMR, and player cards
+            refresh ({stats?.cronScheduleIst ?? "3:30 AM IST"}) updates rank, MMR, and player cards
             for every linked player — same as manual refresh below. Episode and act come from{" "}
             <code className="text-white/60">VALORANT_CURRENT_ACT</code> on Vercel.
           </p>
@@ -209,6 +277,92 @@ export default function AdminLeaderboardSyncPanel() {
           View public leaderboard →
         </Link>
       </div>
+
+      {cronFlash ? (
+        <div
+          role="status"
+          className="mt-4 rounded-xl border border-cyan-500/30 bg-cyan-500/10 px-4 py-3 text-sm text-cyan-100 shadow-lg shadow-cyan-500/5"
+        >
+          {cronFlash}
+        </div>
+      ) : null}
+
+      {showCronBanner && cronRun ? (
+        <div
+          className={`mt-4 rounded-xl border px-4 py-4 ${
+            cronRun.phase === "running"
+              ? "border-violet-500/30 bg-violet-500/10"
+              : cronRun.phase === "complete"
+                ? "border-emerald-500/30 bg-emerald-500/10"
+                : "border-red-500/30 bg-red-500/10"
+          }`}
+        >
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <p
+                className={`flex items-center gap-2 text-sm font-semibold ${
+                  cronRun.phase === "running"
+                    ? "text-violet-100"
+                    : cronRun.phase === "complete"
+                      ? "text-emerald-100"
+                      : "text-red-100"
+                }`}
+              >
+                {cronRun.phase === "running" ? (
+                  <span className="relative flex h-2 w-2">
+                    <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-violet-400 opacity-75" />
+                    <span className="relative inline-flex h-2 w-2 rounded-full bg-violet-300" />
+                  </span>
+                ) : null}
+                {cronRun.phase === "running"
+                  ? "Daily cron running"
+                  : cronRun.phase === "complete"
+                    ? "Daily cron complete"
+                    : "Daily cron failed"}
+              </p>
+              <p className="mt-1 text-xs text-white/50">
+                Started {formatWhen(cronRun.runStartedAt)}
+                {cronRun.finishedAt ? ` · Finished ${formatWhen(cronRun.finishedAt)}` : ""}
+                {cronRun.currentAct
+                  ? ` · ${formatValorantActLabel(cronRun.currentAct) ?? cronRun.currentAct}`
+                  : ""}
+              </p>
+              {cronRun.phase === "error" && cronRun.errorMessage ? (
+                <p className="mt-2 text-xs text-red-200">{cronRun.errorMessage}</p>
+              ) : null}
+              {cronRun.phase !== "error" ? (
+                <p className="mt-2 text-xs text-white/60">
+                  {cronProcessed} / {cronRun.totalPlayers} users processed
+                  {cronRun.synced > 0 ? ` · ${cronRun.synced} refreshed` : ""}
+                  {cronRun.skipped > 0 ? ` · ${cronRun.skipped} skipped` : ""}
+                  {cronRun.failed > 0 ? ` · ${cronRun.failed} failed` : ""}
+                  {cronRun.pending > 0 ? ` · ${cronRun.pending} remaining` : ""}
+                </p>
+              ) : null}
+            </div>
+            {cronRun.phase !== "running" ? (
+              <button
+                type="button"
+                onClick={() => setDismissedCronRunId(cronRun.runStartedAt)}
+                className="shrink-0 text-xs font-semibold text-white/50 hover:text-white"
+              >
+                Dismiss
+              </button>
+            ) : null}
+          </div>
+          {cronRun.phase === "running" ? (
+            <div className="mt-3 space-y-1">
+              <div className="h-2 overflow-hidden rounded-full bg-white/10">
+                <div
+                  className="h-full rounded-full bg-violet-400 transition-all duration-500"
+                  style={{ width: `${cronProgressPct}%` }}
+                />
+              </div>
+              <p className="text-[10px] text-white/40">Live — updates every few seconds</p>
+            </div>
+          ) : null}
+        </div>
+      ) : null}
 
       <dl className="mt-5 grid gap-3 sm:grid-cols-3 text-sm">
         <div className="rounded-xl border border-white/[0.06] bg-white/[0.02] px-4 py-3">

@@ -1,5 +1,11 @@
 import { isCronAuthorized } from "@/lib/cron-auth";
 import {
+  markLeaderboardCronComplete,
+  markLeaderboardCronError,
+  markLeaderboardCronProgress,
+  markLeaderboardCronStarted,
+} from "@/lib/leaderboard-cron-status";
+import {
   getLeaderboardSyncNotifyEmail,
   isLeaderboardSyncNotifyEnabled,
   notifyLeaderboardSyncComplete,
@@ -10,6 +16,7 @@ import {
 } from "@/lib/valorant-sync-act";
 import { serverEnv } from "@core/config/env.server";
 import {
+  getLeaderboardSyncStats,
   RANK_SYNC_BATCH_SIZE,
   syncAllLinkedPlayers,
   syncUserRank,
@@ -55,7 +62,12 @@ function cronSiteOrigin(): string {
   return raw.replace(/\/$/, "");
 }
 
-function scheduleNextRankBatch(runStartedAt: Date, totals: RunTotals): void {
+function scheduleNextRankBatch(
+  runStartedAt: Date,
+  totals: RunTotals,
+  currentAct: string,
+  totalPlayers: number,
+): void {
   const secret = serverEnv.cronSecret;
   if (!secret) return;
 
@@ -81,6 +93,18 @@ function scheduleNextRankBatch(runStartedAt: Date, totals: RunTotals): void {
         throw new Error(text.slice(0, 200) || `Continuation failed (${res.status})`);
       }
     } catch (err) {
+      const errorMessage =
+        err instanceof Error ? err.message : "Sync continuation failed.";
+      await markLeaderboardCronError({
+        runStartedAt,
+        currentAct,
+        synced: totals.synced,
+        failed: totals.failed,
+        skipped: totals.skipped,
+        pending: totals.pending,
+        totalPlayers,
+        errorMessage,
+      }).catch(() => {});
       await notifyLeaderboardSyncComplete({
         runStartedAt,
         finishedAt: new Date(),
@@ -90,7 +114,7 @@ function scheduleNextRankBatch(runStartedAt: Date, totals: RunTotals): void {
         batches: totals.batches,
         pending: totals.pending,
         status: "error",
-        errorMessage: err instanceof Error ? err.message : "Sync continuation failed.",
+        errorMessage,
       });
     }
   });
@@ -141,8 +165,13 @@ export async function GET(req: Request) {
   const envAct = getEnvValorantActKey();
   if (!envAct) {
     if (!req.url.includes("runStartedAt=")) {
+      const now = new Date();
+      await markLeaderboardCronError({
+        runStartedAt: now,
+        errorMessage: SYNC_ACT_NOT_CONFIGURED,
+      }).catch(() => {});
       await notifyLeaderboardSyncComplete({
-        runStartedAt: new Date(),
+        runStartedAt: now,
         finishedAt: new Date(),
         synced: 0,
         failed: 0,
@@ -187,6 +216,22 @@ export async function GET(req: Request) {
   const isContinuation = Boolean(runStartedAtRaw);
   const priorTotals = isContinuation ? readRunTotals(searchParams) : emptyTotals();
 
+  let totalPlayers = priorTotals.synced + priorTotals.failed + priorTotals.skipped + priorTotals.pending;
+  if (!isContinuation) {
+    const stats = await getLeaderboardSyncStats();
+    totalPlayers = stats.linkedPlayers;
+    await markLeaderboardCronStarted({
+      runStartedAt,
+      currentAct: envAct,
+      totalPlayers,
+    });
+    console.info("[cron/sync-ranks] Daily run started", {
+      runStartedAt: runStartedAt.toISOString(),
+      totalPlayers,
+      currentAct: envAct,
+    });
+  }
+
   try {
     const runId = runStartedAt.toISOString();
     const result = await syncAllLinkedPlayers({
@@ -199,9 +244,21 @@ export async function GET(req: Request) {
     });
 
     const totals = accumulate(priorTotals, result);
+    if (totalPlayers < totals.synced + totals.failed + totals.skipped + totals.pending) {
+      totalPlayers = totals.synced + totals.failed + totals.skipped + totals.pending;
+    }
 
     if (result.hasMore) {
-      scheduleNextRankBatch(runStartedAt, totals);
+      await markLeaderboardCronProgress({
+        runStartedAt,
+        currentAct: envAct,
+        synced: totals.synced,
+        failed: totals.failed,
+        skipped: totals.skipped,
+        pending: totals.pending,
+        totalPlayers,
+      });
+      scheduleNextRankBatch(runStartedAt, totals, envAct, totalPlayers);
 
       return NextResponse.json({
         ok: true,
@@ -216,6 +273,21 @@ export async function GET(req: Request) {
         ...result,
       });
     }
+
+    await markLeaderboardCronComplete({
+      runStartedAt,
+      currentAct: envAct,
+      synced: totals.synced,
+      failed: totals.failed,
+      skipped: totals.skipped,
+      totalPlayers,
+    });
+    console.info("[cron/sync-ranks] Daily run complete", {
+      runStartedAt: runStartedAt.toISOString(),
+      synced: totals.synced,
+      failed: totals.failed,
+      skipped: totals.skipped,
+    });
 
     const notify = await notifyLeaderboardSyncComplete({
       runStartedAt,
@@ -244,11 +316,22 @@ export async function GET(req: Request) {
       pending: 0,
     });
   } catch (err) {
+    const errorMessage = err instanceof Error ? err.message : "Sync failed.";
+    await markLeaderboardCronError({
+      runStartedAt,
+      currentAct: envAct,
+      synced: priorTotals.synced,
+      failed: priorTotals.failed,
+      skipped: priorTotals.skipped,
+      pending: priorTotals.pending,
+      totalPlayers,
+      errorMessage,
+    }).catch(() => {});
     await sendSyncNotify(
       runStartedAt,
-      emptyTotals(),
+      priorTotals,
       "error",
-      err instanceof Error ? err.message : "Sync failed.",
+      errorMessage,
     );
     return NextResponse.json({ error: "Sync failed." }, { status: 500 });
   }

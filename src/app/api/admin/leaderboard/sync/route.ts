@@ -1,6 +1,7 @@
 import { guardResponse, isAuthedAdmin, requireAdmin } from "@/lib/auth-guard";
 import { logAdminAction } from "@/lib/admin-audit";
 import { formatValorantActLabel, parseValorantActSeasonKey } from "@/lib/valorant-act";
+import { getLeaderboardCronStatus } from "@/lib/leaderboard-cron-status";
 import {
   getEnvValorantActKey,
   requireEnvValorantActKey,
@@ -53,10 +54,14 @@ export async function GET() {
   if (!isAuthedAdmin(auth)) return guardResponse(auth)!;
 
   try {
-    const stats = await getLeaderboardSyncStats();
+    const [stats, cronRun] = await Promise.all([
+      getLeaderboardSyncStats(),
+      getLeaderboardCronStatus(),
+    ]);
     const envAct = getEnvValorantActKey();
     return NextResponse.json({
       stats,
+      cronRun,
       currentAct: envAct,
       currentActLabel: formatValorantActLabel(envAct),
       envConfigured: Boolean(serverEnv.valorantCurrentAct?.trim()),
