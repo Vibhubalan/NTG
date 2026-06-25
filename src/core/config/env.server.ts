@@ -44,6 +44,10 @@ export const serverEnv = {
   get cronSecret() {
     return optional("CRON_SECRET");
   },
+  /** Enable /api/cron/leaderboard-hourly (staging + cron-job.org). */
+  get leaderboardHourlyRefreshEnabled() {
+    return optional("LEADERBOARD_HOURLY_REFRESH_ENABLED") === "true";
+  },
   get youtubeChannelId() {
     return optional("YOUTUBE_CHANNEL_ID");
   },

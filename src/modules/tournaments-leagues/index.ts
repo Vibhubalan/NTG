@@ -29,6 +29,12 @@ export {
   type LeaderboardRankAuditRow,
 } from "./application/rank-sync.service";
 export {
+  runHourlyLeaderboardRefresh,
+  listLeaderboardRefreshRuns,
+  playersAfterCursor,
+  type HourlyRefreshResult,
+} from "./application/leaderboard-hourly-refresh.service";
+export {
   registerForTournament,
   registerFifaTeam,
   getRegistrationEligibility,

@@ -5,6 +5,9 @@
     },
     "src/app/api/cron/sync-ranks/route.ts": {
       "maxDuration": 60
+    },
+    "src/app/api/cron/leaderboard-hourly/route.ts": {
+      "maxDuration": 60
     }
   },
   "crons": [

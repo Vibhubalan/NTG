@@ -50,6 +50,19 @@ type AuditRow = {
   createdAt: string;
 };
 
+type HourlyRefreshRun = {
+  id: string;
+  status: string;
+  startedAt: string;
+  finishedAt: string | null;
+  durationMs: number | null;
+  totalPlayers: number;
+  successCount: number;
+  failedCount: number;
+  henrikRequestCount: number;
+  errorMessage: string | null;
+};
+
 function formatWhen(iso: string | null): string {
   if (!iso) return "Never";
   return new Date(iso).toLocaleString("en-IN", {
@@ -59,8 +72,34 @@ function formatWhen(iso: string | null): string {
   });
 }
 
+function refreshRunStatusLabel(status: string): string {
+  switch (status) {
+    case "RUNNING":
+      return "Running";
+    case "COMPLETE":
+      return "Complete";
+    case "ERROR":
+      return "Error";
+    case "SKIPPED":
+      return "Skipped";
+    default:
+      return status;
+  }
+}
+
+function formatDuration(ms: number | null): string {
+  if (ms == null) return "—";
+  const sec = Math.round(ms / 1000);
+  if (sec < 60) return `${sec}s`;
+  const min = Math.floor(sec / 60);
+  const rem = sec % 60;
+  return `${min}m ${rem}s`;
+}
+
 function sourceLabel(source: string): string {
   switch (source) {
+    case "HOURLY_CRON":
+      return "Hourly cron";
     case "CRON":
       return "Daily cron";
     case "MANUAL":
@@ -100,6 +139,9 @@ export default function AdminLeaderboardSyncPanel({
   const [dismissedCronRunId, setDismissedCronRunId] = useState<string | null>(null);
   const [cronFlash, setCronFlash] = useState<string | null>(null);
   const prevCronPhaseRef = useRef<string | null>(null);
+  const [hourlyRuns, setHourlyRuns] = useState<HourlyRefreshRun[]>([]);
+  const [lastCompletedRefreshAt, setLastCompletedRefreshAt] = useState<string | null>(null);
+  const [hourlyRunsLoading, setHourlyRunsLoading] = useState(false);
 
   const loadStats = useCallback(async () => {
     const res = await fetch("/api/admin/leaderboard/sync");
@@ -156,9 +198,26 @@ export default function AdminLeaderboardSyncPanel({
     }
   }, [auditChangedOnly]);
 
+  const loadHourlyRuns = useCallback(async () => {
+    setHourlyRunsLoading(true);
+    try {
+      const res = await fetch("/api/admin/leaderboard/refresh-runs?limit=15");
+      const parsed = await parseApiJson(res);
+      if (!parsed.ok || !res.ok) return;
+      setHourlyRuns((parsed.data.runs as HourlyRefreshRun[]) ?? []);
+      setLastCompletedRefreshAt((parsed.data.lastCompletedRefreshAt as string | null) ?? null);
+    } finally {
+      setHourlyRunsLoading(false);
+    }
+  }, []);
+
   useEffect(() => {
     loadStats();
   }, [loadStats]);
+
+  useEffect(() => {
+    void loadHourlyRuns();
+  }, [loadHourlyRuns]);
 
   useEffect(() => {
     if (!showCronStatus) return;
@@ -471,6 +530,88 @@ export default function AdminLeaderboardSyncPanel({
       <div className="mt-8 border-t border-white/[0.06] pt-6">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
+            <h3 className="text-sm font-bold text-white">Hourly refresh runs</h3>
+            <p className="mt-0.5 text-xs text-white/40">
+              Staging cron at :50 each hour (cron-job.org). Public &quot;Last refreshed&quot; updates only
+              when a full run completes.
+            </p>
+            <p className="mt-2 text-xs text-white/55">
+              Last completed refresh:{" "}
+              <span className="font-medium text-white/80">
+                {formatWhen(lastCompletedRefreshAt)}
+              </span>
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={loadHourlyRuns}
+            disabled={hourlyRunsLoading}
+            className="rounded-lg border border-white/15 px-3 py-1.5 text-xs font-semibold text-white/60 hover:text-white disabled:opacity-50"
+          >
+            {hourlyRunsLoading ? "Loading…" : "Reload runs"}
+          </button>
+        </div>
+
+        <div className="mt-4 overflow-hidden rounded-xl border border-white/[0.06]">
+          <div className="max-h-[min(20rem,50vh)] overflow-auto">
+            <table className="min-w-full text-left text-xs">
+              <thead className="sticky top-0 z-10 bg-[#0c1424] text-[10px] uppercase tracking-wider text-white/40 shadow-[0_1px_0_0_rgba(255,255,255,0.06)]">
+                <tr>
+                  <th className="px-3 py-2.5 font-semibold">Started (IST)</th>
+                  <th className="px-3 py-2.5 font-semibold">Status</th>
+                  <th className="px-3 py-2.5 font-semibold">Players</th>
+                  <th className="px-3 py-2.5 font-semibold">Henrik calls</th>
+                  <th className="px-3 py-2.5 font-semibold">Duration</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-white/[0.04] text-white/75">
+                {hourlyRuns.length === 0 ? (
+                  <tr>
+                    <td colSpan={5} className="px-3 py-6 text-center text-white/35">
+                      {hourlyRunsLoading ? "Loading runs…" : "No hourly runs yet."}
+                    </td>
+                  </tr>
+                ) : (
+                  hourlyRuns.map((run) => (
+                    <tr key={run.id} className={run.status === "ERROR" ? "bg-red-500/5" : undefined}>
+                      <td className="whitespace-nowrap px-3 py-2.5">{formatWhen(run.startedAt)}</td>
+                      <td className="px-3 py-2.5">
+                        <span
+                          className={
+                            run.status === "RUNNING"
+                              ? "text-violet-300"
+                              : run.status === "COMPLETE"
+                                ? "text-emerald-300"
+                                : run.status === "ERROR"
+                                  ? "text-red-300"
+                                  : "text-white/55"
+                          }
+                        >
+                          {refreshRunStatusLabel(run.status)}
+                        </span>
+                        {run.errorMessage ? (
+                          <div className="mt-0.5 text-[10px] text-red-300">{run.errorMessage}</div>
+                        ) : null}
+                      </td>
+                      <td className="px-3 py-2.5">
+                        {run.successCount} ok
+                        {run.failedCount > 0 ? ` · ${run.failedCount} failed` : ""}
+                        {run.totalPlayers > 0 ? ` / ${run.totalPlayers}` : ""}
+                      </td>
+                      <td className="px-3 py-2.5">{run.henrikRequestCount}</td>
+                      <td className="px-3 py-2.5">{formatDuration(run.durationMs)}</td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <div className="mt-8 border-t border-white/[0.06] pt-6">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div>
             <h3 className="text-sm font-bold text-white">Rank change audit</h3>
             <p className="mt-0.5 text-xs text-white/40">
               Who changed rank, from → to, and whether it was daily cron or manual refresh.
@@ -529,6 +670,8 @@ export default function AdminLeaderboardSyncPanel({
                         className={
                           row.source === "CRON"
                             ? "text-violet-300"
+                            : row.source === "HOURLY_CRON"
+                              ? "text-amber-300"
                             : row.source === "MANUAL"
                               ? "text-cyan-300"
                               : "text-white/55"

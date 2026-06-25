@@ -461,6 +461,33 @@ enum LeaderboardSyncSource {
   RIOT_LINK
   REGISTRATION
   ADMIN_MEMBER
+  HOURLY_CRON
+}
+
+enum LeaderboardRefreshRunStatus {
+  RUNNING
+  COMPLETE
+  ERROR
+  SKIPPED
+}
+
+/** Hourly full leaderboard refresh job (cron-job.org). */
+model LeaderboardRefreshRun {
+  id                 String                      @id @default(cuid())
+  status             LeaderboardRefreshRunStatus @default(RUNNING)
+  startedAt          DateTime                    @default(now())
+  finishedAt         DateTime?
+  durationMs         Int?
+  totalPlayers       Int                         @default(0)
+  successCount       Int                         @default(0)
+  failedCount        Int                         @default(0)
+  henrikRequestCount Int                         @default(0)
+  cursorUserId       String?
+  errorMessage       String?
+  createdAt          DateTime                    @default(now())
+  updatedAt          DateTime                    @updatedAt
+
+  @@index([status, startedAt])
 }
 
 /** Rank change history from Henrik sync (cron, manual refresh, profile, etc.). */

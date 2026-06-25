@@ -20,4 +20,7 @@ export type LeaderboardPreview = {
   game: GameSlug;
   scope: string;
   entries: LeaderboardPreviewEntry[];
+  /** Set when a full hourly refresh job completes (not per-player sync). */
+  lastRefreshedAt?: string | null;
+  hourlyRefreshEnabled?: boolean;
 };

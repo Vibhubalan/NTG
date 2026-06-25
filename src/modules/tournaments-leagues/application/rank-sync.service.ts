@@ -27,7 +27,8 @@ export type RankSyncSource =
   | "profile"
   | "riot_link"
   | "registration"
-  | "admin_member";
+  | "admin_member"
+  | "hourly_cron";
 
 export type RankSyncContext = {
   source: RankSyncSource;
@@ -44,6 +45,7 @@ function toPrismaSyncSource(source: RankSyncSource): LeaderboardSyncSource {
     riot_link: LeaderboardSyncSource.RIOT_LINK,
     registration: LeaderboardSyncSource.REGISTRATION,
     admin_member: LeaderboardSyncSource.ADMIN_MEMBER,
+    hourly_cron: LeaderboardSyncSource.HOURLY_CRON,
   };
   return map[source];
 }
@@ -412,6 +414,8 @@ export async function syncUserRank(
   options?: {
     tryAllRegions?: boolean;
     skipPlayerCard?: boolean;
+    /** Hourly refresh: all 3 Henrik calls must succeed before any DB write. */
+    requireAllHenrikCalls?: boolean;
     context?: RankSyncContext;
   },
 ): Promise<{ ok: true } | { ok: false; error: string }> {
@@ -444,6 +448,7 @@ export async function syncUserRank(
   const region = normalizeHenrikRegion(user.riotRegion);
   const syncName = user.riotGameName;
   const syncTag = user.riotTagLine;
+  const strictHenrik = options?.requireAllHenrikCalls ?? false;
   const actOverride = options?.context?.currentActOverride ?? null;
   const v2Opts = { currentActOverride: actOverride };
 
@@ -452,6 +457,10 @@ export async function syncUserRank(
     v2Bundle = await fetchHenrikV2MmrBundle(region, syncName, syncTag, v2Opts);
   } catch {
     v2Bundle = null;
+  }
+
+  if (strictHenrik && !v2Bundle) {
+    return fail("Henrik v2 request failed.");
   }
 
   let fetched:
@@ -494,7 +503,7 @@ export async function syncUserRank(
 
   const lookupName = resolvedGameName || syncName;
   const lookupTag = resolvedTagLine || syncTag;
-  if (resolvedRegion !== region || !v2Bundle) {
+  if (!strictHenrik && (resolvedRegion !== region || !v2Bundle)) {
     try {
       v2Bundle = await fetchHenrikV2MmrBundle(resolvedRegion, lookupName, lookupTag, v2Opts);
     } catch {
@@ -529,9 +538,17 @@ export async function syncUserRank(
         const accData = (await res.json()) as { data?: { card?: { large?: string; wide?: string } } };
         cardLarge = accData.data?.card?.large;
         cardWide = accData.data?.card?.wide;
+      } else if (strictHenrik) {
+        return fail(`Henrik player card request failed (${res.status}).`);
       }
     } catch (e) {
       console.error("Failed to fetch player card on rank sync:", e);
+      if (strictHenrik) {
+        return fail("Henrik player card request failed.");
+      }
+    }
+    if (strictHenrik && !cardLarge && !cardWide) {
+      return fail("Henrik player card request returned no card data.");
     }
   }
 
@@ -694,6 +711,7 @@ async function syncUserRankWithRetry(
   options?: {
     tryAllRegions?: boolean;
     skipPlayerCard?: boolean;
+    requireAllHenrikCalls?: boolean;
     context?: RankSyncContext;
   },
 ): Promise<{ ok: true } | { ok: false; error: string }> {
@@ -712,6 +730,18 @@ async function syncUserRankWithRetry(
   }
 
   return last;
+}
+
+export async function syncUserRankWithRetryForHourly(
+  userId: string,
+  context: RankSyncContext,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  return syncUserRankWithRetry(userId, {
+    tryAllRegions: false,
+    skipPlayerCard: false,
+    requireAllHenrikCalls: true,
+    context,
+  });
 }
 
 type LinkedPlayerFilter = {
@@ -781,6 +811,15 @@ const LINKED_PLAYER_WHERE: Prisma.UserWhereInput = {
   riotGameName: { not: null },
   riotTagLine: { not: null },
 };
+
+export async function listLinkedValorantPlayerIds(): Promise<string[]> {
+  const users = await prisma.user.findMany({
+    where: LINKED_PLAYER_WHERE,
+    select: { id: true },
+    orderBy: { id: "asc" },
+  });
+  return users.map((u) => u.id);
+}
 
 export async function getLeaderboardSyncStats(): Promise<LeaderboardSyncStats> {
   const [linkedPlayers, rankedOnLeaderboard, lastEntry] = await Promise.all([

@@ -1,6 +1,8 @@
 import { prisma } from "@core/database/client";
 import type { LeaderboardPreview } from "@core/contracts";
 import { sortValorantBoardEntries } from "@/lib/leaderboard-sort";
+import { getLeaderboardLastCompletedRefresh } from "@/lib/leaderboard-last-refresh";
+import { serverEnv } from "@core/config/env.server";
 import type { GameSlug } from "@prisma/client";
 
 const POINTS_WIN = 3;
@@ -72,6 +74,8 @@ export class LeaderboardRepository {
       game: "VALORANT",
       scope: "TOWN",
       entries: sortValorantBoardEntries(mapped).slice(0, limit),
+      lastRefreshedAt: await getLeaderboardLastCompletedRefresh(),
+      hourlyRefreshEnabled: serverEnv.leaderboardHourlyRefreshEnabled,
     };
   }
 

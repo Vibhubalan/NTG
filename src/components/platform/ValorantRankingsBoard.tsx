@@ -253,17 +253,25 @@ export default function ValorantRankingsBoard({ data }: Props) {
   let timeLeftStr = "--:--:--";
 
   if (mounted) {
-    const lastSyncStr = data.entries.reduce((latest, e) => {
-      if (!e.lastSyncedAt) return latest;
-      if (!latest) return e.lastSyncedAt;
-      return new Date(e.lastSyncedAt) > new Date(latest) ? e.lastSyncedAt : latest;
-    }, null as string | null);
+    const lastSyncStr =
+      data.lastRefreshedAt ??
+      data.entries.reduce((latest, e) => {
+        if (!e.lastSyncedAt) return latest;
+        if (!latest) return e.lastSyncedAt;
+        return new Date(e.lastSyncedAt) > new Date(latest) ? e.lastSyncedAt : latest;
+      }, null as string | null);
 
-    const lastSyncDate = lastSyncStr ? new Date(lastSyncStr) : new Date();
-    
-    // The cron job runs at midnight (12:00 AM) local time
+    const lastSyncDate = lastSyncStr ? new Date(lastSyncStr) : null;
+
     const nextSyncDate = new Date(now);
-    nextSyncDate.setHours(24, 0, 0, 0);
+    if (data.hourlyRefreshEnabled) {
+      nextSyncDate.setMinutes(50, 0, 0);
+      if (nextSyncDate.getTime() <= now.getTime()) {
+        nextSyncDate.setHours(nextSyncDate.getHours() + 1);
+      }
+    } else {
+      nextSyncDate.setHours(24, 0, 0, 0);
+    }
 
     let timeUntilNext = nextSyncDate.getTime() - now.getTime();
     if (timeUntilNext < 0) timeUntilNext = 0;
@@ -273,6 +281,9 @@ export default function ValorantRankingsBoard({ data }: Props) {
     const s = Math.floor((timeUntilNext / 1000) % 60);
     timeLeftStr = `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
 
+    if (!lastSyncDate) {
+      lastRefreshedStr = "--";
+    } else {
     const day = lastSyncDate.getDate();
     let suffix = "th";
     if (day === 1 || day === 21 || day === 31) suffix = "st";
@@ -283,6 +294,7 @@ export default function ValorantRankingsBoard({ data }: Props) {
     const timeStr = lastSyncDate.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit', hour12: true }).toLowerCase();
 
     lastRefreshedStr = `${day}${suffix} ${monthStr} ${timeStr}`;
+    }
   }
 
   return (
