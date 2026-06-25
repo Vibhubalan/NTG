@@ -845,7 +845,7 @@ export async function getLeaderboardSyncStats(): Promise<LeaderboardSyncStats> {
     linkedPlayers,
     rankedOnLeaderboard,
     lastSyncedAt: lastEntry._max.lastSyncedAt?.toISOString() ?? null,
-    cronScheduleIst: "Daily 1:30 AM IST via Vercel → GitHub Actions",
+    cronScheduleIst: "Daily 2:30 AM IST via Vercel → GitHub Actions",
   };
 }
 

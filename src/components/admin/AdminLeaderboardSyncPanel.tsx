@@ -333,7 +333,7 @@ export default function AdminLeaderboardSyncPanel({
           <h2 className="mt-1 font-display text-xl font-bold text-white">Rank sync</h2>
           <p className="mt-1 max-w-lg text-sm text-white/45">
             Ranks sync when members link Riot on profile or register for a cup. The automatic daily
-            refresh ({stats?.cronScheduleIst ?? "1:30 AM IST via Vercel → GitHub Actions"}) updates rank, MMR, and player cards
+            refresh ({stats?.cronScheduleIst ?? "2:30 AM IST via Vercel → GitHub Actions"}) updates rank, MMR, and player cards
             for every linked player — same as manual refresh below. Episode and act come from{" "}
             <code className="text-white/60">VALORANT_CURRENT_ACT</code> on Vercel.
           </p>

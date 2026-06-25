@@ -1,7 +1,10 @@
 name: Daily leaderboard refresh
 
 on:
-  # Scheduled via Vercel cron → /api/cron/trigger-daily-leaderboard (workflow_dispatch).
+  # Backup if Vercel cron misses: 21:05 UTC = 2:35 AM IST
+  schedule:
+    - cron: "5 21 * * *"
+  # Primary: Vercel cron → /api/cron/trigger-daily-leaderboard (workflow_dispatch)
   workflow_dispatch:
 
 concurrency:
