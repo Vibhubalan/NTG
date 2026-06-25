@@ -10,7 +10,7 @@
   "crons": [
     {
       "path": "/api/cron/sync-ranks",
-      "schedule": "0 22 * * *"
+      "schedule": "0 12 * * *"
     },
     {
       "path": "/api/cron/sync-tournament-status",

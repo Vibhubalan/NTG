@@ -654,16 +654,32 @@ export async function syncUserRank(
   return { ok: true };
 }
 
-/** Prevents the same user from blocking overnight batches after retryable failures. */
+/** Prevents the same user from blocking daily batches after skip/fail. */
 async function markSyncAttempted(userId: string): Promise<void> {
-  await prisma.leaderboardEntry.updateMany({
-    where: {
-      userId,
-      game: GameSlug.VALORANT,
-      scope: "TOWN",
-      seasonId: null,
+  const now = new Date();
+  const where = {
+    userId,
+    game: GameSlug.VALORANT,
+    scope: LeaderboardScope.TOWN,
+    seasonId: null,
+  } as const;
+
+  const existing = await prisma.leaderboardEntry.findFirst({ where });
+  if (existing) {
+    await prisma.leaderboardEntry.update({
+      where: { id: existing.id },
+      data: { lastSyncedAt: now },
+    });
+    return;
+  }
+
+  await prisma.leaderboardEntry.create({
+    data: {
+      ...where,
+      rankTier: UNRANKED_TIER_NAME,
+      rankTierId: UNRANKED_TIER_ID,
+      lastSyncedAt: now,
     },
-    data: { lastSyncedAt: new Date() },
   });
 }
 
@@ -790,7 +806,7 @@ export async function getLeaderboardSyncStats(): Promise<LeaderboardSyncStats> {
     linkedPlayers,
     rankedOnLeaderboard,
     lastSyncedAt: lastEntry._max.lastSyncedAt?.toISOString() ?? null,
-    cronScheduleIst: "Daily 3:30 AM IST (22:00 UTC)",
+    cronScheduleIst: "Daily 5:30 PM IST (12:00 UTC)",
   };
 }
 
@@ -872,10 +888,11 @@ export async function syncAllLinkedPlayers(options?: {
       skipPlayerCard: options?.skipPlayerCard ?? false,
       context: options?.context,
     });
-    if (result.ok) synced += 1;
-    else if (result.error === "No competitive rank data found.") failed += 1;
-    else {
-      failed += 1;
+    if (result.ok) {
+      synced += 1;
+    } else {
+      if (result.error === "No competitive rank data found.") failed += 1;
+      else failed += 1;
       await markSyncAttempted(user.id).catch(() => {});
     }
   }
