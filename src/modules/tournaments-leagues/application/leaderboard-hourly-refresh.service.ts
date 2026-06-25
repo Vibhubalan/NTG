@@ -36,8 +36,8 @@ import {
   type RankSyncSource,
 } from "./rank-sync.service";
 
-/** Stay under Vercel maxDuration while processing players sequentially. */
-const RUN_TIME_BUDGET_MS = 52_000;
+/** Leave headroom for cold start, DB, snapshot, and Resend on mode=start (Vercel max 60s). */
+const RUN_TIME_BUDGET_MS = 38_000;
 
 export type LeaderboardRefreshKind = "daily" | "hourly";
 
@@ -220,7 +220,7 @@ async function processRunSegment(
         skipped: 0,
         totalPlayers,
       }).catch(() => {});
-      await notifyLeaderboardSyncComplete({
+      void notifyLeaderboardSyncComplete({
         runStartedAt: run.startedAt,
         finishedAt,
         synced: successCount,
@@ -423,15 +423,13 @@ export async function runLeaderboardRefresh(
     };
   }
 
-  await snapshotTownBoardRanks();
-
   if (kind === "daily") {
-    await markLeaderboardCronStarted({
+    void markLeaderboardCronStarted({
       runStartedAt: run.startedAt,
       currentAct,
       totalPlayers: allIds.length,
     }).catch(() => {});
-    await notifyLeaderboardSyncStarted({
+    void notifyLeaderboardSyncStarted({
       runStartedAt: run.startedAt,
       totalPlayers: allIds.length,
       currentAct,

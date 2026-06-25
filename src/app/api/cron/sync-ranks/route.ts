@@ -4,7 +4,7 @@ import { runDailyLeaderboardRefresh } from "@tournaments-leagues/application/lea
 import { NextResponse } from "next/server";
 
 export const dynamic = "force-dynamic";
-/** ~7–8 players per segment (3 Henrik calls each, 26/min). GHA calls mode=continue until complete. */
+/** ~5–6 players per segment (3 Henrik calls each, 26/min). GHA calls mode=continue until complete. */
 export const maxDuration = 60;
 
 export async function GET(req: Request) {

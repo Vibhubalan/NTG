@@ -39,7 +39,8 @@ jobs:
           fi
 
           BASE="${SITE_URL%/}/api/cron/sync-ranks"
-          echo "Calling ${BASE}?mode=start (SITE_URL length: ${#SITE_URL})"
+          AUTH_HEADER="$(printf 'Authorization: Bearer %s' "$CRON_SECRET")"
+          echo "Calling ${BASE} (SITE_URL length: ${#SITE_URL}, CRON_SECRET length: ${#CRON_SECRET})"
           ATTEMPTS=0
           MAX_ATTEMPTS=50
           MODE="start"
@@ -47,14 +48,23 @@ jobs:
 
           while [ "$ATTEMPTS" -lt "$MAX_ATTEMPTS" ]; do
             echo "--- Attempt $((ATTEMPTS + 1)): mode=${MODE} ---"
-            HTTP_CODE=$(curl -sS -o /tmp/sync-response.json -w "%{http_code}" \
-              -H "Authorization: Bearer ${CRON_SECRET}" \
-              "${BASE}?mode=${MODE}")
+            HTTP_CODE=$(curl -sS -G -o /tmp/sync-response.json -w '%{http_code}' \
+              --max-time 65 \
+              --url "$BASE" \
+              --data-urlencode "mode=${MODE}" \
+              -H "$AUTH_HEADER")
 
             cat /tmp/sync-response.json
             echo ""
 
             if [ "$HTTP_CODE" -ge 400 ]; then
+              if [ "$HTTP_CODE" -eq 504 ] || [ "$HTTP_CODE" -eq 502 ] || [ "$HTTP_CODE" -eq 503 ]; then
+                echo "HTTP ${HTTP_CODE} — function timed out or gateway error; retrying with mode=continue."
+                MODE="continue"
+                ATTEMPTS=$((ATTEMPTS + 1))
+                sleep 15
+                continue
+              fi
               echo "HTTP ${HTTP_CODE} from sync endpoint"
               exit 1
             fi
