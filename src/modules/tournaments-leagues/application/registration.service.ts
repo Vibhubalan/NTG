@@ -13,6 +13,8 @@ import {
 } from "@auth-membership/application/registration-helpers";
 import { isTournamentRegistrationLive } from "../domain/registration-window";
 import { syncUserRank } from "./rank-sync.service";
+import { logUserActivity } from "@/lib/user-audit";
+
 
 export type TournamentRegisterInput = {
   participantRole: RegistrationParticipantRole;
@@ -326,6 +328,15 @@ export async function registerForTournament(
         return reg;
       });
 
+      await logUserActivity({
+        userId,
+        email: user.email,
+        name: user.name,
+        action: "TOURNAMENT_REGISTER",
+        target: slug,
+        details: `Registered for cup "${tournament.name}" as Captain of ${input.teamName!.trim()}.`,
+      });
+
       return { ok: true, registrationId: result.id };
     }
 
@@ -334,6 +345,15 @@ export async function registerForTournament(
         ...baseData,
         participantRole: "PLAYER",
       },
+    });
+
+    await logUserActivity({
+      userId,
+      email: user.email,
+      name: user.name,
+      action: "TOURNAMENT_REGISTER",
+      target: slug,
+      details: `Registered for cup "${tournament.name}" as Player.`,
     });
 
     return { ok: true, registrationId: reg.id };
@@ -661,6 +681,11 @@ export async function adminAddTournamentRegistration(
     userId = byEmail?.id;
   }
   if (!userId) return { ok: false, error: "Member not found." };
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { email: true, name: true },
+  });
+  if (!user) return { ok: false, error: "Member not found." };
 
   const existing = await prisma.tournamentRegistration.findUnique({
     where: {
@@ -721,6 +746,15 @@ export async function adminAddTournamentRegistration(
         return created;
       });
 
+      await logUserActivity({
+        userId,
+        email: user.email,
+        name: user.name,
+        action: "TOURNAMENT_REGISTER",
+        target: slug,
+        details: `Registered for cup "${tournament.name}" as Captain of ${teamName} (by Admin).`,
+      });
+
       return { ok: true, registrationId: reg.id };
     }
 
@@ -729,6 +763,15 @@ export async function adminAddTournamentRegistration(
         ...baseData,
         participantRole: "PLAYER",
       },
+    });
+
+    await logUserActivity({
+      userId,
+      email: user.email,
+      name: user.name,
+      action: "TOURNAMENT_REGISTER",
+      target: slug,
+      details: `Registered for cup "${tournament.name}" as Player (by Admin).`,
     });
 
     return { ok: true, registrationId: reg.id };
@@ -755,6 +798,11 @@ export async function adminRemoveTournamentRegistration(
     return { ok: false, error: "Registration not found." };
   }
 
+  const user = await prisma.user.findUnique({
+    where: { id: reg.userId },
+    select: { email: true, name: true },
+  });
+
   await prisma.$transaction(async (tx) => {
     await tx.tournamentTeamPlayer.deleteMany({ where: { registrationId: reg.id } });
 
@@ -771,6 +819,17 @@ export async function adminRemoveTournamentRegistration(
       data: { updatedAt: new Date() },
     });
   });
+
+  if (user) {
+    await logUserActivity({
+      userId: reg.userId,
+      email: user.email,
+      name: user.name,
+      action: "TOURNAMENT_UNREGISTER",
+      target: slug,
+      details: `Removed registration for cup "${tournament.name}" (by Admin).`,
+    });
+  }
 
   return { ok: true };
 }

@@ -10,6 +10,8 @@ import {
 import { linkRiotAccount, unlinkRiotAccount } from "@auth-membership/application/riot-link.service";
 import { linkSteamAccount, unlinkSteamAccount } from "@auth-membership/application/steam-link.service";
 import type { UserRole } from "@prisma/client";
+import { logUserActivity } from "@/lib/user-audit";
+
 
 const MIN_PASSWORD = 8;
 
@@ -262,6 +264,14 @@ export async function deleteMemberAdmin(
       return { ok: false, error: "Cannot delete the last admin." };
     }
   }
+
+  await logUserActivity({
+    userId,
+    email: user.email,
+    name: user.name,
+    action: "LEAVE",
+    details: "Account deleted by administrator.",
+  });
 
   await prisma.user.delete({ where: { id: userId } });
   return { ok: true };

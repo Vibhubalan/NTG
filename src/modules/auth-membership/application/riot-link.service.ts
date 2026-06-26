@@ -4,6 +4,7 @@ import { linkGameIdentity } from "./profile.service";
 import { normalizeHenrikRegion } from "@/lib/henrik-region";
 import { normalizeRiotPlayerCardUrls } from "@/lib/valorant-player-card";
 import { parseRiotId, resolveRiotAccount } from "./riot-henrik.service";
+import { logUserActivity } from "@/lib/user-audit";
 
 /** Link Riot ID only — rank sync runs in background via route `after()`. */
 export async function linkRiotAccount(
@@ -35,6 +36,11 @@ export async function linkRiotAccount(
 
   const cards = normalizeRiotPlayerCardUrls(account.cardLarge, account.cardWide);
 
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { email: true, name: true },
+  });
+
   await prisma.user.update({
     where: { id: userId },
     data: {
@@ -53,12 +59,30 @@ export async function linkRiotAccount(
     externalId: `${account.gameName}#${account.tagLine}`,
   });
 
+  if (user) {
+    await logUserActivity({
+      userId,
+      email: user.email,
+      name: user.name,
+      action: "RIOT_LINK",
+      target: `${account.gameName}#${account.tagLine}`,
+      details: `Linked Riot account: ${account.gameName}#${account.tagLine}`,
+    });
+  }
+
   return { ok: true };
 }
 
 export async function unlinkRiotAccount(
   userId: string,
 ): Promise<{ ok: true } | { ok: false; error: string }> {
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { email: true, name: true, riotGameName: true, riotTagLine: true },
+  });
+
+  const riotIdLabel = user?.riotGameName && user?.riotTagLine ? `${user.riotGameName}#${user.riotTagLine}` : "Valorant Account";
+
   await prisma.user.update({
     where: { id: userId },
     data: {
@@ -81,5 +105,17 @@ export async function unlinkRiotAccount(
     where: { userId, game: GameSlug.VALORANT },
   });
 
+  if (user) {
+    await logUserActivity({
+      userId,
+      email: user.email,
+      name: user.name,
+      action: "RIOT_UNLINK",
+      target: riotIdLabel,
+      details: `Unlinked Riot account: ${riotIdLabel}`,
+    });
+  }
+
   return { ok: true };
 }
+

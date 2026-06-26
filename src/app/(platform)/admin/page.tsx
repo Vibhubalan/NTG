@@ -1,6 +1,5 @@
 import Link from "next/link";
 import AdminLeaderboardSyncPanel from "@/components/admin/AdminLeaderboardSyncPanel";
-import AdminAuditLogPanel from "@/components/admin/AdminAuditLogPanel";
 import { isSuperAdminEmail } from "@/lib/superadmin";
 import { getSession } from "@core/auth/session";
 import { listTournamentsAdmin } from "@tournaments-leagues/index";
@@ -192,9 +191,6 @@ export default async function AdminDashboardPage() {
           })}
         </div>
       </div>
-
-      {/* Admin Action Log */}
-      <AdminAuditLogPanel />
 
       {/* Leaderboard Sync */}
       <AdminLeaderboardSyncPanel showCronStatus={isSuperAdmin} />

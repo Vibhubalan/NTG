@@ -2,6 +2,8 @@ import { prisma } from "@core/database/client";
 import { GameSlug } from "@prisma/client";
 import { serverEnv } from "@core/config/env.server";
 import { linkGameIdentity } from "./profile.service";
+import { logUserActivity } from "@/lib/user-audit";
+
 
 const CS2_APP_ID = 730;
 
@@ -132,6 +134,11 @@ export async function linkSteamAccount(
       ? profileUrl.trim()
       : `https://steamcommunity.com/profiles/${steamId64}`);
 
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { email: true, name: true },
+  });
+
   await prisma.user.update({
     where: { id: userId },
     data: {
@@ -158,6 +165,17 @@ export async function linkSteamAccount(
     data: { verified: true },
   });
 
+  if (user) {
+    await logUserActivity({
+      userId,
+      email: user.email,
+      name: user.name,
+      action: "STEAM_LINK",
+      target: summary.personaname ?? steamId64,
+      details: `Linked Steam account: ${summary.personaname ?? steamId64}`,
+    });
+  }
+
   return {
     ok: true,
     steamId64,
@@ -169,6 +187,13 @@ export async function linkSteamAccount(
 export async function unlinkSteamAccount(
   userId: string,
 ): Promise<{ ok: true } | { ok: false; error: string }> {
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { email: true, name: true, steamPersonaName: true, steamId64: true },
+  });
+
+  const steamIdLabel = user?.steamPersonaName ?? user?.steamId64 ?? "Steam Account";
+
   await prisma.user.update({
     where: { id: userId },
     data: {
@@ -196,6 +221,17 @@ export async function unlinkSteamAccount(
     where: { userId },
     data: { cs2PeakPremierRank: null },
   });
+
+  if (user) {
+    await logUserActivity({
+      userId,
+      email: user.email,
+      name: user.name,
+      action: "STEAM_UNLINK",
+      target: steamIdLabel,
+      details: `Unlinked Steam account: ${steamIdLabel}`,
+    });
+  }
 
   return { ok: true };
 }

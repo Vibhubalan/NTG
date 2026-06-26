@@ -90,7 +90,7 @@ export default function AdminAuditLogPanel() {
         </button>
       </div>
 
-      <div className="mt-4 max-h-[min(28rem,60vh)] overflow-y-auto overflow-x-auto rounded-xl border border-white/[0.06]">
+      <div className="mt-4 max-h-[500px] overflow-y-auto overflow-x-auto rounded-xl border border-white/[0.06]">
         <table className="min-w-full text-left text-xs">
           <thead className="sticky top-0 bg-[#0c1424] text-[10px] uppercase tracking-wider text-white/40 border-b border-white/[0.06]">
             <tr>

@@ -18,7 +18,7 @@ const marketingLinks = [
 const platformLinks = [
   { label: "Lounge", href: "/" },
   { label: "Cups", href: "/esports/tournaments" },
-  { label: "Rankings", href: "/esports/leaderboard" },
+  { label: "Leaderboards", href: "/esports/leaderboard" },
   { label: "Moments", href: "/gallery" },
 ];
 
@@ -42,7 +42,8 @@ function NavLink({
   const isLounge = label.toLowerCase() === "lounge";
   
   let textColorClass = active ? "text-white" : "text-white/60 hover:text-white";
-  let spanClass = "relative z-10";
+  let textSpanClass = "";
+  let containerSpanClass = "relative z-10 flex items-center justify-center gap-1.5";
 
   if (isEsports || isLounge) {
     textColorClass = active ? "" : "opacity-75 hover:opacity-100 transition-opacity";
@@ -53,21 +54,30 @@ function NavLink({
       ? "drop-shadow-[0_0_8px_rgba(124,58,237,0.3)]"
       : "drop-shadow-[0_0_8px_rgba(52,211,153,0.3)]";
 
-    spanClass = `relative z-10 bg-gradient-to-r ${gradient} bg-clip-text text-transparent font-bold ${
+    textSpanClass = `bg-gradient-to-r ${gradient} bg-clip-text text-transparent font-bold ${
       active ? shadow : ""
     }`;
   }
 
-  const className = `group relative rounded-full px-4 py-2 text-[12px] font-medium uppercase tracking-[0.16em] transition-colors sm:px-5 sm:py-2.5 sm:text-[13px] sm:tracking-[0.18em] ${textColorClass}`;
+  const className = `group relative rounded-full px-4 py-2 text-[12px] font-medium uppercase tracking-[0.16em] transition-colors sm:px-5 sm:py-2.5 sm:text-[13px] sm:tracking-[0.18em] flex items-center ${textColorClass}`;
 
   const underline = !active && (
     <span className="absolute inset-x-3 bottom-1.5 h-px origin-left scale-x-0 bg-gradient-to-r from-[var(--color-brand)] to-[var(--color-iris)] transition-transform duration-300 group-hover:scale-x-100 sm:inset-x-4" />
   );
 
+  const loungeIcon = isLounge && (
+    <svg className="h-[1.2em] w-[1.2em] shrink-0 text-emerald-400 opacity-90 pb-[1px]" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
+    </svg>
+  );
+
   if (external) {
     return (
       <a href={href} className={className}>
-        <span className={spanClass}>{label}</span>
+        <span className={containerSpanClass}>
+          {loungeIcon}
+          <span className={textSpanClass || undefined}>{label}</span>
+        </span>
         {underline}
       </a>
     );
@@ -75,7 +85,10 @@ function NavLink({
 
   return (
     <Link href={href} className={className}>
-      <span className={spanClass}>{label}</span>
+      <span className={containerSpanClass}>
+        {loungeIcon}
+        <span className={textSpanClass || undefined}>{label}</span>
+      </span>
       {underline}
     </Link>
   );
@@ -262,9 +275,16 @@ function MobileMenu({
               active ? "text-white" : "text-white/70 hover:text-white"
             }`;
 
+            const isLounge = link.label.toLowerCase() === "lounge";
+            const loungeIcon = isLounge && (
+              <svg className="inline-block h-[1.1em] w-[1.1em] ml-2 opacity-80 shrink-0 mb-1" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
+              </svg>
+            );
+
             const content = (
               <>
-                <span>{link.label}</span>
+                <span>{link.label}{loungeIcon}</span>
                 <ChevronRightIcon />
               </>
             );

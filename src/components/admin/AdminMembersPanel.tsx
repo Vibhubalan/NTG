@@ -24,13 +24,19 @@ type Member = {
 const inputClass =
   "w-full rounded-xl border border-white/10 bg-[#0a1020]/60 px-4 py-2.5 text-sm text-white placeholder:text-white/30 focus:outline-none focus:border-amber-500/30 focus:ring-1 focus:ring-amber-500/30 transition-all duration-200";
 
-export default function AdminMembersPanel({ initialMembers }: { initialMembers: Member[] }) {
+export default function AdminMembersPanel({
+  initialMembers,
+  isSuperAdmin,
+}: {
+  initialMembers: Member[];
+  isSuperAdmin: boolean;
+}) {
   const router = useRouter();
   const { openDeleteConfirm, DeleteConfirmDialog } = useAdminDeleteConfirm();
   const [search, setSearch] = useState("");
   const [selected, setSelected] = useState<Member | null>(null);
   const [isCreating, setIsCreating] = useState(false);
-  const [newPassword, setNewPassword] = useState("");
+  // No force reset password state
   const [riotId, setRiotId] = useState("");
   const [steamUrl, setSteamUrl] = useState("");
   const [createForm, setCreateForm] = useState({ email: "", password: "", displayName: "" });
@@ -122,21 +128,34 @@ export default function AdminMembersPanel({ initialMembers }: { initialMembers: 
           <h1 className="font-display text-3xl font-extrabold text-white tracking-tight">Members</h1>
           <p className="mt-1 text-sm text-white/40">Manage accounts, membership details, and linked game IDs.</p>
         </div>
-        <div>
-          <button
-            type="button"
-            onClick={() => {
-              setSelected(null);
-              setIsCreating(true);
-              setMessage(null);
-            }}
-            className="inline-flex items-center gap-1.5 rounded-xl bg-amber-500 px-4 py-2.5 text-xs font-bold text-black hover:bg-amber-400 transition-colors shadow-lg"
+        <div className="flex items-center gap-2.5">
+          <a
+            href="/api/admin/members/export"
+            download
+            className="inline-flex items-center gap-1.5 rounded-xl bg-white/10 px-4 py-2.5 text-xs font-semibold text-white hover:bg-white/15 transition-colors shadow-md border border-white/[0.08]"
           >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2.2" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3" />
             </svg>
-            <span>New Member</span>
-          </button>
+            <span>Export CSV</span>
+          </a>
+
+          {isSuperAdmin && (
+            <button
+              type="button"
+              onClick={() => {
+                setSelected(null);
+                setIsCreating(true);
+                setMessage(null);
+              }}
+              className="inline-flex items-center gap-1.5 rounded-xl bg-amber-500 px-4 py-2.5 text-xs font-bold text-black hover:bg-amber-400 transition-colors shadow-lg"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+              </svg>
+              <span>New Member</span>
+            </button>
+          )}
         </div>
       </div>
 
@@ -186,7 +205,6 @@ export default function AdminMembersPanel({ initialMembers }: { initialMembers: 
                         setSelected(m);
                         setRiotId(m.riotId ?? "");
                         setSteamUrl("");
-                        setNewPassword("");
                         setIsCreating(false);
                         setMessage(null);
                       }}
@@ -232,7 +250,7 @@ export default function AdminMembersPanel({ initialMembers }: { initialMembers: 
         {/* Right Column: Creation Form or Details Editor */}
         <div className="sticky top-4">
           {/* Option A: Creation Form */}
-          {isCreating && (
+          {isCreating && isSuperAdmin && (
             <form
               onSubmit={createMember}
               className="space-y-4 rounded-2xl border border-amber-500/20 bg-amber-500/[0.02] p-5 shadow-xl animate-in fade-in slide-in-from-right-3 duration-200"
@@ -364,37 +382,7 @@ export default function AdminMembersPanel({ initialMembers }: { initialMembers: 
                 </select>
               </div>
 
-              {/* Action 2: Password Reset */}
-              <div className="space-y-1">
-                <label className="text-[10px] font-bold uppercase tracking-wider text-white/40">Force Password Reset</label>
-                <div className="flex gap-2">
-                  <input
-                    className={inputClass}
-                    value={newPassword}
-                    onChange={(e) => setNewPassword(e.target.value)}
-                    placeholder="New secure password"
-                    type="password"
-                    autoComplete="new-password"
-                  />
-                  <button
-                    type="button"
-                    onClick={async () => {
-                      if (!newPassword.trim()) return;
-                      const ok = await patchMember(selected.id, {
-                        action: "resetPassword",
-                        newPassword: newPassword.trim(),
-                      });
-                      if (ok) {
-                        setNewPassword("");
-                        setMessage("Password updated successfully.");
-                      }
-                    }}
-                    className="shrink-0 rounded-xl bg-white/10 hover:bg-white/15 px-4 text-xs font-semibold text-white/80 transition-colors"
-                  >
-                    Reset
-                  </button>
-                </div>
-              </div>
+              {/* Force Password Reset removed */}
 
               {/* Action 3: Link Riot ID */}
               <div className="space-y-1">

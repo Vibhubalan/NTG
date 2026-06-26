@@ -131,18 +131,12 @@ export default function AdminLeaderboardSyncPanel({
   const [error, setError] = useState<string | null>(null);
   const [totals, setTotals] = useState<SyncTotals | null>(null);
   const [pending, setPending] = useState(0);
-  const [runStartedAt, setRunStartedAt] = useState<string | null>(null);
   const [runCurrentAct, setRunCurrentAct] = useState<string | null>(null);
-  const [auditRows, setAuditRows] = useState<AuditRow[]>([]);
-  const [auditChangedOnly, setAuditChangedOnly] = useState(false);
-  const [auditLoading, setAuditLoading] = useState(false);
+  const [runStartedAt, setRunStartedAt] = useState<string | null>(null);
   const [cronRun, setCronRun] = useState<CronRunStatus | null>(null);
   const [dismissedCronRunId, setDismissedCronRunId] = useState<string | null>(null);
   const [cronFlash, setCronFlash] = useState<string | null>(null);
   const prevCronPhaseRef = useRef<string | null>(null);
-  const [refreshRuns, setRefreshRuns] = useState<RefreshRunRow[]>([]);
-  const [lastCompletedRefreshAt, setLastCompletedRefreshAt] = useState<string | null>(null);
-  const [refreshRunsLoading, setRefreshRunsLoading] = useState(false);
 
   const loadStats = useCallback(async () => {
     const res = await fetch("/api/admin/leaderboard/sync");
@@ -183,42 +177,9 @@ export default function AdminLeaderboardSyncPanel({
     }
   }, [showCronStatus]);
 
-  const loadAudit = useCallback(async () => {
-    setAuditLoading(true);
-    try {
-      const params = new URLSearchParams({
-        limit: "50",
-        changedOnly: auditChangedOnly ? "true" : "false",
-      });
-      const res = await fetch(`/api/admin/leaderboard/audit?${params}`);
-      const parsed = await parseApiJson(res);
-      if (!parsed.ok || !res.ok) return;
-      setAuditRows((parsed.data.rows as AuditRow[]) ?? []);
-    } finally {
-      setAuditLoading(false);
-    }
-  }, [auditChangedOnly]);
-
-  const loadRefreshRuns = useCallback(async () => {
-    setRefreshRunsLoading(true);
-    try {
-      const res = await fetch("/api/admin/leaderboard/refresh-runs?limit=15&kind=daily");
-      const parsed = await parseApiJson(res);
-      if (!parsed.ok || !res.ok) return;
-      setRefreshRuns((parsed.data.runs as RefreshRunRow[]) ?? []);
-      setLastCompletedRefreshAt((parsed.data.lastCompletedRefreshAt as string | null) ?? null);
-    } finally {
-      setRefreshRunsLoading(false);
-    }
-  }, []);
-
   useEffect(() => {
     loadStats();
   }, [loadStats]);
-
-  useEffect(() => {
-    void loadRefreshRuns();
-  }, [loadRefreshRuns]);
 
   useEffect(() => {
     if (!showCronStatus) return;
@@ -230,20 +191,10 @@ export default function AdminLeaderboardSyncPanel({
   }, [loadStats, cronRun?.phase, showCronStatus]);
 
   useEffect(() => {
-    if (!showCronStatus || cronRun?.phase !== "complete") return;
-    void loadAudit();
-    void loadRefreshRuns();
-  }, [cronRun?.phase, cronRun?.runStartedAt, loadAudit, loadRefreshRuns, showCronStatus]);
-
-  useEffect(() => {
     if (!showCronStatus || !cronFlash) return;
     const id = setTimeout(() => setCronFlash(null), 12000);
     return () => clearTimeout(id);
   }, [cronFlash, showCronStatus]);
-
-  useEffect(() => {
-    loadAudit();
-  }, [loadAudit]);
 
   async function runFullSync() {
     if (!envConfigured || !currentAct) {
@@ -299,7 +250,7 @@ export default function AdminLeaderboardSyncPanel({
 
       setPhase("complete");
       setPending(0);
-      await loadAudit();
+      window.location.reload();
     } catch (err) {
       setPhase("error");
       setError(err instanceof Error ? err.message : "Sync failed.");
@@ -332,10 +283,8 @@ export default function AdminLeaderboardSyncPanel({
           </p>
           <h2 className="mt-1 font-display text-xl font-bold text-white">Rank sync</h2>
           <p className="mt-1 max-w-lg text-sm text-white/45">
-            Ranks sync when members link Riot on profile or register for a cup. The automatic daily
-            refresh ({stats?.cronScheduleIst ?? "2:30 AM IST via Vercel → GitHub Actions"}) updates rank, MMR, and player cards
-            for every linked player — same as manual refresh below. Episode and act come from{" "}
-            <code className="text-white/60">VALORANT_CURRENT_ACT</code> on Vercel.
+            Ranks sync when members link Riot on their profile or register for a cup. The automatic daily
+            refresh updates rank, MMR, and player cards for every linked player.
           </p>
         </div>
         <Link
@@ -346,14 +295,7 @@ export default function AdminLeaderboardSyncPanel({
         </Link>
       </div>
 
-      {showCronStatus && cronFlash ? (
-        <div
-          role="status"
-          className="mt-4 rounded-xl border border-cyan-500/30 bg-cyan-500/10 px-4 py-3 text-sm text-cyan-100 shadow-lg shadow-cyan-500/5"
-        >
-          {cronFlash}
-        </div>
-      ) : null}
+
 
       {showCronBanner && cronRun ? (
         <div
@@ -391,9 +333,6 @@ export default function AdminLeaderboardSyncPanel({
               <p className="mt-1 text-xs text-white/50">
                 Started {formatWhen(cronRun.runStartedAt)}
                 {cronRun.finishedAt ? ` · Finished ${formatWhen(cronRun.finishedAt)}` : ""}
-                {cronRun.currentAct
-                  ? ` · ${formatValorantActLabel(cronRun.currentAct) ?? cronRun.currentAct}`
-                  : ""}
               </p>
               {cronRun.phase === "error" && cronRun.errorMessage ? (
                 <p className="mt-2 text-xs text-red-200">{cronRun.errorMessage}</p>
@@ -472,7 +411,6 @@ export default function AdminLeaderboardSyncPanel({
             {totals.synced} user{totals.synced === 1 ? "" : "s"} refreshed successfully
             {totals.skipped > 0 ? ` · ${totals.skipped} skipped (no comp rank)` : ""}
             {totals.failed > 0 ? ` · ${totals.failed} could not be updated` : ""}
-            {runCurrentAct ? ` · ${formatValorantActLabel(runCurrentAct) ?? runCurrentAct}` : ""}
             {runStartedAt ? ` · started ${formatWhen(runStartedAt)}` : ""}
           </p>
         </div>
@@ -484,31 +422,7 @@ export default function AdminLeaderboardSyncPanel({
         </p>
       ) : null}
 
-      <div className="mt-5 rounded-xl border border-white/[0.06] bg-white/[0.02] px-4 py-4">
-        <p className="text-[10px] font-bold uppercase tracking-wider text-white/40">
-          Current Valorant act
-        </p>
-        <p className="mt-1 text-xs text-white/45">
-          Used for ranked vs unranked on the town leaderboard. Cron and manual refresh both read{" "}
-          <code className="text-white/55">VALORANT_CURRENT_ACT</code> from Vercel env.
-        </p>
 
-        {envConfigured && currentAct ? (
-          <div className="mt-3 rounded-lg border border-cyan-500/20 bg-cyan-500/5 px-3 py-2.5">
-            <p className="text-sm font-semibold text-cyan-100">
-              {currentActLabel ?? formatValorantActLabel(currentAct) ?? currentAct}
-            </p>
-            <p className="mt-1 text-xs text-white/45">
-              Env key: <span className="font-mono text-white/60">{currentAct}</span>
-            </p>
-          </div>
-        ) : (
-          <div className="mt-3 rounded-lg border border-amber-500/25 bg-amber-500/10 px-3 py-2.5 text-xs text-amber-100">
-            VALORANT_CURRENT_ACT is not set. Add it in Vercel project settings (e.g. e11a3) and
-            redeploy before cron or manual refresh can run.
-          </div>
-        )}
-      </div>
 
       <div className="mt-5 flex flex-wrap gap-3">
         <button
@@ -529,193 +443,6 @@ export default function AdminLeaderboardSyncPanel({
         </button>
       </div>
 
-      <div className="mt-8 border-t border-white/[0.06] pt-6">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <h3 className="text-sm font-bold text-white">Daily refresh runs</h3>
-            <p className="mt-0.5 text-xs text-white/40">
-              Production nightly sync via GitHub Actions → /api/cron/sync-ranks. Public
-              &quot;Last refreshed&quot; updates when a full run completes (~6–10 min).
-            </p>
-            <p className="mt-2 text-xs text-white/55">
-              Last completed refresh:{" "}
-              <span className="font-medium text-white/80">
-                {formatWhen(lastCompletedRefreshAt)}
-              </span>
-            </p>
-          </div>
-          <button
-            type="button"
-            onClick={loadRefreshRuns}
-            disabled={refreshRunsLoading}
-            className="rounded-lg border border-white/15 px-3 py-1.5 text-xs font-semibold text-white/60 hover:text-white disabled:opacity-50"
-          >
-            {refreshRunsLoading ? "Loading…" : "Reload runs"}
-          </button>
-        </div>
-
-        <div className="mt-4 overflow-hidden rounded-xl border border-white/[0.06]">
-          <div className="max-h-[min(20rem,50vh)] overflow-auto">
-            <table className="min-w-full text-left text-xs">
-              <thead className="sticky top-0 z-10 bg-[#0c1424] text-[10px] uppercase tracking-wider text-white/40 shadow-[0_1px_0_0_rgba(255,255,255,0.06)]">
-                <tr>
-                  <th className="px-3 py-2.5 font-semibold">Started (IST)</th>
-                  <th className="px-3 py-2.5 font-semibold">Status</th>
-                  <th className="px-3 py-2.5 font-semibold">Players</th>
-                  <th className="px-3 py-2.5 font-semibold">Henrik calls</th>
-                  <th className="px-3 py-2.5 font-semibold">Duration</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-white/[0.04] text-white/75">
-                {refreshRuns.length === 0 ? (
-                  <tr>
-                    <td colSpan={5} className="px-3 py-6 text-center text-white/35">
-                      {refreshRunsLoading ? "Loading runs…" : "No daily runs yet."}
-                    </td>
-                  </tr>
-                ) : (
-                  refreshRuns.map((run) => (
-                    <tr key={run.id} className={run.status === "ERROR" ? "bg-red-500/5" : undefined}>
-                      <td className="whitespace-nowrap px-3 py-2.5">{formatWhen(run.startedAt)}</td>
-                      <td className="px-3 py-2.5">
-                        <span
-                          className={
-                            run.status === "RUNNING"
-                              ? "text-violet-300"
-                              : run.status === "COMPLETE"
-                                ? "text-emerald-300"
-                                : run.status === "ERROR"
-                                  ? "text-red-300"
-                                  : "text-white/55"
-                          }
-                        >
-                          {refreshRunStatusLabel(run.status)}
-                        </span>
-                        {run.errorMessage ? (
-                          <div className="mt-0.5 text-[10px] text-red-300">{run.errorMessage}</div>
-                        ) : null}
-                      </td>
-                      <td className="px-3 py-2.5">
-                        {run.successCount} ok
-                        {run.failedCount > 0 ? ` · ${run.failedCount} failed` : ""}
-                        {run.totalPlayers > 0 ? ` / ${run.totalPlayers}` : ""}
-                      </td>
-                      <td className="px-3 py-2.5">{run.henrikRequestCount}</td>
-                      <td className="px-3 py-2.5">{formatDuration(run.durationMs)}</td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      </div>
-
-      <div className="mt-8 border-t border-white/[0.06] pt-6">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <h3 className="text-sm font-bold text-white">Rank change audit</h3>
-            <p className="mt-0.5 text-xs text-white/40">
-              Who changed rank, from → to, and whether it was daily cron or manual refresh.
-            </p>
-          </div>
-          <div className="flex flex-wrap items-center gap-3">
-            <label className="flex items-center gap-2 text-xs text-white/60">
-              <input
-                type="checkbox"
-                checked={auditChangedOnly}
-                onChange={(e) => setAuditChangedOnly(e.target.checked)}
-                className="rounded border-white/20 bg-white/5 text-cyan-500 focus:ring-0"
-              />
-              Rank changes only
-            </label>
-            <button
-              type="button"
-              onClick={loadAudit}
-              disabled={auditLoading}
-              className="rounded-lg border border-white/15 px-3 py-1.5 text-xs font-semibold text-white/60 hover:text-white disabled:opacity-50"
-            >
-              {auditLoading ? "Loading…" : "Reload audit"}
-            </button>
-          </div>
-        </div>
-
-        <div className="mt-4 overflow-hidden rounded-xl border border-white/[0.06]">
-          <div className="max-h-[min(28rem,60vh)] overflow-auto">
-            <table className="min-w-full text-left text-xs">
-              <thead className="sticky top-0 z-10 bg-[#0c1424] text-[10px] uppercase tracking-wider text-white/40 shadow-[0_1px_0_0_rgba(255,255,255,0.06)]">
-              <tr>
-                <th className="px-3 py-2.5 font-semibold">When (IST)</th>
-                <th className="px-3 py-2.5 font-semibold">Player</th>
-                <th className="px-3 py-2.5 font-semibold">Source</th>
-                <th className="px-3 py-2.5 font-semibold">Previous</th>
-                <th className="px-3 py-2.5 font-semibold">New</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-white/[0.04] text-white/75">
-              {auditRows.length === 0 ? (
-                <tr>
-                  <td colSpan={5} className="px-3 py-6 text-center text-white/35">
-                    {auditLoading ? "Loading audit log…" : "No audit entries yet."}
-                  </td>
-                </tr>
-              ) : (
-                auditRows.map((row) => (
-                  <tr key={row.id} className={row.error ? "bg-red-500/5" : undefined}>
-                    <td className="whitespace-nowrap px-3 py-2.5">{formatWhen(row.createdAt)}</td>
-                    <td className="px-3 py-2.5">
-                      <div className="font-medium text-white/90">{row.displayName ?? "—"}</div>
-                      <div className="text-[10px] text-white/35">{row.riotId ?? ""}</div>
-                    </td>
-                    <td className="px-3 py-2.5">
-                      <span
-                        className={
-                          row.source === "CRON"
-                            ? "text-violet-300"
-                            : row.source === "HOURLY_CRON"
-                              ? "text-amber-300"
-                            : row.source === "MANUAL"
-                              ? "text-cyan-300"
-                              : "text-white/55"
-                        }
-                      >
-                        {sourceLabel(row.source)}
-                      </span>
-                    </td>
-                    <td className="px-3 py-2.5">
-                      {row.error ? (
-                        <span className="text-red-300">{row.error}</span>
-                      ) : (
-                        <>
-                          {row.previousRankTier ?? "—"}
-                          {row.previousMmr != null ? (
-                            <span className="text-white/35"> · {row.previousMmr}</span>
-                          ) : null}
-                        </>
-                      )}
-                    </td>
-                    <td className="px-3 py-2.5">
-                      {row.error ? (
-                        "—"
-                      ) : (
-                        <>
-                          <span className={row.changed ? "font-semibold text-emerald-300" : ""}>
-                            {row.newRankTier ?? "—"}
-                          </span>
-                          {row.newMmr != null ? (
-                            <span className="text-white/35"> · {row.newMmr}</span>
-                          ) : null}
-                        </>
-                      )}
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-          </div>
-        </div>
-      </div>
     </section>
   );
 }

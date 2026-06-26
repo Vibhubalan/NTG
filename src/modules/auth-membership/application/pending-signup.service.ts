@@ -10,6 +10,8 @@ import {
 } from "../domain/username";
 import { clearSignupSession } from "../infrastructure/signup-session";
 import { verifySignupOtp } from "./email-otp.service";
+import { logUserActivity } from "@/lib/user-audit";
+
 
 const PENDING_TTL_MS = 30 * 60 * 1000; // matches signup cookie
 
@@ -215,6 +217,14 @@ export async function finalizePendingSignup(
 
   await prisma.pendingSignup.delete({ where: { id: pendingId } });
   await clearSignupSession();
+
+  await logUserActivity({
+    userId: user.id,
+    email: user.email,
+    name: user.name,
+    action: "SIGNUP",
+    details: "Joined the platform.",
+  });
 
   return { ok: true, userId: user.id, email: pending.email };
 }

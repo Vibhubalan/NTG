@@ -604,6 +604,201 @@ model AdminAuditLog {
 /** Platform-wide settings (e.g. current Valorant act for rank sync). */
 model PlatformSetting {
   key         String   @id
+  match        Match    @relation(fields: [matchId], references: [id], onDelete: Cascade)
+  winnerSlot   Int
+  scoreSummary String?
+  completedAt  DateTime @default(now())
+}
+
+model TournamentPlacement {
+  id           String        @id @default(cuid())
+  tournamentId String
+  tournament   Tournament    @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
+  role         PlacementRole
+  userId       String?
+  user         User?         @relation(fields: [userId], references: [id], onDelete: SetNull)
+  teamLabel    String?
+
+  @@unique([tournamentId, role])
+}
+
+model LeaderboardEntry {
+  id             String           @id @default(cuid())
+  game           GameSlug
+  scope          LeaderboardScope @default(TOWN)
+  seasonId       String?
+  userId         String
+  user           User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  points         Int              @default(0)
+  wins           Int              @default(0)
+  losses         Int              @default(0)
+  mmr            Int?
+  premierRating  Int?
+  rankTier       String?
+  rankTierId     Int?
+  peakMmr        Int?
+  peakRr         Int?
+  peakRankTier   String?
+  peakRankTierId Int?
+  peakAct        String?
+  currentAct     String?
+  rank           Int?
+  lastSyncedAt   DateTime?
+  updatedAt      DateTime         @updatedAt
+
+  @@unique([game, scope, seasonId, userId])
+}
+
+enum LeaderboardSyncSource {
+  CRON
+  MANUAL
+  PROFILE
+  RIOT_LINK
+  REGISTRATION
+  ADMIN_MEMBER
+  HOURLY_CRON
+}
+
+enum LeaderboardRefreshRunStatus {
+  RUNNING
+  COMPLETE
+  ERROR
+  SKIPPED
+}
+
+enum LeaderboardRefreshRunKind {
+  DAILY
+  HOURLY
+}
+
+/** Cursor-based full leaderboard refresh (daily GHA or hourly staging). */
+model LeaderboardRefreshRun {
+  id                 String                      @id @default(cuid())
+  kind               LeaderboardRefreshRunKind   @default(HOURLY)
+  status             LeaderboardRefreshRunStatus @default(RUNNING)
+  startedAt          DateTime                    @default(now())
+  finishedAt         DateTime?
+  durationMs         Int?
+  totalPlayers       Int                         @default(0)
+  successCount       Int                         @default(0)
+  failedCount        Int                         @default(0)
+  henrikRequestCount Int                         @default(0)
+  cursorUserId       String?
+  errorMessage       String?
+  createdAt          DateTime                    @default(now())
+  updatedAt          DateTime                    @updatedAt
+
+  @@index([status, startedAt])
+  @@index([kind, status, startedAt])
+}
+
+/** Rank change history from Henrik sync (cron, manual refresh, profile, etc.). */
+model LeaderboardRankAuditLog {
+  id               String                @id @default(cuid())
+  userId           String
+  user             User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  riotGameName     String?
+  riotTagLine      String?
+  source           LeaderboardSyncSource
+  runId            String?
+  adminId          String?
+  previousRankTier   String?
+  previousRankTierId Int?
+  previousMmr        Int?
+  newRankTier        String?
+  newRankTierId      Int?
+  newMmr             Int?
+  changed          Boolean               @default(false)
+  error            String?
+  createdAt        DateTime              @default(now())
+
+  @@index([userId, createdAt])
+  @@index([source, createdAt])
+  @@index([runId])
+  @@index([createdAt])
+}
+
+// ─── @socials-gallery ───────────────────────────────────────────────────────
+
+model GallerySource {
+  id       String        @id @default(cuid())
+  platform String
+  handle   String
+  active   Boolean       @default(true)
+  items    GalleryItem[]
+
+  @@unique([platform, handle])
+}
+
+model GalleryItem {
+  id           String        @id @default(cuid())
+  sourceId     String
+  source       GallerySource @relation(fields: [sourceId], references: [id], onDelete: Cascade)
+  externalId   String
+  mediaType    String
+  embedUrl     String?
+  thumbnailUrl String?
+  caption      String?
+  publishedAt  DateTime?
+  pinned       Boolean       @default(false)
+
+  @@unique([sourceId, externalId])
+}
+
+model MomentsFeaturedDeck {
+  id          String               @id @default(cuid())
+  slug        String               @unique
+  eyebrow     String
+  title       String
+  subtitle    String
+  displayMode MomentsDisplayMode   @default(BLEND)
+  active      Boolean              @default(true)
+  sortOrder   Int                  @default(0)
+  createdAt   DateTime             @default(now())
+  updatedAt   DateTime             @updatedAt
+  images      MomentsFeaturedImage[]
+}
+
+model MomentsFeaturedImage {
+  id        String              @id @default(cuid())
+  deckId    String
+  deck      MomentsFeaturedDeck @relation(fields: [deckId], references: [id], onDelete: Cascade)
+  url       String
+  alt       String
+  caption   String?
+  sortOrder Int                 @default(0)
+
+  @@index([deckId, sortOrder])
+}
+
+model SocialReelPost {
+  id        String   @id @default(cuid())
+  reelUrl   String   @unique
+  coverUrl  String?
+  caption   String?
+  sortOrder Int      @default(0)
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+/** Tamper-evident log of admin mutations (no PII in metadata). */
+model AdminAuditLog {
+  id        String   @id @default(cuid())
+  adminId   String
+  admin     User     @relation(fields: [adminId], references: [id], onDelete: Cascade)
+  action    String
+  target    String?
+  metadata  Json?
+  createdAt DateTime @default(now())
+
+  @@index([adminId, createdAt])
+  @@index([action, createdAt])
+}
+
+/** Platform-wide settings (e.g. current Valorant act for rank sync). */
+model PlatformSetting {
+  key         String   @id
   value       String
   updatedAt   DateTime @updatedAt
   updatedById String?
