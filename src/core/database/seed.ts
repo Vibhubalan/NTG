@@ -2,11 +2,9 @@ import { seedLoungeCommerce } from "@/core/database/seed-lounge-commerce";
 import { tournaments, tournamentRegistration } from "@/lib/data";
 import {
   GameSlug,
-  PrismaClient,
   TournamentStatus,
 } from "@prisma/client";
-
-const prisma = new PrismaClient();
+import { prisma } from "./client";
 
 /** Dev-only: mock leaderboard users + static tournament bootstrap. Never run on production. */
 const seedDevMockData = process.env.SEED_DEV_MOCK_DATA === "1";
