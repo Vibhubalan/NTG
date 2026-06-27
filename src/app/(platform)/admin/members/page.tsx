@@ -6,13 +6,21 @@ import { isSuperAdminEmail } from "@/lib/superadmin";
 
 export const metadata = { title: "Admin Members" };
 
+export const dynamic = "force-dynamic";
+
 export default async function AdminMembersPage() {
   const session = await getSession();
   const isSuperAdmin = isSuperAdminEmail(session?.user?.email);
 
-  const { users } = serverEnv.databaseUrl
+  const { users, total } = serverEnv.databaseUrl
     ? await listMembersAdmin({ limit: 200 })
-    : { users: [] };
+    : { users: [], total: 0 };
 
-  return <AdminMembersPanel initialMembers={users} isSuperAdmin={isSuperAdmin} />;
+  return (
+    <AdminMembersPanel
+      initialMembers={users}
+      memberTotal={total}
+      isSuperAdmin={isSuperAdmin}
+    />
+  );
 }

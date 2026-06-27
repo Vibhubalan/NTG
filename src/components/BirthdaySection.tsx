@@ -152,35 +152,56 @@ export default function BirthdaySection() {
       <div className="grid gap-12 lg:grid-cols-2 lg:gap-16 items-center">
         {/* Left Side: Visuals */}
         <div className="relative h-[400px] w-full sm:h-[500px] rounded-[32px] overflow-hidden border border-white/10 bg-white/5">
-          <AnimatePresence mode="wait">
-            <motion.div
-              key={content.id}
-              initial={{ opacity: 0, scale: 1.02 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.98 }}
-              transition={{ duration: 0.4 }}
-              className="absolute inset-0"
-            >
-              <div className="absolute inset-0 bg-gradient-to-tr from-black/80 via-black/20 to-transparent z-10" />
-              <Image
-                src={content.imageSrc}
-                alt={content.imageAlt}
-                fill
-                sizes="(max-width: 1024px) 100vw, 50vw"
-                className="object-cover"
-                priority
-              />
-              <div className="absolute bottom-8 left-8 z-20 max-w-[280px]">
-                <div className={`inline-flex items-center gap-2 rounded-full border border-white/20 bg-black/40 px-4 py-2 backdrop-blur-md mb-4`}>
-                  <span className={`flex h-2 w-2 rounded-full ${content.badgePulseColor} animate-pulse`} />
-                  <span className="text-[10px] font-bold uppercase tracking-widest text-white">{content.badgeText}</span>
-                </div>
-                <p className="font-display text-xl font-semibold text-white">
-                  {content.imageOverlayTitle}
-                </p>
-              </div>
-            </motion.div>
-          </AnimatePresence>
+          <div className="grid grid-cols-1 grid-rows-1 absolute inset-0">
+            {(["events", "sponsors", "birthday"] as HostTabId[]).map((tabId) => {
+              const isTabActive = activeTab === tabId;
+              const tabContent = TAB_DATA[tabId];
+              return (
+                <motion.div
+                  key={tabId}
+                  initial={isTabActive ? "active" : "inactive"}
+                  animate={isTabActive ? "active" : "inactive"}
+                  variants={{
+                    active: {
+                      opacity: 1,
+                      scale: 1,
+                      visibility: "visible",
+                      transition: { duration: 0.4 }
+                    },
+                    inactive: {
+                      opacity: 0,
+                      scale: 0.98,
+                      transition: { duration: 0.3 },
+                      transitionEnd: { visibility: "hidden" }
+                    }
+                  }}
+                  className="col-start-1 row-start-1 absolute inset-0"
+                  style={{
+                    pointerEvents: isTabActive ? "auto" : "none",
+                  }}
+                >
+                  <div className="absolute inset-0 bg-gradient-to-tr from-black/80 via-black/20 to-transparent z-10" />
+                  <Image
+                    src={tabContent.imageSrc}
+                    alt={tabContent.imageAlt}
+                    fill
+                    sizes="(max-width: 1024px) 100vw, 50vw"
+                    className="object-cover"
+                    priority
+                  />
+                  <div className="absolute bottom-8 left-8 z-20 max-w-[280px]">
+                    <div className={`inline-flex items-center gap-2 rounded-full border border-white/20 bg-black/40 px-4 py-2 backdrop-blur-md mb-4`}>
+                      <span className={`flex h-2 w-2 rounded-full ${tabContent.badgePulseColor} animate-pulse`} />
+                      <span className="text-[10px] font-bold uppercase tracking-widest text-white">{tabContent.badgeText}</span>
+                    </div>
+                    <p className="font-display text-xl font-semibold text-white">
+                      {tabContent.imageOverlayTitle}
+                    </p>
+                  </div>
+                </motion.div>
+              );
+            })}
+          </div>
         </div>
         {/* Right Side: Content Stack (Grid layout prevents height twitching and shifts) */}
         <div className="grid grid-cols-1 grid-rows-1 items-start relative w-full min-h-[460px]">

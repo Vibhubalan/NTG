@@ -26,9 +26,11 @@ const inputClass =
 
 export default function AdminMembersPanel({
   initialMembers,
+  memberTotal,
   isSuperAdmin,
 }: {
   initialMembers: Member[];
+  memberTotal: number;
   isSuperAdmin: boolean;
 }) {
   const router = useRouter();
@@ -127,6 +129,12 @@ export default function AdminMembersPanel({
         <div>
           <h1 className="font-display text-3xl font-extrabold text-white tracking-tight">Members</h1>
           <p className="mt-1 text-sm text-white/40">Manage accounts, membership details, and linked game IDs.</p>
+          <p className="mt-2 text-xs font-medium uppercase tracking-wider text-white/45">
+            <span className="text-2xl font-extrabold text-white tabular-nums normal-case tracking-tight">
+              {memberTotal}
+            </span>
+            {" "}registered members
+          </p>
         </div>
         <div className="flex items-center gap-2.5">
           <a
