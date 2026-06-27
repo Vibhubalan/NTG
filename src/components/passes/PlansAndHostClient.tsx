@@ -104,14 +104,20 @@ export default function PlansAndHostClient({ data }: { data: LoungeCommerceHomeD
 
           <div>
             <div className="border-t border-white/5 pt-4">
-              <div className="space-y-1">
-                <div className="flex items-baseline gap-1">
-                  <span className="text-3xl font-extrabold text-white">₹80</span>
-                  <span className="text-xs text-white/55 font-medium">/ hr · single player</span>
+              <div className="space-y-3">
+                <div>
+                  <div className="flex items-baseline gap-1">
+                    <span className="text-3xl font-extrabold text-white">₹80</span>
+                    <span className="text-xs text-white/55 font-medium">/ hr</span>
+                  </div>
+                  <p className="mt-1 text-[11px] font-medium tracking-wide text-white/45">Single player</p>
                 </div>
-                <div className="flex items-baseline gap-1">
-                  <span className="text-xl font-bold text-white/80">₹70</span>
-                  <span className="text-[11px] text-white/45 font-medium">/ person / hr · group (2–4)</span>
+                <div>
+                  <div className="flex items-baseline gap-1">
+                    <span className="text-xl font-bold text-white/80">₹70</span>
+                    <span className="text-[11px] text-white/45 font-medium">/ hr</span>
+                  </div>
+                  <p className="mt-1 text-[11px] font-medium tracking-wide text-white/35">Group · 2–4 players</p>
                 </div>
               </div>
             </div>
