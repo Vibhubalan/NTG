@@ -4,6 +4,8 @@ import type {
   TournamentPreview,
   TournamentRegistrationBanner,
 } from "@core/contracts";
+import type { ClashRoyaleLeaderboardPreview } from "@core/contracts/clash-royale-leaderboard";
+import { getClashRankings } from "./clash-royale-sync.service";
 import { TournamentRepository } from "../infrastructure/tournament.repository";
 import { LeaderboardRepository } from "../infrastructure/leaderboard.repository";
 import { fetchChallongeBracket } from "@/lib/challonge-api";
@@ -70,6 +72,14 @@ export async function getValorantRankings(
   search?: string,
 ): Promise<LeaderboardPreview> {
   return leaderboardRepo.listValorantRankings({ limit, search });
+}
+
+export async function getClashRoyaleRankings(
+  mode: "current" | "peak",
+  limit = 250,
+  search?: string,
+): Promise<ClashRoyaleLeaderboardPreview> {
+  return getClashRankings(mode, limit, search);
 }
 
 export async function recordMatchResult(

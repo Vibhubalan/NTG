@@ -23,6 +23,12 @@ const gameMeta: Record<
   VALORANT: { iconPath: siValorant.path, hex: "#ff4655", label: "Valorant" },
   CS2: { iconPath: siCounterstrike.path, hex: "#e65a23", label: "Counter-Strike 2" },
   EA_FC26: { iconPath: siEa.path, hex: "#02ef5c", label: "EA FC 26" },
+  CLASH_ROYALE: {
+    iconPath:
+      "M12 2l2.4 4.8L20 8l-4 3.6L17.6 18 12 15.2 6.4 18 8 11.6 4 8l5.6-1.2L12 2z",
+    hex: "#3b82f6",
+    label: "Clash Royale",
+  },
   OTHER: { iconPath: siValorant.path, hex: "#ff4655", label: "Other" },
 };
 

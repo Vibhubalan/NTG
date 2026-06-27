@@ -24,6 +24,8 @@ type FullProfile = {
   steamProfileUrl: string | null;
   cs2HoursPlayed: number | null;
   valorantRankTier: string | null;
+  clashRoyaleTag: string | null;
+  clashRoyaleName: string | null;
 };
 
 function rolesEqual(a: ValorantRole[], b: ValorantRole[]) {
@@ -47,6 +49,7 @@ export default function ProfileEditor() {
 
   const [pendingRiotId, setPendingRiotId] = useState("");
   const [pendingSteamUrl, setPendingSteamUrl] = useState("");
+  const [pendingClashTag, setPendingClashTag] = useState("");
   const [deleting, setDeleting] = useState(false);
 
   const deleteAccount = async () => {
@@ -120,8 +123,12 @@ export default function ProfileEditor() {
 
   const linksDirty = useMemo(() => {
     if (!profile) return false;
-    return pendingRiotId.trim() !== "" || pendingSteamUrl.trim() !== "";
-  }, [profile, pendingRiotId, pendingSteamUrl]);
+    return (
+      pendingRiotId.trim() !== "" ||
+      pendingSteamUrl.trim() !== "" ||
+      pendingClashTag.trim() !== ""
+    );
+  }, [profile, pendingRiotId, pendingSteamUrl, pendingClashTag]);
 
   const hasChanges = accountDirty || rolesDirty || cs2Dirty || linksDirty;
 
@@ -144,6 +151,7 @@ export default function ProfileEditor() {
     linksDirty,
     pendingRiotId,
     pendingSteamUrl,
+    pendingClashTag,
   ]);
 
   async function saveChanges() {
@@ -184,6 +192,21 @@ export default function ProfileEditor() {
         return;
       }
       setPendingSteamUrl("");
+    }
+
+    if (pendingClashTag.trim()) {
+      const res = await fetch("/api/auth/clash-royale/verify", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ tag: pendingClashTag.trim() }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setError(data.error ?? "Could not link Clash Royale tag.");
+        setSaving(false);
+        return;
+      }
+      setPendingClashTag("");
     }
 
     const body: Record<string, unknown> = {};
@@ -409,6 +432,8 @@ export default function ProfileEditor() {
               onPendingRiotIdChange={setPendingRiotId}
               pendingSteamUrl={pendingSteamUrl}
               onPendingSteamUrlChange={setPendingSteamUrl}
+              pendingClashTag={pendingClashTag}
+              onPendingClashTagChange={setPendingClashTag}
               onToggleRole={(role) => {
                 setSelectedRoles((prev) => {
                   if (role === "FLEX") return prev.includes("FLEX") ? [] : ["FLEX"];

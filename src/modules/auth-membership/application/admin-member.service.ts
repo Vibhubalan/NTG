@@ -9,6 +9,10 @@ import {
 } from "../domain/username";
 import { linkRiotAccount, unlinkRiotAccount } from "@auth-membership/application/riot-link.service";
 import { linkSteamAccount, unlinkSteamAccount } from "@auth-membership/application/steam-link.service";
+import {
+  linkClashRoyaleAccount,
+  unlinkClashRoyaleAccount,
+} from "@auth-membership/application/clash-royale-link.service";
 import type { UserRole } from "@prisma/client";
 import { logUserActivity } from "@/lib/user-audit";
 
@@ -63,6 +67,8 @@ export async function listMembersAdmin(opts?: { search?: string; limit?: number;
         u.riotGameName && u.riotTagLine ? `${u.riotGameName}#${u.riotTagLine}` : null,
       steamId64: u.steamId64,
       steamPersonaName: u.steamPersonaName,
+      clashRoyaleTag: u.clashRoyaleTag,
+      clashRoyaleName: u.clashRoyaleName,
       displayName: u.playerProfile?.displayName ?? null,
       createdAt: u.createdAt.toISOString(),
     })),
@@ -94,6 +100,8 @@ export async function getMemberAdmin(userId: string) {
         : null,
     steamId64: user.steamId64,
     steamPersonaName: user.steamPersonaName,
+    clashRoyaleTag: user.clashRoyaleTag,
+    clashRoyaleName: user.clashRoyaleName,
     displayName: user.playerProfile?.displayName ?? null,
     createdAt: user.createdAt.toISOString(),
   };
@@ -250,6 +258,25 @@ export async function unlinkMemberSteamAdmin(
   if (!user) return { ok: false, error: "User not found." };
 
   return unlinkSteamAccount(userId);
+}
+
+export async function linkMemberClashRoyaleAdmin(
+  userId: string,
+  tag: string,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const user = await prisma.user.findUnique({ where: { id: userId } });
+  if (!user) return { ok: false, error: "User not found." };
+
+  return linkClashRoyaleAccount(userId, tag);
+}
+
+export async function unlinkMemberClashRoyaleAdmin(
+  userId: string,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const user = await prisma.user.findUnique({ where: { id: userId } });
+  if (!user) return { ok: false, error: "User not found." };
+
+  return unlinkClashRoyaleAccount(userId);
 }
 
 export async function deleteMemberAdmin(

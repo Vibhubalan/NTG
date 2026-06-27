@@ -21,6 +21,7 @@ export default async function AdminMembersPage() {
       initialMembers={users}
       memberTotal={total}
       isSuperAdmin={isSuperAdmin}
+      clashRoyaleEnabled={serverEnv.clashRoyaleLeaderboardEnabled}
     />
   );
 }

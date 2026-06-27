@@ -3,6 +3,7 @@
 import { useState } from "react";
 import type { ValorantRole } from "@prisma/client";
 import { parseApiJson } from "@/lib/parse-api-json";
+import { showClashRoyaleLeaderboard } from "@/lib/env";
 import {
   VALORANT_ROLE_LABELS,
   VALORANT_ROLE_OPTIONS,
@@ -20,6 +21,8 @@ type GameProfile = {
   steamProfileUrl: string | null;
   cs2HoursPlayed: number | null;
   valorantRankTier: string | null;
+  clashRoyaleTag: string | null;
+  clashRoyaleName: string | null;
 };
 
 type GameProfilesPanelProps = {
@@ -31,6 +34,8 @@ type GameProfilesPanelProps = {
   onPendingRiotIdChange: (value: string) => void;
   pendingSteamUrl: string;
   onPendingSteamUrlChange: (value: string) => void;
+  pendingClashTag: string;
+  onPendingClashTagChange: (value: string) => void;
   onToggleRole: (role: ValorantRole) => void;
   onCs2PremierChange: (value: string) => void;
   onCs2FaceitChange: (value: string) => void;
@@ -46,6 +51,8 @@ export default function GameProfilesPanel({
   onPendingRiotIdChange,
   pendingSteamUrl,
   onPendingSteamUrlChange,
+  pendingClashTag,
+  onPendingClashTagChange,
   onToggleRole,
   onCs2PremierChange,
   onCs2FaceitChange,
@@ -259,6 +266,51 @@ export default function GameProfilesPanel({
           </div>
         )}
       </div>
+
+      {showClashRoyaleLeaderboard ? (
+        <div className="relative overflow-hidden rounded-3xl border border-white/[0.08] bg-white/[0.01] glass-strong p-6 space-y-4 border-l-4 border-l-blue-500">
+          <div className="absolute top-0 right-0 -mr-16 -mt-16 h-36 w-36 rounded-full bg-blue-500 opacity-[0.02] blur-3xl" />
+          <div className="flex items-center justify-between border-b border-white/[0.06] pb-3">
+            <div className="flex items-center gap-3">
+              <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-500/10 text-blue-400">
+                <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" />
+                </svg>
+              </span>
+              <h4 className="font-display text-base font-semibold text-white tracking-wide">Clash Royale</h4>
+            </div>
+            {profile.clashRoyaleTag ? (
+              <span className="rounded-full bg-blue-500/10 border border-blue-500/20 px-2.5 py-0.5 text-[9px] font-bold uppercase tracking-wider text-blue-300">
+                Linked
+              </span>
+            ) : null}
+          </div>
+
+          <div className="rounded-2xl border border-white/[0.04] bg-[#070b19]/40 p-4">
+            <p className="text-[10px] font-bold uppercase tracking-wider text-white/35">Player Tag</p>
+            {profile.clashRoyaleTag ? (
+              <div className="mt-2">
+                <p className="font-mono text-sm font-semibold text-blue-300">{profile.clashRoyaleTag}</p>
+                {profile.clashRoyaleName ? (
+                  <p className="text-xs text-white/50 mt-1">{profile.clashRoyaleName}</p>
+                ) : (
+                  <p className="text-xs text-white/40 mt-1">Stats sync on the next 5-minute refresh.</p>
+                )}
+              </div>
+            ) : (
+              <div className="mt-2 space-y-2">
+                <input
+                  value={pendingClashTag}
+                  onChange={(e) => onPendingClashTagChange(e.target.value)}
+                  placeholder="#PLAYER_TAG"
+                  className="w-full rounded-xl border border-white/10 bg-[#0c1428]/60 px-3 py-2 text-xs text-white placeholder:text-white/30 focus:border-blue-500/50 focus:outline-none transition-all"
+                />
+                <p className="text-[9px] text-white/30">Enter your in-game tag (e.g. #U28LQ9G2G) to save changes.</p>
+              </div>
+            )}
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }

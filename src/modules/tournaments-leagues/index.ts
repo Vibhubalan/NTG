@@ -6,6 +6,7 @@ export {
   listActiveRegistrationBanners,
   getLeaderboardPreview,
   getValorantRankings,
+  getClashRoyaleRankings,
   recordMatchResult,
 } from "./application/tournament.service";
 export {
@@ -28,6 +29,14 @@ export {
   type RankSyncContext,
   type LeaderboardRankAuditRow,
 } from "./application/rank-sync.service";
+export {
+  getClashRankings,
+  getClashSyncStatus,
+  listLinkedClashPlayers,
+  importClashPlayerStats,
+  type ClashPlayerExport,
+  type ClashPlayerImportRow,
+} from "./application/clash-royale-sync.service";
 export {
   runHourlyLeaderboardRefresh,
   runDailyLeaderboardRefresh,

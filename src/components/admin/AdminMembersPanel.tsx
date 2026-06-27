@@ -18,6 +18,8 @@ type Member = {
   steamId64: string | null;
   steamPersonaName: string | null;
   displayName: string | null;
+  clashRoyaleTag: string | null;
+  clashRoyaleName: string | null;
   signupCompleted: boolean;
 };
 
@@ -28,10 +30,12 @@ export default function AdminMembersPanel({
   initialMembers,
   memberTotal,
   isSuperAdmin,
+  clashRoyaleEnabled = false,
 }: {
   initialMembers: Member[];
   memberTotal: number;
   isSuperAdmin: boolean;
+  clashRoyaleEnabled?: boolean;
 }) {
   const router = useRouter();
   const { openDeleteConfirm, DeleteConfirmDialog } = useAdminDeleteConfirm();
@@ -41,6 +45,7 @@ export default function AdminMembersPanel({
   // No force reset password state
   const [riotId, setRiotId] = useState("");
   const [steamUrl, setSteamUrl] = useState("");
+  const [clashTag, setClashTag] = useState("");
   const [createForm, setCreateForm] = useState({ email: "", password: "", displayName: "" });
   const [message, setMessage] = useState<string | null>(null);
   const [syncingRank, setSyncingRank] = useState(false);
@@ -213,6 +218,7 @@ export default function AdminMembersPanel({
                         setSelected(m);
                         setRiotId(m.riotId ?? "");
                         setSteamUrl("");
+                        setClashTag(m.clashRoyaleTag ?? "");
                         setIsCreating(false);
                         setMessage(null);
                       }}
@@ -504,6 +510,58 @@ export default function AdminMembersPanel({
                   </div>
                 )}
               </div>
+
+              {clashRoyaleEnabled ? (
+                <div className="space-y-1">
+                  <label className="text-[10px] font-bold uppercase tracking-wider text-white/40">
+                    Clash Royale
+                  </label>
+                  {!selected.clashRoyaleTag ? (
+                    <div className="flex gap-2">
+                      <input
+                        className={inputClass}
+                        value={clashTag}
+                        onChange={(e) => setClashTag(e.target.value)}
+                        placeholder="#PLAYER_TAG"
+                      />
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          if (!clashTag.trim()) return;
+                          const ok = await patchMember(selected.id, {
+                            action: "linkClashRoyale",
+                            tag: clashTag.trim(),
+                          });
+                          if (ok) setMessage("Clash Royale tag linked.");
+                        }}
+                        className="shrink-0 rounded-xl bg-white/10 hover:bg-white/15 px-4 text-xs font-semibold text-white/80 transition-colors"
+                      >
+                        Link
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="flex items-center justify-between gap-2 rounded-xl border border-white/[0.06] bg-white/[0.02] px-3 py-2">
+                      <p className="text-xs text-white/70 truncate flex items-center gap-1.5">
+                        <span className="h-1.5 w-1.5 rounded-full bg-blue-400" />
+                        {selected.clashRoyaleName ?? selected.clashRoyaleTag}
+                      </p>
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          const ok = await patchMember(selected.id, { action: "unlinkClashRoyale" });
+                          if (ok) {
+                            setClashTag("");
+                            setMessage("Clash Royale tag unlinked.");
+                          }
+                        }}
+                        className="shrink-0 rounded-lg bg-rose-500/10 px-3 py-1.5 text-[10px] font-semibold text-rose-300"
+                      >
+                        Unlink
+                      </button>
+                    </div>
+                  )}
+                </div>
+              ) : null}
 
               {/* Delete Action */}
               <div className="border-t border-white/[0.04] pt-4 flex justify-between items-center">

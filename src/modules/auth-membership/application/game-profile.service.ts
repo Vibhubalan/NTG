@@ -34,6 +34,8 @@ export type PlayerGameProfile = {
   cs2HoursPlayed: number | null;
   valorantRankTier: string | null;
   valorantRankTierId: number | null;
+  clashRoyaleTag: string | null;
+  clashRoyaleName: string | null;
   signupCompleted: boolean;
 };
 
@@ -73,6 +75,8 @@ export async function getPlayerGameProfile(userId: string): Promise<PlayerGamePr
     cs2HoursPlayed: user.cs2HoursPlayed,
     valorantRankTier: rank?.rankTier ?? null,
     valorantRankTierId: rank?.rankTierId ?? null,
+    clashRoyaleTag: user.clashRoyaleTag,
+    clashRoyaleName: user.clashRoyaleName,
     signupCompleted: user.signupCompleted,
   };
 }

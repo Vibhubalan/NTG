@@ -48,6 +48,13 @@ export const serverEnv = {
   get leaderboardHourlyRefreshEnabled() {
     return optional("LEADERBOARD_HOURLY_REFRESH_ENABLED") === "true";
   },
+  /** Staging-only Clash Royale leaderboard + sync APIs. */
+  get clashRoyaleLeaderboardEnabled() {
+    return optional("CLASH_ROYALE_LEADERBOARD_ENABLED") === "true";
+  },
+  get clashRoyaleSyncWorkerSecret() {
+    return optional("CLASH_ROYALE_SYNC_WORKER_SECRET");
+  },
   get youtubeChannelId() {
     return optional("YOUTUBE_CHANNEL_ID");
   },

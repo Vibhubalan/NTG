@@ -16,6 +16,8 @@ import {
   unlinkMemberSteamAdmin,
   updateMemberAdmin,
   linkMemberSteamAdmin,
+  linkMemberClashRoyaleAdmin,
+  unlinkMemberClashRoyaleAdmin,
 } from "@auth-membership/application/admin-member.service";
 import { syncUserRank } from "@tournaments-leagues/application/rank-sync.service";
 import type { UserRole } from "@prisma/client";
@@ -146,6 +148,22 @@ export async function PATCH(req: Request, { params }: Props) {
     const result = await linkMemberSteamAdmin(id, String(body.steamUrl ?? ""));
     if (!result.ok) return NextResponse.json({ error: result.error }, { status: 400 });
     await logAdminAction(auth.userId, "member.linkSteam", id);
+    return NextResponse.json({ ok: true });
+  }
+
+  if (body.action === "linkClashRoyale") {
+    const result = await linkMemberClashRoyaleAdmin(id, String(body.tag ?? ""));
+    if (!result.ok) return NextResponse.json({ error: result.error }, { status: 400 });
+    await logAdminAction(auth.userId, "member.linkClashRoyale", id, {
+      tag: String(body.tag ?? "").trim(),
+    });
+    return NextResponse.json({ ok: true });
+  }
+
+  if (body.action === "unlinkClashRoyale") {
+    const result = await unlinkMemberClashRoyaleAdmin(id);
+    if (!result.ok) return NextResponse.json({ error: result.error }, { status: 400 });
+    await logAdminAction(auth.userId, "member.unlinkClashRoyale", id);
     return NextResponse.json({ ok: true });
   }
 

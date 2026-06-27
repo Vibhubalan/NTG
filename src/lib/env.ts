@@ -27,6 +27,10 @@ export const allowPastTournamentClicks =
 /** Gate homepage Plans & Host section until client approves copy (Phase 1 DEV). */
 export const showPlansSection = process.env.NEXT_PUBLIC_SHOW_PLANS_SECTION === "1";
 
+/** Gate Clash Royale leaderboard tab (staging / dev only). */
+export const showClashRoyaleLeaderboard =
+  process.env.NEXT_PUBLIC_SHOW_CLASH_ROYALE_LEADERBOARD === "1";
+
 export const sponsorEmail = process.env.NEXT_PUBLIC_SPONSOR_EMAIL || "sponsor@ntgesports.com";
 
 

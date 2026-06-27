@@ -1,0 +1,46 @@
+name: Clash Royale sync
+
+on:
+  schedule:
+    # Every 5 minutes UTC — triggers Oracle worker (static IP → Supercell API)
+    - cron: "*/5 * * * *"
+  workflow_dispatch:
+
+concurrency:
+  group: clash-royale-sync
+  cancel-in-progress: false
+
+jobs:
+  trigger:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - name: Trigger Oracle sync worker
+        env:
+          CLASH_ROYALE_SYNC_WORKER_URL: ${{ secrets.CLASH_ROYALE_SYNC_WORKER_URL }}
+          CLASH_ROYALE_SYNC_WORKER_SECRET: ${{ secrets.CLASH_ROYALE_SYNC_WORKER_SECRET }}
+        run: |
+          set -euo pipefail
+
+          if [ -z "${CLASH_ROYALE_SYNC_WORKER_URL:-}" ] || [ -z "${CLASH_ROYALE_SYNC_WORKER_SECRET:-}" ]; then
+            echo "Missing CLASH_ROYALE_SYNC_WORKER_URL or CLASH_ROYALE_SYNC_WORKER_SECRET."
+            exit 1
+          fi
+
+          WORKER_URL="$(printf '%s' "$CLASH_ROYALE_SYNC_WORKER_URL" | tr -d '\r\n' | sed -e 's/[[:space:]]*$//' -e 's/\/$//')"
+          WORKER_SECRET="$(printf '%s' "$CLASH_ROYALE_SYNC_WORKER_SECRET" | tr -d '\r\n')"
+
+          HTTP_CODE=$(curl -sS -o /tmp/cr-sync.json -w '%{http_code}' \
+            --max-time 120 \
+            -X POST "${WORKER_URL}/sync" \
+            -H "Authorization: Bearer ${WORKER_SECRET}")
+
+          cat /tmp/cr-sync.json
+          echo ""
+
+          if [ "$HTTP_CODE" -lt 200 ] || [ "$HTTP_CODE" -ge 300 ]; then
+            echo "Worker returned HTTP ${HTTP_CODE}"
+            exit 1
+          fi
+
+          echo "Clash Royale sync triggered successfully."

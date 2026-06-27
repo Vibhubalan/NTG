@@ -23,6 +23,7 @@ enum GameSlug {
   VALORANT
   CS2
   EA_FC26
+  CLASH_ROYALE
   OTHER
 }
 
@@ -108,6 +109,8 @@ enum UserActivityAction {
   RIOT_UNLINK
   STEAM_LINK
   STEAM_UNLINK
+  CLASH_ROYALE_LINK
+  CLASH_ROYALE_UNLINK
   TOURNAMENT_REGISTER
   TOURNAMENT_UNREGISTER
 }
@@ -148,6 +151,9 @@ model User {
   steamPersonaName   String?
   cs2HoursPlayed     Float?
   steamLinkedAt      DateTime?
+  clashRoyaleTag     String?   @unique
+  clashRoyaleName    String?
+  clashRoyaleLinkedAt DateTime?
   signupCompleted    Boolean   @default(false)
   role               UserRole  @default(PLAYER)
   createdAt          DateTime  @default(now())
