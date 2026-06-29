@@ -1,4 +1,6 @@
 import { whatsappInquiryUrl } from "@/lib/env";
+import SplitText from "./SplitText";
+
 
 export default function Hero() {
   return (
@@ -30,51 +32,73 @@ export default function Hero() {
         NTG
       </span>
 
-      <div className="relative z-10 flex flex-col items-center px-6 text-center">
-        <h1 className="font-display font-semibold uppercase text-white mt-30">
-          <span className="block text-4xl leading-[0.96] tracking-[-0.025em] sm:text-6xl md:text-7xl lg:text-[6rem]">
-            Namma Tulunad
+      {/*
+       * Heading — center pinned to watermark center via matching top% + -translate-y-1/2.
+       */}
+      <div className="absolute inset-x-0 top-[42.7%] sm:top-[48.5%] z-10 -translate-y-1/2 flex flex-col items-center px-6 text-center">
+        <h1 className="font-display font-semibold uppercase text-white">
+          <span className="block leading-[0.96] tracking-[-0.025em]" style={{ fontSize: "var(--text-hero)" }}>
+            <SplitText text="Namma Tulunad" delay={0} stagger={25} duration={680} />
           </span>
-          <span className="mt-2 block text-4xl leading-[0.96] tracking-[-0.025em] sm:text-6xl md:text-7xl lg:text-[6rem]">
-            <span className="text-gradient-brand">Gaming</span>
+
+          {/* Line 2 — overflow-hidden clips the rising word, gradient works correctly */}
+          <span className="mt-2 block leading-[0.96] tracking-[-0.025em]" style={{ fontSize: "var(--text-hero)" }}>
+            <span className="inline-block overflow-hidden">
+              <span className="text-gradient-brand inline-block hero-word-rise">
+                Gaming
+              </span>
+            </span>
           </span>
         </h1>
+      </div>
 
-        <div className="relative top-10 flex flex-col items-center">
-          <p className="max-w-xl text-balance text-base leading-relaxed text-white/55 sm:text-lg translate-x-2.5">
-            Mangaluru&apos;s premier esports lounge. Premium hardware, electric
-            atmosphere, engineered for the players who set the standard.
-          </p>
+      {/*
+       * Caption + CTA — positioned just below the h1.
+       * h1 bottom lands at ~55-56% in all viewports (watermark 48.5% + ~7% half-h1-height).
+       * top-[57%] sits just beneath with a natural gap.
+       */}
+      <div className="absolute inset-x-0 top-[56%] sm:top-[69%] z-10 flex flex-col items-center gap-6 sm:gap-8 px-6 text-center">
+        <p
+          className="leading-relaxed text-white/55"
+          style={{
+            fontSize: "clamp(1rem, 1.25vw, 1.5rem)",
+            maxWidth: "clamp(28rem, 40vw, 68rem)",
+          }}
+        >
+          Mangaluru&apos;s premier esports lounge — premium hardware, electric
+          <br />
+          atmosphere, engineered for the players who set the standard.
+        </p>
 
-          <div className="mt-10 flex flex-wrap items-center justify-center gap-3">
-            <a
-              href={whatsappInquiryUrl()}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="cta group relative inline-flex items-center gap-2 rounded-full px-7 py-3.5 text-sm font-semibold uppercase tracking-[0.18em] transition-all hover:scale-[1.03] hover:brightness-110"
+        <div className="flex flex-wrap items-center justify-center gap-3">
+          <a
+            href={whatsappInquiryUrl()}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="cta group relative inline-flex items-center gap-2 rounded-full px-7 py-3.5 text-sm font-semibold uppercase tracking-[0.18em] transition-all hover:scale-[1.03] hover:brightness-110"
+          >
+            Inquire Now
+            <svg
+              viewBox="0 0 24 24"
+              className="h-4 w-4 transition-transform group-hover:translate-x-0.5"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
             >
-              Inquire Now
-              <svg
-                viewBox="0 0 24 24"
-                className="h-4 w-4 transition-transform group-hover:translate-x-0.5"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              >
-                <path d="M5 12h14M13 5l7 7-7 7" />
-              </svg>
-            </a>
-            <a
-              href="#games"
-              className="glass rounded-full px-7 py-3.5 text-sm font-medium uppercase tracking-[0.18em] text-white/85 transition-colors hover:text-white"
-            >
-              Explore Games
-            </a>
-          </div>
+              <path d="M5 12h14M13 5l7 7-7 7" />
+            </svg>
+          </a>
+          <a
+            href="#games"
+            className="glass rounded-full px-7 py-3.5 text-sm font-medium uppercase tracking-[0.18em] text-white/85 transition-colors hover:text-white"
+          >
+            Explore Games
+          </a>
         </div>
       </div>
+
     </section>
   );
 }

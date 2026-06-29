@@ -35,7 +35,7 @@ const contacts = [
 
 export default function VisitLounge() {
   return (
-    <section id="visit" className="relative mx-auto w-full max-w-7xl scroll-mt-28 px-5 py-24 sm:py-32">
+    <section id="visit" className="relative mx-auto w-full max-w-[var(--container)] scroll-mt-28 px-[clamp(1.25rem,_3vw,_4rem)] py-24 sm:py-32">
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         whileInView={{ opacity: 1, y: 0 }}
@@ -46,7 +46,7 @@ export default function VisitLounge() {
         <span className="text-[10px] font-medium uppercase tracking-[0.4em] text-[var(--color-brand)]/80">
           07 · Visit
         </span>
-        <h2 className="mt-3 font-display text-4xl font-semibold tracking-[-0.02em] text-white sm:text-5xl">
+        <h2 className="mt-3 font-display font-semibold tracking-[-0.02em] text-white" style={{ fontSize: "var(--text-section-h2)" }}>
           Step{" "}
           <span className="font-display italic font-light text-white/55">inside</span>{" "}
           <span className="text-gradient-iris">the lounge.</span>
@@ -109,7 +109,7 @@ export default function VisitLounge() {
             • Lighter filter chain on mobile, fuller chain on desktop
             • No backdrop-blur or animate-ping below `md` (GPU-cheap)
           */}
-          <div className="group relative min-h-[280px] overflow-hidden rounded-3xl border border-[var(--color-brand)]/25 bg-[#060a14] [contain:layout_paint] [content-visibility:auto] md:min-h-[340px] md:shadow-[0_0_40px_rgba(94,234,212,0.08),inset_0_0_60px_rgba(124,58,237,0.05)]">
+          <div className="group relative overflow-hidden rounded-3xl border border-[var(--color-brand)]/25 bg-[#060a14] [contain:layout_paint] [content-visibility:auto]" style={{ minHeight: "clamp(280px, 28vw, 580px)" }} >
             <LazyMap
               title={`Map · ${brand.name}`}
               src={mapsEmbedFor(brand.coords)}

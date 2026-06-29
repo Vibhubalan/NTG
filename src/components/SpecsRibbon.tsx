@@ -5,7 +5,7 @@ import { specs } from "@/lib/data";
 
 export default function SpecsRibbon() {
   return (
-    <section id="specs" className="relative mx-auto w-full max-w-6xl scroll-mt-28 px-5 pt-12 sm:pt-16">
+    <section id="specs" className="relative mx-auto w-full max-w-[var(--container)] scroll-mt-28 px-[clamp(1.25rem,_3vw,_4rem)] pt-12 sm:pt-16">
       <motion.div
         initial={{ opacity: 0, y: 24 }}
         whileInView={{ opacity: 1, y: 0 }}
@@ -24,7 +24,7 @@ export default function SpecsRibbon() {
                   {s.label}
                 </p>
                 <div className="mt-2">
-                  <p className="font-display text-2xl font-semibold tracking-tight text-white transition-colors group-hover:text-[var(--color-brand)] sm:text-[1.65rem]">
+                  <p className="font-display font-semibold tracking-tight text-white transition-colors group-hover:text-[var(--color-brand)]" style={{ fontSize: "clamp(1.5rem, 1.8vw, 2.5rem)" }}>
                     {s.value}
                   </p>
                 </div>

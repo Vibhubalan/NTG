@@ -11,7 +11,7 @@ export default function Footer() {
     <footer className="relative">
       <div className="h-px w-full bg-gradient-to-r from-transparent via-[var(--color-brand)]/55 to-transparent" />
 
-      <div className="w-full px-6 pb-7 pt-9 sm:px-10 lg:px-14 xl:px-20">
+      <div className="w-full px-[clamp(1.5rem,_5vw,_8rem)] pb-7 pt-9">
         <div className="flex flex-col gap-8 md:flex-row md:items-start md:justify-between md:gap-10">
           {/* LEFT — full address */}
           <div className="min-w-0 max-w-md">

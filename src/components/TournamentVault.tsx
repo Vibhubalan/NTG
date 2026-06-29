@@ -11,7 +11,7 @@ export default function TournamentVault({ tournaments, registration }: Tournamen
   const showBanner = registration?.active ?? false;
 
   return (
-    <section id="vault" className="relative mx-auto w-full max-w-6xl scroll-mt-28 px-5 py-24 sm:py-32">
+    <section id="vault" className="relative mx-auto w-full max-w-[var(--container)] scroll-mt-28 px-[clamp(1.25rem,_3vw,_4rem)] py-24 sm:py-32">
       <div className="pointer-events-none absolute inset-0 -z-10 overflow-hidden">
         <div className="absolute right-1/3 top-1/2 h-[50vh] w-[50vh] rounded-full bg-[radial-gradient(circle,rgba(217,70,239,0.10),transparent_65%)] blur-3xl" />
       </div>
@@ -27,7 +27,7 @@ export default function TournamentVault({ tournaments, registration }: Tournamen
           <span className="text-[10px] font-medium uppercase tracking-[0.4em] text-[var(--color-brand)]/80">
             03 · Trophy Room
           </span>
-          <h2 className="mt-3 font-display text-4xl font-semibold tracking-[-0.02em] text-white sm:text-5xl">
+          <h2 className="mt-3 font-display font-semibold tracking-[-0.02em] text-white" style={{ fontSize: "var(--text-section-h2)" }}>
             Cups <span className="font-display italic font-light text-white/55">we&apos;ve</span>{" "}
             <span className="text-gradient-iris">hosted.</span>
           </h2>

@@ -59,7 +59,7 @@ function ImageCard({
           <span className="h-1 w-1 rounded-full bg-[var(--color-brand)]" />
           {kicker}
         </span>
-        <h3 className="mt-3 font-display text-2xl font-semibold tracking-[-0.01em] text-white sm:text-[1.65rem]">
+        <h3 className="mt-3 font-display font-semibold tracking-[-0.01em] text-white" style={{ fontSize: "clamp(1.5rem, 1.8vw, 2.4rem)" }}>
           {title}
         </h3>
         <p className="mt-2 max-w-sm text-sm leading-relaxed text-white/65">
@@ -161,7 +161,7 @@ function ChampionshipCard({
           <span className="h-1 w-1 rounded-full bg-[var(--color-brand)]" />
           {kicker}
         </span>
-        <h3 className="mt-3 font-display text-2xl font-semibold tracking-[-0.01em] text-white sm:text-[1.65rem]">
+        <h3 className="mt-3 font-display font-semibold tracking-[-0.01em] text-white" style={{ fontSize: "clamp(1.5rem, 1.8vw, 2.4rem)" }}>
           {title}
         </h3>
         <p className="mt-2 max-w-sm text-sm leading-relaxed text-white/65">
@@ -174,7 +174,7 @@ function ChampionshipCard({
 
 export default function Performance() {
   return (
-    <section id="arena" className="relative mx-auto w-full max-w-6xl scroll-mt-28 px-5 py-20 sm:py-28">
+    <section id="arena" className="relative mx-auto w-full max-w-[var(--container)] scroll-mt-28 px-[clamp(1.25rem,_3vw,_4rem)] py-20 sm:py-28">
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         whileInView={{ opacity: 1, y: 0 }}
@@ -186,7 +186,7 @@ export default function Performance() {
           <span className="text-[10px] font-medium uppercase tracking-[0.4em] text-[var(--color-brand)]/80">
             01 · The Arena
           </span>
-          <h2 className="mt-3 font-display text-4xl font-semibold tracking-[-0.02em] text-white sm:text-5xl">
+          <h2 className="mt-3 font-display font-semibold tracking-[-0.02em] text-white" style={{ fontSize: "var(--text-section-h2)" }}>
             Engineered{" "}
             <span className="font-display italic font-light text-white/55">for</span>{" "}
             <span className="text-gradient-iris">Performance.</span>
@@ -198,7 +198,7 @@ export default function Performance() {
         </p>
       </motion.div>
 
-      <div className="grid gap-4 md:grid-cols-[1.15fr_0.85fr] md:grid-rows-2 md:gap-5 md:min-h-[560px] lg:min-h-[620px]">
+      <div className="grid gap-4 md:grid-cols-[1.15fr_0.85fr] md:grid-rows-2 md:gap-5 md:min-h-[min(620px,_44vw)]">
         <ChampionshipCard
           kicker="Live Tournaments"
           title="Championship Arena"

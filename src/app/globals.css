@@ -22,6 +22,30 @@
 
 :root {
   color-scheme: dark;
+
+  /*
+   * Fluid container width — scales proportionally with the viewport.
+   * At 1440px  →  min(90vw, 2200px) = 1296px  (≈ current max-w-6xl density)
+   * At 2560px  →  min(90vw, 2200px) = 2200px  (fills 86% — same feel, just bigger)
+   */
+  --container: min(90vw, 2200px);
+
+  /*
+   * Fluid section heading (h2).
+   * At  768px →  clamp floor  ≈ 2.25rem  (36px)
+   * At 1440px →  4vw          = 57.6px   (≈ text-5xl, matches current sm:text-5xl)
+   * At 2560px →  4vw          = 102px    (proportionally larger)
+   * Hard cap  → 6rem           (96px max — prevents runaway on 4K+)
+   */
+  --text-section-h2: clamp(2.25rem, 4vw, 6rem);
+
+  /*
+   * Fluid hero heading.
+   * At 1440px →  6.67vw = 96px  (= 6rem, current lg:text-[6rem])
+   * At 2560px →  6.67vw = 171px (scales up perfectly)
+   * Hard cap  → 11rem           (176px — stops at ~2640px viewport)
+   */
+  --text-hero: clamp(2.5rem, 6.67vw, 11rem);
 }
 
 html {
@@ -314,4 +338,26 @@ header[data-site-nav] {
 ::selection {
   background: rgba(168, 85, 247, 0.5);
   color: #fff;
+}
+
+/* ---------- Hero word-rise (used for gradient text that can't use SplitText) ---------- */
+@keyframes hero-rise {
+  from {
+    opacity: 0;
+    transform: translateY(105%);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/*
+ * Only animate on desktop (≥1024px). On mobile/tablet the span is visible
+ * immediately — no opacity:0 flash, no layout shift.
+ */
+@media (min-width: 1024px) {
+  .hero-word-rise {
+    animation: hero-rise 0.68s cubic-bezier(0.22, 1, 0.36, 1) 0.38s both;
+  }
 }

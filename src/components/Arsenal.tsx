@@ -7,7 +7,7 @@ import { games, platforms, services } from "@/lib/data";
 
 export default function Arsenal() {
   return (
-    <section id="games" className="relative mx-auto w-full max-w-6xl scroll-mt-28 px-5 py-24 sm:py-32">
+    <section id="games" className="relative mx-auto w-full max-w-[var(--container)] scroll-mt-28 px-[clamp(1.25rem,_3vw,_4rem)] py-24 sm:py-32">
       <div className="pointer-events-none absolute inset-0 -z-10 overflow-hidden">
         <div className="absolute left-1/2 top-1/4 h-[40vh] w-[60vh] -translate-x-1/2 rounded-full bg-[radial-gradient(ellipse,rgba(168,85,247,0.14),transparent_65%)] blur-3xl" />
       </div>
@@ -23,7 +23,7 @@ export default function Arsenal() {
           <span className="text-[10px] font-medium uppercase tracking-[0.4em] text-[var(--color-brand)]/80">
             02 · Games
           </span>
-          <h2 className="mt-3 font-display text-4xl font-semibold tracking-[-0.02em] text-white sm:text-5xl">
+          <h2 className="mt-3 font-display font-semibold tracking-[-0.02em] text-white" style={{ fontSize: "var(--text-section-h2)" }}>
             Every title.{" "}
             <span className="font-display italic font-light text-white/55">On tap.</span>
           </h2>
@@ -42,7 +42,7 @@ export default function Arsenal() {
           visible: { transition: { staggerChildren: 0.04 } },
           hidden: {}
         }}
-        className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-3 lg:grid-cols-3"
+        className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5"
       >
         {games.map((g) => (
           <motion.div

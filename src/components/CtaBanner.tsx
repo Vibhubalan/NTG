@@ -7,7 +7,7 @@ import { instagramUrl, showPlansSection, whatsappInquiryUrl } from "@/lib/env";
 
 export default function CtaBanner() {
   return (
-    <section className="mx-auto w-full max-w-6xl px-5 pb-24 [content-visibility:auto] sm:pb-32">
+    <section className="mx-auto w-full max-w-[var(--container)] px-[clamp(1.25rem,_3vw,_4rem)] pb-24 [content-visibility:auto] sm:pb-32">
       <motion.div
         initial={{ opacity: 0, y: 28 }}
         whileInView={{ opacity: 1, y: 0 }}
@@ -35,7 +35,7 @@ export default function CtaBanner() {
             Open · {brand.hours}
           </motion.span>
 
-          <h2 className="mt-6 font-display text-4xl font-semibold tracking-[-0.025em] text-white sm:text-6xl lg:text-7xl">
+          <h2 className="mt-6 font-display font-semibold tracking-[-0.025em] text-white" style={{ fontSize: "clamp(2.25rem, 5.5vw, 8rem)" }}>
             Ready to{" "}
             <span className="font-display italic font-light text-white/70">dominate?</span>
           </h2>

@@ -12,7 +12,7 @@ const letters = [
 
 export default function NtgStandard() {
   return (
-    <section id="about" className="relative mx-auto w-full max-w-6xl scroll-mt-28 px-5 py-24 sm:py-32">
+    <section id="about" className="relative mx-auto w-full max-w-[var(--container)] scroll-mt-28 px-[clamp(1.25rem,_3vw,_4rem)] py-24 sm:py-32">
       <div className="pointer-events-none absolute inset-0 -z-10 overflow-hidden">
         <div className="absolute right-0 top-1/3 h-[42vh] w-[42vh] rounded-full bg-[radial-gradient(circle,rgba(168,85,247,0.16),transparent_65%)] blur-3xl" />
         <div className="absolute left-0 bottom-1/4 h-[36vh] w-[36vh] rounded-full bg-[radial-gradient(circle,rgba(34,211,238,0.12),transparent_65%)] blur-3xl" />
@@ -28,7 +28,7 @@ export default function NtgStandard() {
         <span className="text-[10px] font-medium uppercase tracking-[0.4em] text-[var(--color-brand)]/80">
           04 · Heritage
         </span>
-        <h2 className="mt-3 font-display text-4xl font-semibold tracking-[-0.02em] text-white sm:text-5xl">
+        <h2 className="mt-3 font-display font-semibold tracking-[-0.02em] text-white" style={{ fontSize: "var(--text-section-h2)" }}>
           What <span className="font-display italic font-light text-white/55">does</span>{" "}
           <span className="text-gradient-iris">NTG</span>{" "}
           <span className="font-display italic font-light text-white/55">mean?</span>
@@ -57,7 +57,7 @@ export default function NtgStandard() {
                 }}
                 className="group flex items-center gap-5 border-b border-white/[0.06] pb-6 last:border-b-0 last:pb-0 sm:gap-7"
               >
-                <span className="text-outline w-[2.5ch] shrink-0 font-display text-7xl font-black leading-none tracking-[-0.05em] max-md:[-webkit-text-stroke:1px_var(--color-brand)] max-md:drop-shadow-[0_0_14px_rgba(94,234,212,0.4)] md:transition-colors md:duration-500 md:group-hover:[-webkit-text-stroke:1px_var(--color-brand)] sm:text-8xl">
+                <span className="text-outline w-[2.5ch] shrink-0 font-display font-black leading-none tracking-[-0.05em] max-md:[-webkit-text-stroke:1px_var(--color-brand)] max-md:drop-shadow-[0_0_14px_rgba(94,234,212,0.4)] md:transition-colors md:duration-500 md:group-hover:[-webkit-text-stroke:1px_var(--color-brand)]" style={{ fontSize: "clamp(4rem, 7vw, 10rem)" }}>
                   {l.letter}
                 </span>
                 <div className="min-w-0">
@@ -95,7 +95,7 @@ export default function NtgStandard() {
           transition={{ duration: 0.8, ease: [0.22, 1, 0.36, 1] }}
           className="flex justify-center md:col-span-2"
         >
-          <div className="relative flex h-80 w-80 items-center justify-center sm:h-96 sm:w-96">
+          <div className="relative flex items-center justify-center" style={{ width: "clamp(18rem, 22vw, 36rem)", height: "clamp(18rem, 22vw, 36rem)" }}>
             <div className="absolute inset-6 rounded-full bg-[radial-gradient(circle,rgba(168,85,247,0.34),transparent_62%)] blur-2xl" />
             <div className="absolute inset-14 rounded-full bg-[radial-gradient(circle,rgba(34,211,238,0.24),transparent_60%)] blur-2xl" />
 
