@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import type { GameSlug } from "@prisma/client";
 import RegistrationTermsAgreement from "@/components/platform/RegistrationTermsAgreement";
+import { profileRequirementFix } from "@/lib/profile-requirements";
 
 export type RegistrationPreview = {
   displayName: string | null;
@@ -69,8 +70,8 @@ function ProfilePreview({
         <>
           <p className="text-white/45">Faceit: {preview.cs2FaceitRank ?? "NA"}</p>
           <p className="text-white/45">Peak premier: {preview.cs2PeakPremierRank ?? "NA"}</p>
-          <Link href="/profile" className="inline-block text-[10px] font-semibold uppercase tracking-wider text-[var(--color-brand)]/80 hover:text-[var(--color-brand)]">
-            Edit CS ranks on profile →
+          <Link href="/profile?tab=games" className="inline-block text-[10px] font-semibold uppercase tracking-wider text-[var(--color-brand)]/80 hover:text-[var(--color-brand)]">
+            Edit CS ranks in Game Accounts →
           </Link>
         </>
       ) : null}
@@ -140,14 +141,24 @@ export default function TournamentRegisterForm({
         <div className="shine-border-inner space-y-4 rounded-[1.35rem] bg-[#0a1020]/85 p-6 backdrop-blur-sm">
           <p className="text-[10px] font-medium uppercase tracking-[0.32em] text-[var(--color-brand)]/85">Registration</p>
           <p className="text-sm text-white/55">Complete your profile before registering:</p>
-          <ul className="list-inside list-disc space-y-1 text-sm text-amber-200/80">
-            {preview.missing.map((m) => (
-              <li key={m}>{m}</li>
-            ))}
+          <ul className="space-y-2">
+            {preview.missing.map((m) => {
+              const { href, cta } = profileRequirementFix(m);
+              return (
+                <li key={m}>
+                  <Link
+                    href={href}
+                    className="group block rounded-xl border border-[var(--color-brand)]/30 bg-[var(--color-brand)]/10 px-4 py-3 transition-all hover:border-[var(--color-brand)]/50 hover:bg-[var(--color-brand)]/15"
+                  >
+                    <p className="text-sm text-white/65">{m}</p>
+                    <p className="mt-1.5 text-xs font-semibold text-[var(--color-brand)] group-hover:underline">
+                      {cta} →
+                    </p>
+                  </Link>
+                </li>
+              );
+            })}
           </ul>
-          <Link href="/profile" className="inline-flex w-full items-center justify-center rounded-full border border-white/15 py-3 text-xs font-semibold uppercase tracking-[0.16em] text-white/80 hover:bg-white/[0.04]">
-            Go to profile
-          </Link>
         </div>
       </div>
     );

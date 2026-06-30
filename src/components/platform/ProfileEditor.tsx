@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { signOut } from "next-auth/react";
+import { useSearchParams } from "next/navigation";
 import type { ValorantRole } from "@prisma/client";
 import { computeAgeFromDateOfBirth } from "@/lib/date-age";
 import AccountInfoPanel from "@/components/platform/AccountInfoPanel";
@@ -32,6 +33,7 @@ function rolesEqual(a: ValorantRole[], b: ValorantRole[]) {
 }
 
 export default function ProfileEditor() {
+  const searchParams = useSearchParams();
   const [profile, setProfile] = useState<FullProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -92,6 +94,12 @@ export default function ProfileEditor() {
   useEffect(() => {
     load();
   }, [load]);
+
+  useEffect(() => {
+    const tab = searchParams.get("tab");
+    if (tab === "games") setActiveTab("games");
+    else if (tab === "profile") setActiveTab("profile");
+  }, [searchParams]);
 
   const accountDirty = useMemo(() => {
     if (!profile) return false;
