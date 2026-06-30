@@ -30,7 +30,7 @@ export async function GET(_req: Request, { params }: Props) {
     return NextResponse.json({ error: "Tournament not found." }, { status: 404 });
   }
 
-  const csv = buildRegistrationsCsv(tournament.game, rows, tournament.registrationFormat);
+  const csv = buildRegistrationsCsv(tournament.game, rows);
   const filename = `${slug}-registrations.csv`;
 
   return new NextResponse(csv, {
