@@ -186,6 +186,7 @@ export default function TournamentDetailView({
                 <TournamentRegisterForm
                   slug={tournament.slug}
                   game={tournament.game}
+                  registrationFormat={tournament.registrationFormat}
                   isLoggedIn={isLoggedIn}
                   alreadyRegistered={tournament.userRegistered}
                   registrationOpen={tournament.registrationOpen}
