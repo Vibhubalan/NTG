@@ -181,8 +181,8 @@ export class TournamentRepository {
           },
         },
         registrations: userId
-          ? { where: { userId }, select: { id: true } }
-          : { select: { id: true } },
+          ? { where: { userId }, select: { id: true, participantRole: true } }
+          : { select: { id: true, participantRole: true } },
         _count: { select: { registrations: true } },
       },
     });
@@ -283,6 +283,7 @@ export class TournamentRepository {
         })) ?? [],
       registrationCount: t._count.registrations,
       userRegistered: userId ? t.registrations.length > 0 : false,
+      userParticipantRole: userId ? (t.registrations[0]?.participantRole ?? null) : null,
     };
   }
 

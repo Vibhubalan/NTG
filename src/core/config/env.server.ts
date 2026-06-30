@@ -28,6 +28,14 @@ export const serverEnv = {
   get resendApiKey() {
     return optional("RESEND_API_KEY");
   },
+  /** Base URL of the standalone auction app (server-to-server + redirect target). */
+  get auctionUrl() {
+    return optional("AUCTION_URL");
+  },
+  /** Shared HMAC secret for minting auction identity tokens — must match the auction app. */
+  get auctionJwtSecret() {
+    return optional("AUCTION_JWT_SECRET");
+  },
   get emailFrom() {
     return optional("EMAIL_FROM") ?? "NTG Lounge <onboarding@resend.dev>";
   },

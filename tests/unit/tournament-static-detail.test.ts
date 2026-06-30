@@ -28,6 +28,7 @@ function minimalDetail(overrides: Partial<TournamentDetail> = {}): TournamentDet
     matches: [],
     registrationCount: 0,
     userRegistered: false,
+    userParticipantRole: null,
     ...overrides,
   };
 }

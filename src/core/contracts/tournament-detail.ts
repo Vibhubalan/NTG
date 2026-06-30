@@ -47,6 +47,7 @@ export type TournamentDetail = {
   matches: TournamentMatchView[];
   registrationCount: number;
   userRegistered: boolean;
+  userParticipantRole: "CAPTAIN" | "PLAYER" | null;
 };
 
 export type PrizeSplitRow = {

@@ -392,6 +392,18 @@ export default function AdminTournamentEditor({
     return ok;
   }
 
+  async function createAuction() {
+    setLoading(true);
+    setMessage(null);
+    try {
+      const res = await fetch(`/api/admin/tournaments/${form.slug}/auction`, { method: "POST" });
+      const data = await readJsonResponse(res);
+      setMessage(res.ok ? "Auction created." : String(data.error ?? "Failed to create auction."));
+    } finally {
+      setLoading(false);
+    }
+  }
+
   async function saveAll() {
     setLoading(true);
     setMessage(null);
@@ -823,6 +835,16 @@ export default function AdminTournamentEditor({
                       <p className="mt-0.5 text-[10px] leading-relaxed text-white/40">Captain registers full 5-player team upfront. All 5 must have NTG accounts.</p>
                     </button>
                   </div>
+                  {form.registrationFormat === "AUCTION" && (
+                    <button
+                      type="button"
+                      onClick={createAuction}
+                      disabled={loading}
+                      className="cta mt-1 inline-flex rounded-full px-5 py-2 text-[11px] font-semibold uppercase tracking-[0.16em] disabled:opacity-50"
+                    >
+                      Create Auction
+                    </button>
+                  )}
                 </div>
               )}
 
