@@ -118,6 +118,14 @@ export const fifaRegisterSchema = z.object({
   ...registrationTermsField,
 });
 
+/** Clash Royale 1v1 — solo registration (terms only). */
+export const clashRoyaleSoloRegisterSchema = z.object({
+  ...registrationTermsField,
+});
+
+/** Clash Royale 2v2 — same shape as FIFA duo registration. */
+export const clashRoyaleDuoRegisterSchema = fifaRegisterSchema;
+
 export const profileAccountPatchSchema = z.object({
   dateOfBirth: z
     .string()
@@ -132,6 +140,7 @@ export const tournamentRegisterSchema = z.discriminatedUnion("participantRole", 
     participantRole: z.literal("CAPTAIN"),
     teamName: z.string().trim().min(2).max(48),
     logoUrl: z.string().trim().url(),
+    coCaptainUsername: z.string().trim().min(2).max(48),
     valorantRoles: valorantRolesSchema.optional(),
     cs2PeakPremierRank: cs2PremierRankSchema.optional(),
     ...registrationTermsField,

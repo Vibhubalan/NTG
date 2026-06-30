@@ -50,8 +50,8 @@ describe("validateCs2RanksForRegistration", () => {
     expect(validateCs2RanksForRegistration("Level 5", null)).toMatch(/Premier/i);
   });
 
-  it("rejects both NA", () => {
-    expect(validateCs2RanksForRegistration("NA", "NA")).toMatch(/at least one real/i);
+  it("accepts both NA", () => {
+    expect(validateCs2RanksForRegistration("NA", "NA")).toBeNull();
   });
 
   it("accepts one real rank and one NA", () => {

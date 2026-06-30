@@ -22,7 +22,7 @@ export type CreateTournamentInput = {
   seasonId?: string;
   status?: TournamentStatus;
   format?: BracketType;
-  registrationFormat?: "AUCTION" | "STANDARD" | null;
+  registrationFormat?: "AUCTION" | "STANDARD" | "SOLO" | "DUO" | null;
   description?: string;
   startsAt?: string;
   endsAt?: string;
@@ -74,7 +74,7 @@ export type UpdateTournamentInput = Partial<
   prizePool?: number | null;
   hideAfter?: string | null;
   teams?: string[];
-  registrationFormat?: "AUCTION" | "STANDARD" | null;
+  registrationFormat?: "AUCTION" | "STANDARD" | "SOLO" | "DUO" | null;
 };
 
 function parsePrizeSplit(value: unknown): PrizeSplitRow[] | null {
@@ -734,7 +734,11 @@ function csvEscape(value: string | number | null | undefined): string {
 export function buildRegistrationsCsv(
   game: import("@prisma/client").GameSlug,
   rows: AdminRegistrationRow[],
+  registrationFormat?: string | null,
 ): string {
+  const isCrDuo = game === "CLASH_ROYALE" && registrationFormat === "DUO";
+  const isCrSolo = game === "CLASH_ROYALE" && registrationFormat !== "DUO";
+
   let headers: string[];
   if (game === "CS2") {
     headers = [
@@ -749,19 +753,20 @@ export function buildRegistrationsCsv(
       "Peak Premier",
       "Registered At",
     ];
-  } else if (game === "EA_FC26") {
+  } else if (game === "EA_FC26" || isCrDuo) {
     headers = [
       "Name",
       "Email",
       "Phone",
-      "Olympus ID",
-      "DOB",
+      ...(game === "EA_FC26" ? ["Olympus ID", "DOB"] : ["Player Tag"]),
       "Role",
       "Team",
       "Partner Username",
       "Partner Name",
       "Registered At",
     ];
+  } else if (isCrSolo) {
+    headers = ["Name", "Email", "Phone", "Player Tag", "Registered At"];
   } else {
     headers = [
       "Name",
@@ -779,7 +784,12 @@ export function buildRegistrationsCsv(
   const lines = [headers.join(",")];
 
   for (const r of rows) {
-    const role = r.participantRole === "CAPTAIN" ? "Captain" : "Player";
+    const role =
+      r.participantRole === "CAPTAIN"
+        ? "Captain"
+        : r.participantRole === "CO_CAPTAIN"
+          ? "Co-Captain"
+          : "Player";
     const at = new Date(r.createdAt).toISOString();
 
     if (game === "CS2") {
@@ -797,18 +807,29 @@ export function buildRegistrationsCsv(
           csvEscape(at),
         ].join(","),
       );
-    } else if (game === "EA_FC26") {
+    } else if (game === "EA_FC26" || isCrDuo) {
       lines.push(
         [
           csvEscape(r.displayName),
           csvEscape(r.email),
           csvEscape(r.phone),
-          csvEscape(r.olympusId),
-          csvEscape(r.dateOfBirth),
+          ...(game === "EA_FC26"
+            ? [csvEscape(r.olympusId), csvEscape(r.dateOfBirth)]
+            : [csvEscape(r.riotId)]),
           csvEscape(role),
           csvEscape(r.teamName),
           csvEscape(r.partnerUsername),
           csvEscape(r.partnerName),
+          csvEscape(at),
+        ].join(","),
+      );
+    } else if (isCrSolo) {
+      lines.push(
+        [
+          csvEscape(r.displayName),
+          csvEscape(r.email),
+          csvEscape(r.phone),
+          csvEscape(r.riotId),
           csvEscape(at),
         ].join(","),
       );

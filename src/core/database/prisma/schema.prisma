@@ -43,6 +43,8 @@ enum BracketType {
 enum TournamentFormat {
   AUCTION
   STANDARD
+  SOLO
+  DUO
 }
 
 enum MatchStatus {
@@ -84,6 +86,7 @@ enum PlayedGame {
 
 enum RegistrationParticipantRole {
   CAPTAIN
+  CO_CAPTAIN
   PLAYER
 }
 
@@ -110,6 +113,23 @@ enum UserActivityAction {
   STEAM_UNLINK
   TOURNAMENT_REGISTER
   TOURNAMENT_UNREGISTER
+  LISTING_APPLY
+}
+
+enum RosterTeamStatus {
+  ACTIVE
+  RECRUITING
+}
+
+enum ListingType {
+  JOB
+  ROSTER_TRYOUT
+}
+
+enum ListingStatus {
+  DRAFT
+  OPEN
+  CLOSED
 }
 
 enum GamepassCategory {
@@ -165,10 +185,13 @@ model User {
   leaderboard             LeaderboardEntry[]
   leaderboardRankAudits   LeaderboardRankAuditLog[]
   captainedTeams          TournamentTeam[]          @relation("TeamCaptain")
+  coCaptainedTeams        TournamentTeam[]          @relation("TeamCoCaptain")
   teamPlayers             TournamentTeamPlayer[]
   adminAuditLogs          AdminAuditLog[]
   userActivityLogs        UserActivityLog[]
   platformSettingsUpdated PlatformSetting[]         @relation("PlatformSettingUpdatedBy")
+  rosterPlayers           RosterPlayer[]
+  listingApplications     ListingApplication[]
 }
 
 model EmailOtp {
@@ -322,6 +345,8 @@ model TournamentTeam {
   sortOrder            Int                      @default(0)
   captainUserId        String?
   captain              User?                    @relation("TeamCaptain", fields: [captainUserId], references: [id], onDelete: SetNull)
+  coCaptainUserId      String?
+  coCaptain            User?                    @relation("TeamCoCaptain", fields: [coCaptainUserId], references: [id], onDelete: SetNull)
   logoUrl              String?
   sourceRegistrationId String?                  @unique
   createdAt            DateTime                 @default(now())
@@ -714,4 +739,82 @@ model SponsorLogo {
   active     Boolean @default(true)
 
   @@index([active, sortOrder])
+}
+
+// ─── @roster-listings (NTG roster + job/tryout listings) ─────────────────────
+
+model RosterTeam {
+  id               String           @id @default(cuid())
+  gameKey          String           @unique
+  gameLabel        String
+  status           RosterTeamStatus @default(RECRUITING)
+  benefitsMarkdown String?
+  tryoutsOpenAt    DateTime?        // When the next tryout window opens (displayed on public roster)
+  sortOrder        Int              @default(0)
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
+
+  players RosterPlayer[]
+
+  @@index([sortOrder])
+}
+
+model RosterPlayer {
+  id           String     @id @default(cuid())
+  rosterTeamId String
+  rosterTeam   RosterTeam @relation(fields: [rosterTeamId], references: [id], onDelete: Cascade)
+  userId       String
+  user         User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  roleLabel    String?
+  bio          String?
+  sortOrder    Int        @default(0)
+  createdAt    DateTime   @default(now())
+
+  @@unique([rosterTeamId, userId])
+  @@index([rosterTeamId, sortOrder])
+}
+
+model Listing {
+  id          String        @id @default(cuid())
+  slug        String        @unique
+  type        ListingType
+  title       String
+  description String?
+  gameKey     String?
+  gameLabel   String?
+  status      ListingStatus @default(DRAFT)
+  sortOrder   Int           @default(0)
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  applications ListingApplication[]
+
+  @@index([status, type, sortOrder])
+}
+
+model ListingApplication {
+  id                    String             @id @default(cuid())
+  listingId             String
+  listing               Listing            @relation(fields: [listingId], references: [id], onDelete: Cascade)
+  userId                String
+  user                  User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  status                RegistrationStatus @default(PENDING)
+  message               String?
+  snapshotDisplayName   String?
+  snapshotPhone         String?
+  snapshotRiotId        String?
+  snapshotRankTier      String?
+  snapshotRankTierId    Int?
+  snapshotValorantRoles Json?
+  snapshotSteamId64     String?
+  snapshotCs2Hours      Float?
+  snapshotCs2PeakPremier String?
+  snapshotCs2FaceitRank String?
+  snapshotOlympusId     String?
+  snapshotDateOfBirth   DateTime?          @db.Date
+  createdAt             DateTime           @default(now())
+  updatedAt             DateTime           @updatedAt
+
+  @@unique([listingId, userId])
+  @@index([listingId, createdAt])
 }

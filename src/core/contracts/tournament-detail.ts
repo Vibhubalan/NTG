@@ -60,7 +60,7 @@ export type TournamentTeamPlayerView = {
   displayName: string;
   riotId: string | null;
   olympusId?: string | null;
-  participantRole?: "CAPTAIN" | "PLAYER";
+  participantRole?: "CAPTAIN" | "CO_CAPTAIN" | "PLAYER";
 };
 
 export type TournamentTeamView = {

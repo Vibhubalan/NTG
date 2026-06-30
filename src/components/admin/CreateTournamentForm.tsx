@@ -10,10 +10,12 @@ const GAME_OPTIONS = [
   { value: "VALORANT", label: "Valorant" },
   { value: "CS2", label: "CS2" },
   { value: "EA_FC26", label: "EA FC26 (FIFA)" },
+  { value: "CLASH_ROYALE", label: "Clash Royale" },
   { value: "OTHER", label: "Other" },
 ];
 
 const SUPPORTS_FORMAT = ["VALORANT", "CS2"];
+const SUPPORTS_CR_FORMAT = ["CLASH_ROYALE"];
 
 export default function CreateTournamentForm() {
   const router = useRouter();
@@ -21,7 +23,7 @@ export default function CreateTournamentForm() {
   const [name, setName] = useState("");
   const [slug, setSlug] = useState("");
   const [game, setGame] = useState("VALORANT");
-  const [registrationFormat, setRegistrationFormat] = useState<"AUCTION" | "STANDARD">("AUCTION");
+  const [registrationFormat, setRegistrationFormat] = useState<"AUCTION" | "STANDARD" | "SOLO" | "DUO">("AUCTION");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -37,7 +39,11 @@ export default function CreateTournamentForm() {
           name,
           slug: slug || name,
           game,
-          registrationFormat: SUPPORTS_FORMAT.includes(game) ? registrationFormat : null,
+          registrationFormat: SUPPORTS_FORMAT.includes(game)
+            ? registrationFormat
+            : SUPPORTS_CR_FORMAT.includes(game)
+              ? registrationFormat
+              : null,
         }),
       });
       const data = await res.json();
@@ -110,8 +116,10 @@ export default function CreateTournamentForm() {
           className={inputClass}
           value={game}
           onChange={(e) => {
-            setGame(e.target.value);
-            if (!SUPPORTS_FORMAT.includes(e.target.value)) setRegistrationFormat("AUCTION");
+            const next = e.target.value;
+            setGame(next);
+            if (SUPPORTS_FORMAT.includes(next)) setRegistrationFormat("AUCTION");
+            if (SUPPORTS_CR_FORMAT.includes(next)) setRegistrationFormat("SOLO");
           }}
         >
           {GAME_OPTIONS.map((g) => (
@@ -135,7 +143,7 @@ export default function CreateTournamentForm() {
               }`}
             >
               <p className="text-sm font-semibold">Auction Draft</p>
-              <p className="mt-0.5 text-[10px] leading-relaxed text-white/40">Captains register team name. Players register individually. Admin assigns teams.</p>
+              <p className="mt-0.5 text-[10px] leading-relaxed text-white/40">Captains register team name + co-captain. Players join the pool. Admin assigns after auction.</p>
             </button>
             <button
               type="button"
@@ -148,6 +156,38 @@ export default function CreateTournamentForm() {
             >
               <p className="text-sm font-semibold">Standard (5v5)</p>
               <p className="mt-0.5 text-[10px] leading-relaxed text-white/40">Captain registers full 5-player team upfront. All 5 must have NTG accounts.</p>
+            </button>
+          </div>
+        </div>
+      )}
+
+      {SUPPORTS_CR_FORMAT.includes(game) && (
+        <div className="space-y-2">
+          <label className="text-[10px] font-bold uppercase tracking-wider text-white/45">Match Format</label>
+          <div className="grid grid-cols-2 gap-2">
+            <button
+              type="button"
+              onClick={() => setRegistrationFormat("SOLO")}
+              className={`rounded-xl border px-4 py-3 text-left transition-all ${
+                registrationFormat === "SOLO"
+                  ? "border-blue-500/40 bg-blue-500/[0.08] text-blue-200"
+                  : "border-white/10 bg-white/[0.02] text-white/50 hover:border-white/20"
+              }`}
+            >
+              <p className="text-sm font-semibold">1v1 Solo</p>
+              <p className="mt-0.5 text-[10px] leading-relaxed text-white/40">Each player registers individually.</p>
+            </button>
+            <button
+              type="button"
+              onClick={() => setRegistrationFormat("DUO")}
+              className={`rounded-xl border px-4 py-3 text-left transition-all ${
+                registrationFormat === "DUO"
+                  ? "border-indigo-500/40 bg-indigo-500/[0.08] text-indigo-200"
+                  : "border-white/10 bg-white/[0.02] text-white/50 hover:border-white/20"
+              }`}
+            >
+              <p className="text-sm font-semibold">2v2 Duo</p>
+              <p className="mt-0.5 text-[10px] leading-relaxed text-white/40">One player registers a team and partner (like FIFA).</p>
             </button>
           </div>
         </div>

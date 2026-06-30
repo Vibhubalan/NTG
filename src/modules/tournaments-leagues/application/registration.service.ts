@@ -20,6 +20,7 @@ export type TournamentRegisterInput = {
   participantRole: RegistrationParticipantRole;
   teamName?: string;
   logoUrl?: string;
+  coCaptainUsername?: string;
   valorantRoles?: ValorantRole[];
   cs2PeakPremierRank?: string;
 };
@@ -45,6 +46,7 @@ export type RegistrationEligibility = {
   cs2PeakPremierRank: string | null;
   cs2FaceitRank: string | null;
   valorantRankTier: string | null;
+  clashRoyaleTag: string | null;
 };
 
 async function getValorantRankSnapshot(userId: string): Promise<{
@@ -78,6 +80,7 @@ function validateGameProfile(
     olympusId: string | null;
     riotPuuid: string | null;
     steamId64: string | null;
+    clashRoyaleTag: string | null;
     playerProfile: {
       valorantRoles: ValorantRole[];
       cs2PeakPremierRank: string | null;
@@ -112,6 +115,12 @@ function validateGameProfile(
     }
   }
 
+  if (game === GameSlug.CLASH_ROYALE) {
+    if (!user.clashRoyaleTag?.trim()) {
+      missing.push("Link your Clash Royale player tag on your profile.");
+    }
+  }
+
   return missing;
 }
 
@@ -126,6 +135,7 @@ function buildEligibilityFromUser(
     steamId64: string | null;
     steamPersonaName: string | null;
     cs2HoursPlayed: number | null;
+    clashRoyaleTag: string | null;
     playerProfile: {
       displayName: string;
       valorantRoles: ValorantRole[];
@@ -157,6 +167,7 @@ function buildEligibilityFromUser(
     cs2PeakPremierRank: user.playerProfile?.cs2PeakPremierRank ?? null,
     cs2FaceitRank: user.playerProfile?.cs2FaceitRank ?? null,
     valorantRankTier: rank?.rankTier ?? null,
+    clashRoyaleTag: user.clashRoyaleTag,
   };
 }
 
@@ -210,6 +221,97 @@ function userSnapshotFields(user: {
   };
 }
 
+type RegistrationSnapshotData = {
+  snapshotDisplayName: string | null;
+  snapshotPhone: string | null;
+  snapshotOlympusId: string | null;
+  snapshotDateOfBirth: Date | null;
+  snapshotRiotId: string | null;
+  snapshotSteamId64: string | null;
+  snapshotCs2Hours: number | null;
+  snapshotCs2PeakPremier: string | null;
+  snapshotCs2FaceitRank: string | null;
+  snapshotRankTier: string | null;
+  snapshotRankTierId: number | null;
+  snapshotValorantRoles: ValorantRole[] | null;
+};
+
+async function resolveCoCaptainForCaptainRegistration(
+  game: GameSlug,
+  captainUserId: string,
+  captainDisplayName: string | null,
+  coCaptainUsername: string,
+  tournamentId: string,
+): Promise<
+  | {
+      ok: true;
+      coCaptainId: string;
+      coCaptainDisplayName: string;
+      snapshot: RegistrationSnapshotData;
+    }
+  | { ok: false; error: string }
+> {
+  const coCaptainUsernameTrim = coCaptainUsername.trim();
+  if (
+    usernameKeyFromDisplayName(captainDisplayName ?? "") ===
+    usernameKeyFromDisplayName(coCaptainUsernameTrim)
+  ) {
+    return { ok: false, error: "You cannot register yourself as co-captain." };
+  }
+
+  const coCaptain = await findUserByUsername(coCaptainUsernameTrim);
+  if (!coCaptain) {
+    return {
+      ok: false,
+      error: "Co-captain username not found. They must be an NTG member.",
+    };
+  }
+
+  if (!coCaptain.signupCompleted) {
+    return {
+      ok: false,
+      error: "Your co-captain must complete signup before you can register them.",
+    };
+  }
+
+  const missing = validateGameProfile(game, coCaptain);
+  if (missing.length > 0) {
+    return {
+      ok: false,
+      error: `Co-captain must complete their profile: ${missing[0]}`,
+    };
+  }
+
+  const existing = await prisma.tournamentRegistration.findMany({
+    where: {
+      tournamentId,
+      userId: { in: [captainUserId, coCaptain.id] },
+    },
+    select: { userId: true },
+  });
+
+  if (existing.some((r) => r.userId === captainUserId)) {
+    return { ok: false, error: "You are already registered for this tournament." };
+  }
+  if (existing.some((r) => r.userId === coCaptain.id)) {
+    return {
+      ok: false,
+      error: "Your co-captain is already registered for this tournament.",
+    };
+  }
+
+  const snapshot = await buildRegistrationSnapshotForUser(coCaptain.id, game);
+  if (!snapshot.ok) return snapshot;
+
+  return {
+    ok: true,
+    coCaptainId: coCaptain.id,
+    coCaptainDisplayName:
+      coCaptain.playerProfile?.displayName ?? coCaptain.name ?? "Co-Captain",
+    snapshot: snapshot.data,
+  };
+}
+
 export async function registerForTournament(
   slug: string,
   userId: string,
@@ -226,6 +328,10 @@ export async function registerForTournament(
 
   if (tournament.game === GameSlug.EA_FC26) {
     return { ok: false, error: "Use the FIFA team registration form." };
+  }
+
+  if (tournament.game === GameSlug.CLASH_ROYALE) {
+    return { ok: false, error: "Use the Clash Royale registration form." };
   }
 
   const user = await prisma.user.findUnique({
@@ -298,15 +404,29 @@ export async function registerForTournament(
       if (!input.logoUrl?.trim()) {
         return { ok: false, error: "Team logo is required." };
       }
+      if (!input.coCaptainUsername?.trim()) {
+        return { ok: false, error: "Co-captain username is required." };
+      }
 
+      const coCaptainResolved = await resolveCoCaptainForCaptainRegistration(
+        tournament.game,
+        userId,
+        user.playerProfile?.displayName ?? user.name,
+        input.coCaptainUsername,
+        tournament.id,
+      );
+      if (!coCaptainResolved.ok) return coCaptainResolved;
+
+      const teamName = input.teamName.trim();
       const sortOrder = (tournament.tournamentTeams[0]?.sortOrder ?? -1) + 1;
 
       const result = await prisma.$transaction(async (tx) => {
         const team = await tx.tournamentTeam.create({
           data: {
             tournamentId: tournament.id,
-            name: input.teamName!.trim(),
+            name: teamName,
             captainUserId: userId,
+            coCaptainUserId: coCaptainResolved.coCaptainId,
             logoUrl: input.logoUrl!.trim(),
             sortOrder,
           },
@@ -316,7 +436,28 @@ export async function registerForTournament(
           data: {
             ...baseData,
             teamId: team.id,
-            teamName: input.teamName!.trim(),
+            teamName,
+            partnerUserId: coCaptainResolved.coCaptainId,
+            partnerName: coCaptainResolved.coCaptainDisplayName,
+            snapshotPartnerUsername: coCaptainResolved.coCaptainDisplayName,
+          },
+        });
+
+        await tx.tournamentRegistration.create({
+          data: {
+            tournamentId: tournament.id,
+            userId: coCaptainResolved.coCaptainId,
+            participantRole: "CO_CAPTAIN",
+            teamId: team.id,
+            teamName,
+            partnerUserId: userId,
+            partnerName: user.playerProfile?.displayName ?? user.name ?? "Captain",
+            snapshotPartnerUsername: user.playerProfile?.displayName ?? user.name,
+            ...coCaptainResolved.snapshot,
+            snapshotValorantRoles: coCaptainResolved.snapshot.snapshotValorantRoles
+              ? (coCaptainResolved.snapshot.snapshotValorantRoles as unknown as import("@prisma/client").Prisma.InputJsonValue)
+              : undefined,
+            status: "APPROVED",
           },
         });
 
@@ -334,7 +475,7 @@ export async function registerForTournament(
         name: user.name,
         action: "TOURNAMENT_REGISTER",
         target: slug,
-        details: `Registered for cup "${tournament.name}" as Captain of ${input.teamName!.trim()}.`,
+        details: `Registered for cup "${tournament.name}" as Captain of ${teamName} with co-captain ${coCaptainResolved.coCaptainDisplayName}.`,
       });
 
       return { ok: true, registrationId: result.id };
@@ -371,6 +512,93 @@ export async function registerFifaTeam(
   userId: string,
   input: FifaRegisterInput,
 ): Promise<RegistrationResult> {
+  return registerPartnerDuoCup(slug, userId, input, GameSlug.EA_FC26);
+}
+
+export async function registerClashRoyaleDuo(
+  slug: string,
+  userId: string,
+  input: FifaRegisterInput,
+): Promise<RegistrationResult> {
+  return registerPartnerDuoCup(slug, userId, input, GameSlug.CLASH_ROYALE);
+}
+
+export async function registerClashRoyaleSolo(
+  slug: string,
+  userId: string,
+): Promise<RegistrationResult> {
+  const tournament = await prisma.tournament.findUnique({ where: { slug } });
+  if (!tournament) {
+    return { ok: false, error: "Tournament not found." };
+  }
+
+  if (tournament.game !== GameSlug.CLASH_ROYALE) {
+    return { ok: false, error: "This registration flow is for Clash Royale cups only." };
+  }
+
+  if (tournament.registrationFormat !== "SOLO") {
+    return { ok: false, error: "This cup uses 2v2 team registration." };
+  }
+
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    include: { playerProfile: true },
+  });
+
+  if (!user) {
+    return { ok: false, error: "Account not found." };
+  }
+
+  if (!user.emailVerified || !user.signupCompleted) {
+    return { ok: false, error: "Complete signup before registering for cups." };
+  }
+
+  if (!isTournamentRegistrationLive(tournament)) {
+    return { ok: false, error: "Registration is not open for this tournament." };
+  }
+
+  const missing = validateGameProfile(GameSlug.CLASH_ROYALE, user);
+  if (missing.length > 0) {
+    return { ok: false, error: missing[0] };
+  }
+
+  try {
+    const reg = await prisma.tournamentRegistration.create({
+      data: {
+        tournamentId: tournament.id,
+        userId,
+        participantRole: "PLAYER",
+        ...userSnapshotFields(user),
+        snapshotRiotId: user.clashRoyaleTag,
+        status: "APPROVED",
+      },
+    });
+
+    await logUserActivity({
+      userId,
+      email: user.email,
+      name: user.name,
+      action: "TOURNAMENT_REGISTER",
+      target: slug,
+      details: `Registered for Clash Royale cup "${tournament.name}" (1v1).`,
+    });
+
+    return { ok: true, registrationId: reg.id };
+  } catch (e: unknown) {
+    const code = (e as { code?: string })?.code;
+    if (code === "P2002") {
+      return { ok: false, error: "You are already registered for this tournament." };
+    }
+    throw e;
+  }
+}
+
+async function registerPartnerDuoCup(
+  slug: string,
+  userId: string,
+  input: FifaRegisterInput,
+  game: typeof GameSlug.EA_FC26 | typeof GameSlug.CLASH_ROYALE,
+): Promise<RegistrationResult> {
   const tournament = await prisma.tournament.findUnique({
     where: { slug },
     include: { tournamentTeams: { orderBy: { sortOrder: "desc" }, take: 1 } },
@@ -380,8 +608,18 @@ export async function registerFifaTeam(
     return { ok: false, error: "Tournament not found." };
   }
 
-  if (tournament.game !== GameSlug.EA_FC26) {
-    return { ok: false, error: "This registration flow is for FIFA cups only." };
+  if (tournament.game !== game) {
+    return {
+      ok: false,
+      error:
+        game === GameSlug.EA_FC26
+          ? "This registration flow is for FIFA cups only."
+          : "This registration flow is for Clash Royale cups only.",
+    };
+  }
+
+  if (game === GameSlug.CLASH_ROYALE && tournament.registrationFormat !== "DUO") {
+    return { ok: false, error: "This cup uses 1v1 solo registration." };
   }
 
   const initiator = await prisma.user.findUnique({
@@ -401,7 +639,7 @@ export async function registerFifaTeam(
     return { ok: false, error: "Registration is not open for this tournament." };
   }
 
-  const missing = validateGameProfile(GameSlug.EA_FC26, initiator);
+  const missing = validateGameProfile(game, initiator);
   if (missing.length > 0) {
     return { ok: false, error: missing[0] };
   }
@@ -425,11 +663,14 @@ export async function registerFifaTeam(
     return { ok: false, error: "Your partner must complete signup before you can register them." };
   }
 
-  const partnerMissing = validateGameProfile(GameSlug.EA_FC26, partner);
+  const partnerMissing = validateGameProfile(game, partner);
   if (partnerMissing.length > 0) {
     return {
       ok: false,
-      error: "Your partner must complete their profile (date of birth and Olympus ID) first.",
+      error:
+        game === GameSlug.EA_FC26
+          ? "Your partner must complete their profile (date of birth and Olympus ID) first."
+          : "Your partner must link their Clash Royale player tag on their profile first.",
     };
   }
 
@@ -455,6 +696,9 @@ export async function registerFifaTeam(
   const initiatorDisplayName =
     initiator.playerProfile?.displayName ?? initiator.name ?? "Captain";
 
+  const clashSnapshot = (u: typeof initiator) =>
+    game === GameSlug.CLASH_ROYALE ? { snapshotRiotId: u.clashRoyaleTag } : {};
+
   try {
     const captainReg = await prisma.$transaction(async (tx) => {
       const team = await tx.tournamentTeam.create({
@@ -477,6 +721,7 @@ export async function registerFifaTeam(
           partnerName: partnerDisplayName,
           snapshotPartnerUsername: partnerDisplayName,
           ...userSnapshotFields(initiator),
+          ...clashSnapshot(initiator),
           status: "APPROVED",
         },
       });
@@ -492,6 +737,7 @@ export async function registerFifaTeam(
           partnerName: initiatorDisplayName,
           snapshotPartnerUsername: initiatorDisplayName,
           ...userSnapshotFields(partner),
+          ...clashSnapshot(partner),
           status: "APPROVED",
         },
       });
@@ -618,6 +864,11 @@ export async function buildRegistrationSnapshotForUser(
   });
   if (!user) return { ok: false, error: "Member not found." };
 
+  const missing = validateGameProfile(game, user);
+  if (missing.length > 0) {
+    return { ok: false, error: missing[0] };
+  }
+
   let snapshotRankTier: string | null = null;
   let snapshotRankTierId: number | null = null;
   let snapshotValorantRoles: ValorantRole[] | null = null;
@@ -643,6 +894,9 @@ export async function buildRegistrationSnapshotForUser(
     ok: true,
     data: {
       ...userSnapshotFields(user),
+      ...(game === GameSlug.CLASH_ROYALE
+        ? { snapshotRiotId: user.clashRoyaleTag }
+        : {}),
       snapshotRankTier,
       snapshotRankTierId,
       snapshotValorantRoles,
@@ -660,6 +914,7 @@ export async function adminAddTournamentRegistration(
     email?: string;
     participantRole?: RegistrationParticipantRole;
     teamName?: string;
+    coCaptainUsername?: string;
   },
 ): Promise<{ ok: true; registrationId: string } | { ok: false; error: string }> {
   const tournament = await prisma.tournament.findUnique({
@@ -716,6 +971,24 @@ export async function adminAddTournamentRegistration(
       if (!input.teamName?.trim()) {
         return { ok: false, error: "Team name is required for captain registration." };
       }
+      if (!input.coCaptainUsername?.trim()) {
+        return { ok: false, error: "Co-captain username is required for captain registration." };
+      }
+
+      const captainUser = await prisma.user.findUnique({
+        where: { id: userId },
+        include: { playerProfile: true },
+      });
+      if (!captainUser) return { ok: false, error: "Member not found." };
+
+      const coCaptainResolved = await resolveCoCaptainForCaptainRegistration(
+        tournament.game,
+        userId,
+        captainUser.playerProfile?.displayName ?? captainUser.name,
+        input.coCaptainUsername,
+        tournament.id,
+      );
+      if (!coCaptainResolved.ok) return coCaptainResolved;
 
       const sortOrder = (tournament.tournamentTeams[0]?.sortOrder ?? -1) + 1;
       const teamName = input.teamName.trim();
@@ -726,6 +999,7 @@ export async function adminAddTournamentRegistration(
             tournamentId: tournament.id,
             name: teamName,
             captainUserId: userId,
+            coCaptainUserId: coCaptainResolved.coCaptainId,
             sortOrder,
           },
         });
@@ -735,6 +1009,27 @@ export async function adminAddTournamentRegistration(
             ...baseData,
             teamId: team.id,
             teamName,
+            partnerUserId: coCaptainResolved.coCaptainId,
+            partnerName: coCaptainResolved.coCaptainDisplayName,
+            snapshotPartnerUsername: coCaptainResolved.coCaptainDisplayName,
+          },
+        });
+
+        await tx.tournamentRegistration.create({
+          data: {
+            tournamentId: tournament.id,
+            userId: coCaptainResolved.coCaptainId,
+            participantRole: "CO_CAPTAIN",
+            teamId: team.id,
+            teamName,
+            partnerUserId: userId,
+            partnerName: captainUser.playerProfile?.displayName ?? captainUser.name ?? "Captain",
+            snapshotPartnerUsername: captainUser.playerProfile?.displayName ?? captainUser.name,
+            ...coCaptainResolved.snapshot,
+            snapshotValorantRoles: coCaptainResolved.snapshot.snapshotValorantRoles
+              ? (coCaptainResolved.snapshot.snapshotValorantRoles as unknown as import("@prisma/client").Prisma.InputJsonValue)
+              : undefined,
+            status: "APPROVED",
           },
         });
 
@@ -752,7 +1047,7 @@ export async function adminAddTournamentRegistration(
         name: user.name,
         action: "TOURNAMENT_REGISTER",
         target: slug,
-        details: `Registered for cup "${tournament.name}" as Captain of ${teamName} (by Admin).`,
+        details: `Registered for cup "${tournament.name}" as Captain of ${teamName} with co-captain ${coCaptainResolved.coCaptainDisplayName} (by Admin).`,
       });
 
       return { ok: true, registrationId: reg.id };

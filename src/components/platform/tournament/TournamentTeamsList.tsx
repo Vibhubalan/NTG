@@ -3,21 +3,25 @@
 import { useCallback, useEffect, useState } from "react";
 import type { GameSlug } from "@prisma/client";
 import type { TournamentTeamView } from "@core/contracts";
+import { formatParticipantRole } from "@/lib/tournament-display";
 
 type Props = {
   teams: string[];
   teamDetails?: TournamentTeamView[];
   accentHex?: string;
   game?: GameSlug;
+  registrationFormat?: string | null;
 };
 
 function TeamPreviewScreen({
   team,
   accentHex,
+  game,
   onClose,
 }: {
   team: TournamentTeamView;
   accentHex: string;
+  game?: GameSlug;
   onClose: () => void;
 }) {
   const handleKeyDown = useCallback(
@@ -81,14 +85,21 @@ function TeamPreviewScreen({
                     boxShadow: `inset 0 0 0 1px ${accentHex}33`,
                   }}
                 >
-                  {player.participantRole === "CAPTAIN" ? "Captain" : "Player"}
+                  {formatParticipantRole(player.participantRole ?? "PLAYER")}
                 </span>
               </div>
               <dl className="mt-4 space-y-2.5 text-sm">
-                <div className="flex justify-between gap-4">
-                  <dt className="text-white/40">Olympus ID</dt>
-                  <dd className="text-right text-white/85">{player.olympusId ?? "—"}</dd>
-                </div>
+                {game === "CLASH_ROYALE" ? (
+                  <div className="flex justify-between gap-4">
+                    <dt className="text-white/40">Player tag</dt>
+                    <dd className="text-right font-mono text-white/85">{player.riotId ?? "—"}</dd>
+                  </div>
+                ) : (
+                  <div className="flex justify-between gap-4">
+                    <dt className="text-white/40">Olympus ID</dt>
+                    <dd className="text-right text-white/85">{player.olympusId ?? "—"}</dd>
+                  </div>
+                )}
               </dl>
             </li>
           ))}
@@ -104,6 +115,7 @@ export default function TournamentTeamsList({
   teamDetails = [],
   accentHex = "#7c3aed",
   game,
+  registrationFormat,
 }: Props) {
   const [previewTeam, setPreviewTeam] = useState<TournamentTeamView | null>(null);
 
@@ -118,7 +130,8 @@ export default function TournamentTeamsList({
           players: [],
         }));
 
-  const isFifa = game === "EA_FC26";
+  const isDuoTeamCup =
+    game === "EA_FC26" || (game === "CLASH_ROYALE" && registrationFormat === "DUO");
 
   return (
     <section>
@@ -134,14 +147,14 @@ export default function TournamentTeamsList({
         <ul className="grid gap-3 sm:grid-cols-2">
           {rows.map((team, index) => {
             const hasPlayers = team.players.length > 0;
-            const canPreview = isFifa && hasPlayers;
+            const canPreview = isDuoTeamCup && hasPlayers;
 
             return (
               <li key={team.id}>
                 <button
                   type="button"
                   onClick={() => canPreview && setPreviewTeam(team)}
-                  disabled={!canPreview && isFifa}
+                  disabled={!canPreview && isDuoTeamCup}
                   className={`flex w-full items-center gap-4 rounded-[1.15rem] border border-white/[0.06] bg-[#0A0A0A]/70 px-5 py-4 text-left backdrop-blur-sm transition-colors ${
                     canPreview
                       ? "cursor-pointer hover:border-white/[0.12] hover:bg-[#0A0A0A]/85 active:scale-[0.99]"
@@ -170,11 +183,11 @@ export default function TournamentTeamsList({
                     <span className="font-display text-lg font-semibold tracking-[-0.01em] text-white/90">
                       {team.name}
                     </span>
-                    {hasPlayers && !isFifa ? (
+                    {hasPlayers && !isDuoTeamCup ? (
                       <p className="mt-0.5 truncate text-xs text-white/40">
                         {team.players.map((p) => p.displayName).join(" · ")}
                       </p>
-                    ) : hasPlayers && isFifa ? (
+                    ) : hasPlayers && isDuoTeamCup ? (
                       <p className="mt-0.5 text-xs text-white/40">
                         {team.players.length} players
                       </p>
@@ -209,6 +222,7 @@ export default function TournamentTeamsList({
         <TeamPreviewScreen
           team={previewTeam}
           accentHex={accentHex}
+          game={game}
           onClose={() => setPreviewTeam(null)}
         />
       ) : null}

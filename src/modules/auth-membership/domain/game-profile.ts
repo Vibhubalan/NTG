@@ -56,7 +56,7 @@ function isRankNa(value: string | null | undefined): boolean {
   return value.trim().toUpperCase() === "NA";
 }
 
-/** Both Faceit and Premier must be set; at least one must not be NA. */
+/** Both Faceit and Premier must be set on profile (each may be NA). */
 export function validateCs2RanksForRegistration(
   faceit: string | null | undefined,
   premier: string | null | undefined,
@@ -66,9 +66,6 @@ export function validateCs2RanksForRegistration(
   }
   if (!premier?.trim()) {
     return "Set your CS2 peak premier rank (or NA) on your profile.";
-  }
-  if (isRankNa(faceit) && isRankNa(premier)) {
-    return "Enter at least one real Faceit or Premier rank (use NA only for the rank you don't have).";
   }
   return null;
 }

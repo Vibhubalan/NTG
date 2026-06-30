@@ -199,8 +199,10 @@ export class TournamentRepository {
             }))
           : [...team.registrations]
               .sort((a, b) => {
-                if (a.participantRole === "CAPTAIN" && b.participantRole !== "CAPTAIN") return -1;
-                if (b.participantRole === "CAPTAIN" && a.participantRole !== "CAPTAIN") return 1;
+                const order = (role: string) =>
+                  role === "CAPTAIN" ? 0 : role === "CO_CAPTAIN" ? 1 : 2;
+                const diff = order(a.participantRole) - order(b.participantRole);
+                if (diff !== 0) return diff;
                 return 0;
               })
               .map((r) => ({

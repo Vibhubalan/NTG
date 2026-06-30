@@ -26,6 +26,21 @@ const gameMeta: Record<
   OTHER: { iconPath: siValorant.path, hex: "#ff4655", label: "Other" },
 };
 
+export function formatRegistrationLabel(format: string | null | undefined): string {
+  switch (format) {
+    case "AUCTION":
+      return "Auction Draft";
+    case "STANDARD":
+      return "Standard (5v5)";
+    case "SOLO":
+      return "1v1 Solo";
+    case "DUO":
+      return "2v2 Duo";
+    default:
+      return "";
+  }
+}
+
 export function formatMonthYear(iso: string | null): string {
   if (!iso) return "TBA";
   const d = new Date(iso);
@@ -75,7 +90,7 @@ export function toTournamentDisplay(t: TournamentPreview): TournamentDisplay {
     slug: t.slug,
     name: t.name,
     game: meta.label,
-    format: t.registrationFormat === "AUCTION" ? "Auction Draft" : (t.registrationFormat === "STANDARD" ? "Standard (5v5)" : ""),
+    format: formatRegistrationLabel(t.registrationFormat),
     date: formatMonthYear(t.startsAt),
     status: mapDisplayStatus(t.status),
     iconPath: meta.iconPath,
@@ -86,4 +101,17 @@ export function toTournamentDisplay(t: TournamentPreview): TournamentDisplay {
 
 export function gameMetaFor(slug: GameSlug) {
   return gameMeta[slug] ?? gameMeta.OTHER;
+}
+
+export function formatParticipantRole(role: string): string {
+  switch (role) {
+    case "CAPTAIN":
+      return "Captain";
+    case "CO_CAPTAIN":
+      return "Co-Captain";
+    case "PLAYER":
+      return "Player";
+    default:
+      return role;
+  }
 }
