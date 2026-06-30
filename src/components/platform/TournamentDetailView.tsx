@@ -134,6 +134,7 @@ export default function TournamentDetailView({
               teamDetails={tournament.teamDetails}
               accentHex={meta.hex}
               game={tournament.game}
+              registrationFormat={tournament.registrationFormat}
             />
           ) : null}
         </div>

@@ -1,5 +1,5 @@
 import { prisma } from "@core/database/client";
-import type { TournamentDetail, PrizeSplitRow, TournamentTeamView } from "@core/contracts";
+import type { TournamentDetail, PrizeSplitRow, TournamentTeamPlayerView, TournamentTeamView } from "@core/contracts";
 import type { GameSlug, TournamentFormat, TournamentStatus } from "@prisma/client";
 import { gameMetaFor } from "@/lib/tournament-display";
 import { syncRegistrationStatus } from "../application/admin-tournament.service";
@@ -24,6 +24,53 @@ function parsePrizeSplit(value: unknown): PrizeSplitRow[] | null {
 function parseCarouselImages(value: unknown): string[] {
   if (!Array.isArray(value)) return [];
   return value.filter((item): item is string => typeof item === "string" && item.trim().length > 0);
+}
+
+function parseValorantRoles(value: unknown): string[] | null {
+  if (!Array.isArray(value)) return null;
+  const roles = value.filter((r): r is string => typeof r === "string" && r.trim().length > 0);
+  return roles.length > 0 ? roles : null;
+}
+
+const registrationPlayerSelect = {
+  id: true,
+  participantRole: true,
+  snapshotDisplayName: true,
+  snapshotOlympusId: true,
+  snapshotRiotId: true,
+  snapshotSteamId64: true,
+  snapshotCs2FaceitRank: true,
+  snapshotCs2PeakPremier: true,
+  snapshotRankTier: true,
+  snapshotValorantRoles: true,
+} as const;
+
+type RegistrationPlayerRow = {
+  id: string;
+  participantRole: string;
+  snapshotDisplayName: string | null;
+  snapshotOlympusId: string | null;
+  snapshotRiotId: string | null;
+  snapshotSteamId64: string | null;
+  snapshotCs2FaceitRank: string | null;
+  snapshotCs2PeakPremier: string | null;
+  snapshotRankTier: string | null;
+  snapshotValorantRoles: unknown;
+};
+
+function mapRegistrationToPlayerView(r: RegistrationPlayerRow): TournamentTeamPlayerView {
+  return {
+    id: r.id,
+    displayName: r.snapshotDisplayName ?? "Player",
+    riotId: r.snapshotRiotId,
+    olympusId: r.snapshotOlympusId,
+    steamId64: r.snapshotSteamId64,
+    cs2FaceitRank: r.snapshotCs2FaceitRank,
+    cs2PeakPremier: r.snapshotCs2PeakPremier,
+    valorantRankTier: r.snapshotRankTier,
+    valorantRoles: parseValorantRoles(r.snapshotValorantRoles),
+    participantRole: r.participantRole as TournamentTeamPlayerView["participantRole"],
+  };
 }
 
 function isRegistrationOpen(t: {
@@ -154,16 +201,15 @@ export class TournamentRepository {
         tournamentTeams: {
           orderBy: { sortOrder: "asc" },
           include: {
-            players: { orderBy: { sortOrder: "asc" } },
+            players: {
+              orderBy: { sortOrder: "asc" },
+              include: {
+                registration: { select: registrationPlayerSelect },
+              },
+            },
             registrations: {
               orderBy: { createdAt: "asc" },
-              select: {
-                id: true,
-                participantRole: true,
-                snapshotDisplayName: true,
-                snapshotOlympusId: true,
-                snapshotRiotId: true,
-              },
+              select: registrationPlayerSelect,
             },
           },
         },
@@ -191,12 +237,21 @@ export class TournamentRepository {
     const teamDetails: TournamentTeamView[] = t.tournamentTeams.map((team) => {
       const rosterPlayers =
         team.players.length > 0
-          ? team.players.map((p) => ({
-              id: p.id,
-              displayName: p.displayName,
-              riotId:
-                p.riotGameName && p.riotTagLine ? `${p.riotGameName}#${p.riotTagLine}` : null,
-            }))
+          ? team.players.map((p) => {
+              if (p.registration) {
+                return mapRegistrationToPlayerView(p.registration);
+              }
+              return {
+                id: p.id,
+                displayName: p.displayName,
+                riotId:
+                  p.riotGameName && p.riotTagLine
+                    ? `${p.riotGameName}#${p.riotTagLine}`
+                    : null,
+                cs2PeakPremier: p.peakPremierRank,
+                valorantRoles: parseValorantRoles(p.valorantRoles),
+              };
+            })
           : [...team.registrations]
               .sort((a, b) => {
                 const order = (role: string) =>
@@ -205,13 +260,7 @@ export class TournamentRepository {
                 if (diff !== 0) return diff;
                 return 0;
               })
-              .map((r) => ({
-              id: r.id,
-              displayName: r.snapshotDisplayName ?? "Player",
-              riotId: r.snapshotRiotId,
-              olympusId: r.snapshotOlympusId,
-              participantRole: r.participantRole,
-            }));
+              .map((r) => mapRegistrationToPlayerView(r));
 
       return {
         id: team.id,

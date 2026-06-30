@@ -60,6 +60,11 @@ export type TournamentTeamPlayerView = {
   displayName: string;
   riotId: string | null;
   olympusId?: string | null;
+  steamId64?: string | null;
+  cs2FaceitRank?: string | null;
+  cs2PeakPremier?: string | null;
+  valorantRankTier?: string | null;
+  valorantRoles?: string[] | null;
   participantRole?: "CAPTAIN" | "CO_CAPTAIN" | "PLAYER";
 };
 

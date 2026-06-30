@@ -89,10 +89,48 @@ function TeamPreviewScreen({
                 </span>
               </div>
               <dl className="mt-4 space-y-2.5 text-sm">
-                <div className="flex justify-between gap-4">
-                  <dt className="text-white/40">Olympus ID</dt>
-                  <dd className="text-right text-white/85">{player.olympusId ?? "—"}</dd>
-                </div>
+                {game === "EA_FC26" ? (
+                  <div className="flex justify-between gap-4">
+                    <dt className="text-white/40">Olympus ID</dt>
+                    <dd className="text-right text-white/85">{player.olympusId ?? "—"}</dd>
+                  </div>
+                ) : null}
+                {game === "VALORANT" && player.riotId ? (
+                  <div className="flex justify-between gap-4">
+                    <dt className="text-white/40">Riot ID</dt>
+                    <dd className="text-right font-mono text-white/85">{player.riotId}</dd>
+                  </div>
+                ) : null}
+                {game === "VALORANT" && player.valorantRankTier ? (
+                  <div className="flex justify-between gap-4">
+                    <dt className="text-white/40">Rank</dt>
+                    <dd className="text-right text-white/85">{player.valorantRankTier}</dd>
+                  </div>
+                ) : null}
+                {game === "VALORANT" && player.valorantRoles?.length ? (
+                  <div className="flex justify-between gap-4">
+                    <dt className="text-white/40">Roles</dt>
+                    <dd className="text-right text-white/85">{player.valorantRoles.join(", ")}</dd>
+                  </div>
+                ) : null}
+                {game === "CS2" && player.steamId64 ? (
+                  <div className="flex justify-between gap-4">
+                    <dt className="text-white/40">Steam64</dt>
+                    <dd className="text-right font-mono text-xs text-white/85">{player.steamId64}</dd>
+                  </div>
+                ) : null}
+                {game === "CS2" && player.cs2FaceitRank ? (
+                  <div className="flex justify-between gap-4">
+                    <dt className="text-white/40">Faceit</dt>
+                    <dd className="text-right text-white/85">{player.cs2FaceitRank}</dd>
+                  </div>
+                ) : null}
+                {game === "CS2" && player.cs2PeakPremier ? (
+                  <div className="flex justify-between gap-4">
+                    <dt className="text-white/40">Peak Premier</dt>
+                    <dd className="text-right text-white/85">{player.cs2PeakPremier}</dd>
+                  </div>
+                ) : null}
               </dl>
             </li>
           ))}
@@ -139,14 +177,14 @@ export default function TournamentTeamsList({
         <ul className="grid gap-3 sm:grid-cols-2">
           {rows.map((team, index) => {
             const hasPlayers = team.players.length > 0;
-            const canPreview = isDuoTeamCup && hasPlayers;
+            const canPreview = hasPlayers;
 
             return (
               <li key={team.id}>
                 <button
                   type="button"
                   onClick={() => canPreview && setPreviewTeam(team)}
-                  disabled={!canPreview && isDuoTeamCup}
+                  disabled={!canPreview}
                   className={`flex w-full items-center gap-4 rounded-[1.15rem] border border-white/[0.06] bg-[#0A0A0A]/70 px-5 py-4 text-left backdrop-blur-sm transition-colors ${
                     canPreview
                       ? "cursor-pointer hover:border-white/[0.12] hover:bg-[#0A0A0A]/85 active:scale-[0.99]"
@@ -175,13 +213,11 @@ export default function TournamentTeamsList({
                     <span className="font-display text-lg font-semibold tracking-[-0.01em] text-white/90">
                       {team.name}
                     </span>
-                    {hasPlayers && !isDuoTeamCup ? (
-                      <p className="mt-0.5 truncate text-xs text-white/40">
-                        {team.players.map((p) => p.displayName).join(" · ")}
-                      </p>
-                    ) : hasPlayers && isDuoTeamCup ? (
+                    {hasPlayers ? (
                       <p className="mt-0.5 text-xs text-white/40">
-                        {team.players.length} players
+                        {isDuoTeamCup
+                          ? `${team.players.length} players`
+                          : `${team.players.length} player${team.players.length === 1 ? "" : "s"}`}
                       </p>
                     ) : null}
                   </div>
