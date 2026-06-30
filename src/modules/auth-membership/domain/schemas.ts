@@ -120,7 +120,6 @@ export const fifaRegisterSchema = z.object({
 
 export const standardTournamentRegisterSchema = z.object({
   teamName: sanitizedString.pipe(z.string().min(2).max(48)),
-  logoUrl: z.string().trim().url(),
   memberUsernames: z.array(usernameSchema).length(4, "Enter exactly 4 teammate usernames."),
   valorantRoles: valorantRolesSchema.optional(),
   cs2PeakPremierRank: cs2PremierRankSchema.optional(),
@@ -140,7 +139,6 @@ export const tournamentRegisterSchema = z.discriminatedUnion("participantRole", 
   z.object({
     participantRole: z.literal("CAPTAIN"),
     teamName: z.string().trim().min(2).max(48),
-    logoUrl: z.string().trim().url(),
     coCaptainUsername: z.string().trim().min(2).max(48),
     valorantRoles: valorantRolesSchema.optional(),
     cs2PeakPremierRank: cs2PremierRankSchema.optional(),

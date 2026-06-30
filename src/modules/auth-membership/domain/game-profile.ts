@@ -61,11 +61,8 @@ export function validateCs2RanksForRegistration(
   faceit: string | null | undefined,
   premier: string | null | undefined,
 ): string | null {
-  if (!faceit?.trim()) {
-    return "Set your Faceit rank (or NA) on your profile.";
-  }
-  if (!premier?.trim()) {
-    return "Set your CS2 peak premier rank (or NA) on your profile.";
+  if (!faceit?.trim() || !premier?.trim()) {
+    return "Complete your CS2 Faceit and Premier ranks on your profile.";
   }
   return null;
 }

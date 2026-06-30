@@ -19,7 +19,6 @@ import { logUserActivity } from "@/lib/user-audit";
 export type TournamentRegisterInput = {
   participantRole: RegistrationParticipantRole;
   teamName?: string;
-  logoUrl?: string;
   coCaptainUsername?: string;
   valorantRoles?: ValorantRole[];
   cs2PeakPremierRank?: string;
@@ -27,7 +26,6 @@ export type TournamentRegisterInput = {
 
 export type StandardTeamRegisterInput = {
   teamName: string;
-  logoUrl: string;
   memberUsernames: string[];
   valorantRoles?: ValorantRole[];
   cs2PeakPremierRank?: string;
@@ -446,9 +444,6 @@ export async function registerStandardTeam(
   if (!input.teamName?.trim()) {
     return { ok: false, error: "Team name is required." };
   }
-  if (!input.logoUrl?.trim()) {
-    return { ok: false, error: "Team logo is required." };
-  }
 
   const membersResolved = await resolveStandardTeamMembers(
     tournament.game,
@@ -509,7 +504,6 @@ export async function registerStandardTeam(
           tournamentId: tournament.id,
           name: teamName,
           captainUserId: userId,
-          logoUrl: input.logoUrl!.trim(),
           sortOrder,
         },
       });
@@ -655,9 +649,6 @@ export async function registerForTournament(
       if (!input.teamName?.trim()) {
         return { ok: false, error: "Team name is required." };
       }
-      if (!input.logoUrl?.trim()) {
-        return { ok: false, error: "Team logo is required." };
-      }
       if (!input.coCaptainUsername?.trim()) {
         return { ok: false, error: "Co-captain username is required." };
       }
@@ -681,7 +672,6 @@ export async function registerForTournament(
             name: teamName,
             captainUserId: userId,
             coCaptainUserId: coCaptainResolved.coCaptainId,
-            logoUrl: input.logoUrl!.trim(),
             sortOrder,
           },
         });

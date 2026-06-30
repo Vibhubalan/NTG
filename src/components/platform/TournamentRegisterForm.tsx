@@ -87,15 +87,12 @@ export default function TournamentRegisterForm({
 }: Props) {
   const router = useRouter();
   const submitting = useRef(false);
-  const fileRef = useRef<HTMLInputElement>(null);
   const [step, setStep] = useState<Step>("role");
   const [participantRole, setParticipantRole] = useState<"CAPTAIN" | "PLAYER" | null>(null);
   const [teamName, setTeamName] = useState("");
   const [coCaptainUsername, setCoCaptainUsername] = useState("");
   const [memberUsernames, setMemberUsernames] = useState(["", "", "", ""]);
   const [partnerUsername, setPartnerUsername] = useState("");
-  const [logoUrl, setLogoUrl] = useState<string | null>(null);
-  const [logoUploading, setLogoUploading] = useState(false);
   const [acceptedTerms, setAcceptedTerms] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -153,29 +150,6 @@ export default function TournamentRegisterForm({
     );
   }
 
-  async function uploadLogo(file: File) {
-    setLogoUploading(true);
-    setError(null);
-    try {
-      const form = new FormData();
-      form.append("file", file);
-      const res = await fetch("/api/tournaments/upload-team-logo", {
-        method: "POST",
-        body: form,
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        setError(data.error ?? "Logo upload failed.");
-        return;
-      }
-      setLogoUrl(data.url);
-    } catch {
-      setError("Logo upload failed.");
-    } finally {
-      setLogoUploading(false);
-    }
-  }
-
   async function submitDuoRegistration() {
     if (submitting.current || loading || !acceptedTerms) return;
     submitting.current = true;
@@ -220,7 +194,6 @@ export default function TournamentRegisterForm({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           teamName: teamName.trim(),
-          logoUrl: logoUrl!,
           memberUsernames: memberUsernames.map((u) => u.trim()),
           acceptedTerms: true,
         }),
@@ -257,7 +230,6 @@ export default function TournamentRegisterForm({
           ? {
               participantRole,
               teamName: teamName.trim(),
-              logoUrl: logoUrl!,
               coCaptainUsername: coCaptainUsername.trim(),
               acceptedTerms: true,
             }
@@ -357,13 +329,6 @@ export default function TournamentRegisterForm({
               value={teamName}
               onChange={(e) => setTeamName(e.target.value)}
             />
-            <div>
-              <input ref={fileRef} type="file" accept="image/jpeg,image/png,image/webp" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) uploadLogo(f); }} />
-              <button type="button" onClick={() => fileRef.current?.click()} disabled={logoUploading} className="w-full rounded-xl border border-dashed border-white/15 py-3 text-xs uppercase tracking-wider text-white/55 hover:border-white/30">
-                {logoUploading ? "Uploading…" : logoUrl ? "Logo uploaded. Tap to change" : "Upload team logo (max 10 MB)"}
-              </button>
-              {logoUrl ? <p className="mt-1 truncate text-[10px] text-emerald-300/80">{logoUrl}</p> : null}
-            </div>
             <p className="text-xs font-medium uppercase tracking-wider text-white/40">Teammates</p>
             {memberUsernames.map((username, index) => (
               <input
@@ -391,7 +356,7 @@ export default function TournamentRegisterForm({
             <button
               type="button"
               onClick={submitStandardRegistration}
-              disabled={loading || !teamName.trim() || !logoUrl || !standardMembersComplete || !acceptedTerms}
+              disabled={loading || !teamName.trim() || !standardMembersComplete || !acceptedTerms}
               className="cta w-full rounded-full py-3 text-xs font-semibold uppercase tracking-[0.18em] disabled:opacity-50"
             >
               {loading ? "Registering…" : "Register team"}
@@ -424,7 +389,7 @@ export default function TournamentRegisterForm({
               className="rounded-xl border border-white/10 bg-white/[0.03] px-4 py-4 text-left transition-colors hover:border-[var(--color-brand)]/40"
             >
               <p className="text-sm font-semibold text-white">Captain</p>
-              <p className="mt-1 text-xs text-white/40">Team name, logo, and co-captain</p>
+              <p className="mt-1 text-xs text-white/40">Team name and co-captain</p>
             </button>
             <button
               type="button"
@@ -450,19 +415,12 @@ export default function TournamentRegisterForm({
               Your co-captain must be an NTG member with a complete game profile
               {game === "CS2" ? " (Steam linked)" : game === "VALORANT" ? " (Riot ID linked)" : ""}.
             </p>
-            <div>
-              <input ref={fileRef} type="file" accept="image/jpeg,image/png,image/webp" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) uploadLogo(f); }} />
-              <button type="button" onClick={() => fileRef.current?.click()} disabled={logoUploading} className="w-full rounded-xl border border-dashed border-white/15 py-3 text-xs uppercase tracking-wider text-white/55 hover:border-white/30">
-                {logoUploading ? "Uploading…" : logoUrl ? "Logo uploaded. Tap to change" : "Upload team logo (max 10 MB)"}
-              </button>
-              {logoUrl ? <p className="mt-1 truncate text-[10px] text-emerald-300/80">{logoUrl}</p> : null}
-            </div>
             <div className="flex gap-2">
               <button type="button" onClick={() => setStep("role")} className="rounded-full border border-white/10 px-4 py-2 text-xs text-white/50">Back</button>
               <button
                 type="button"
                 onClick={() => setStep("confirm")}
-                disabled={!teamName.trim() || !coCaptainUsername.trim() || !logoUrl}
+                disabled={!teamName.trim() || !coCaptainUsername.trim()}
                 className="cta flex-1 rounded-full py-2.5 text-xs font-semibold uppercase tracking-[0.16em] disabled:opacity-50"
               >
                 Continue
@@ -508,4 +466,3 @@ export default function TournamentRegisterForm({
     </div>
   );
 }
-
