@@ -149,8 +149,8 @@ export default function RosterHub({ teams, jobListings }: Props) {
       <OpenJobsSection jobs={jobListings} />
 
       {teams.length > 1 && (
-        <div className="flex border-b border-white/10 pb-6">
-          <div className="flex items-center gap-1 rounded-full bg-[#111] p-1.5 backdrop-blur-md border border-white/20 shadow-inner">
+        <div className="flex border-b border-white/10 pb-6 overflow-x-auto scrollbar-none -mx-[clamp(1.25rem,_3vw,_4rem)] px-[clamp(1.25rem,_3vw,_4rem)]">
+          <div className="flex items-center gap-1 rounded-full bg-[#111] p-1.5 backdrop-blur-md border border-white/20 shadow-inner flex-nowrap shrink-0">
             {teams.map((t) => {
               const m = gameMetaFor(GAME_KEY_TO_SLUG[t.gameKey] ?? "OTHER");
               const isActive = t.gameKey === activeKey;
