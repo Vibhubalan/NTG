@@ -2,6 +2,7 @@ import { prisma } from "@core/database/client";
 import { GameSlug } from "@prisma/client";
 import { serverEnv } from "@core/config/env.server";
 import { linkGameIdentity } from "./profile.service";
+import { CS2_RANK_DEFAULT } from "../domain/game-profile";
 import { logUserActivity } from "@/lib/user-audit";
 
 
@@ -167,6 +168,23 @@ export async function linkSteamAccount(
     data: { verified: true },
   });
 
+  const existingProfile = await prisma.playerProfile.findUnique({
+    where: { userId },
+    select: { cs2PeakPremierRank: true, cs2FaceitRank: true },
+  });
+
+  await prisma.playerProfile.update({
+    where: { userId },
+    data: {
+      cs2PeakPremierRank: existingProfile?.cs2PeakPremierRank?.trim()
+        ? existingProfile.cs2PeakPremierRank
+        : CS2_RANK_DEFAULT,
+      cs2FaceitRank: existingProfile?.cs2FaceitRank?.trim()
+        ? existingProfile.cs2FaceitRank
+        : CS2_RANK_DEFAULT,
+    },
+  });
+
   if (user) {
     await logUserActivity({
       userId,
@@ -221,7 +239,7 @@ export async function unlinkSteamAccount(
 
   await prisma.playerProfile.updateMany({
     where: { userId },
-    data: { cs2PeakPremierRank: null },
+    data: { cs2PeakPremierRank: null, cs2FaceitRank: null },
   });
 
   if (user) {

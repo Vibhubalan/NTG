@@ -1,9 +1,9 @@
 import { getSession } from "@core/auth/session";
 import ProfileEditor from "@/components/platform/ProfileEditor";
 import PlatformHeader from "@/components/platform/shell/PlatformHeader";
-import Link from "next/link";
 import { redirect } from "next/navigation";
 import { signOut } from "@auth-membership/index";
+import { Suspense } from "react";
 
 async function handleSignOut() {
   "use server";
@@ -33,7 +33,9 @@ export default async function ProfilePage() {
         title="Account Settings"
         subtitle="Manage your NTG lounge identity, linked game profiles, and tournament settings."
       />
-      <ProfileEditor />
+      <Suspense fallback={<div className="h-96 animate-pulse rounded-3xl bg-white/[0.03]" />}>
+        <ProfileEditor />
+      </Suspense>
     </div>
   );
 }

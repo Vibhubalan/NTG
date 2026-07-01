@@ -10,7 +10,9 @@ import {
   usernameKeyFromDisplayName,
   validateCs2RanksForRegistration,
   normalizeCs2PeakPremierRank,
+  normalizeCs2FaceitRank,
 } from "@auth-membership/application/registration-helpers";
+import { ensureCs2RankDefaults } from "@auth-membership/application/game-profile.service";
 import { isTournamentRegistrationLive } from "../domain/registration-window";
 import { syncUserRank } from "./rank-sync.service";
 import { logUserActivity } from "@/lib/user-audit";
@@ -21,14 +23,12 @@ export type TournamentRegisterInput = {
   teamName?: string;
   coCaptainUsername?: string;
   valorantRoles?: ValorantRole[];
-  cs2PeakPremierRank?: string;
 };
 
 export type StandardTeamRegisterInput = {
   teamName: string;
   memberUsernames: string[];
   valorantRoles?: ValorantRole[];
-  cs2PeakPremierRank?: string;
 };
 
 export type FifaRegisterInput = {
@@ -75,6 +75,22 @@ async function getValorantRankSnapshot(userId: string): Promise<{
   return {
     tier: entry?.rankTier ?? null,
     tierId: entry?.rankTierId ?? null,
+  };
+}
+
+function snapshotCs2RanksFromProfile(
+  profile: {
+    cs2PeakPremierRank: string | null;
+    cs2FaceitRank: string | null;
+  } | null,
+): { premier: string | null; faceit: string | null } {
+  const premierRaw = profile?.cs2PeakPremierRank ?? null;
+  const faceitRaw = profile?.cs2FaceitRank ?? null;
+  return {
+    premier: premierRaw
+      ? normalizeCs2PeakPremierRank(premierRaw) ?? premierRaw
+      : null,
+    faceit: faceitRaw ? normalizeCs2FaceitRank(faceitRaw) ?? faceitRaw : null,
   };
 }
 
@@ -173,6 +189,8 @@ export async function getRegistrationEligibility(
 ): Promise<RegistrationEligibility | null> {
   const tournament = await prisma.tournament.findUnique({ where: { slug } });
   if (!tournament) return null;
+
+  await ensureCs2RankDefaults(userId);
 
   const user = await prisma.user.findUnique({
     where: { id: userId },
@@ -471,12 +489,9 @@ export async function registerStandardTeam(
   }
 
   if (tournament.game === GameSlug.CS2) {
-    const premier =
-      input.cs2PeakPremierRank ?? user.playerProfile?.cs2PeakPremierRank ?? null;
-    snapshotCs2PeakPremier = premier
-      ? normalizeCs2PeakPremierRank(premier) ?? premier
-      : null;
-    snapshotCs2Faceit = user.playerProfile?.cs2FaceitRank ?? null;
+    const ranks = snapshotCs2RanksFromProfile(user.playerProfile);
+    snapshotCs2PeakPremier = ranks.premier;
+    snapshotCs2Faceit = ranks.faceit;
   }
 
   const captainBase = {
@@ -621,12 +636,9 @@ export async function registerForTournament(
   }
 
   if (tournament.game === GameSlug.CS2) {
-    const premier =
-      input.cs2PeakPremierRank ?? user.playerProfile?.cs2PeakPremierRank ?? null;
-    snapshotCs2PeakPremier = premier
-      ? normalizeCs2PeakPremierRank(premier) ?? premier
-      : null;
-    snapshotCs2Faceit = user.playerProfile?.cs2FaceitRank ?? null;
+    const ranks = snapshotCs2RanksFromProfile(user.playerProfile);
+    snapshotCs2PeakPremier = ranks.premier;
+    snapshotCs2Faceit = ranks.faceit;
   }
 
   const baseData = {
@@ -1031,11 +1043,9 @@ export async function buildRegistrationSnapshotForUser(
   }
 
   if (game === GameSlug.CS2) {
-    const premier = user.playerProfile?.cs2PeakPremierRank ?? null;
-    snapshotCs2PeakPremier = premier
-      ? normalizeCs2PeakPremierRank(premier) ?? premier
-      : null;
-    snapshotCs2Faceit = user.playerProfile?.cs2FaceitRank ?? null;
+    const ranks = snapshotCs2RanksFromProfile(user.playerProfile);
+    snapshotCs2PeakPremier = ranks.premier;
+    snapshotCs2Faceit = ranks.faceit;
   }
 
   return {

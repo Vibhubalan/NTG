@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { ValorantRole } from "@prisma/client";
 import { parseApiJson } from "@/lib/parse-api-json";
 import {
@@ -25,34 +25,45 @@ type GameProfile = {
 type GameProfilesPanelProps = {
   profile: GameProfile;
   selectedRoles: ValorantRole[];
-  cs2Premier: string;
-  cs2Faceit: string;
   pendingRiotId: string;
   onPendingRiotIdChange: (value: string) => void;
   pendingSteamUrl: string;
   onPendingSteamUrlChange: (value: string) => void;
   onToggleRole: (role: ValorantRole) => void;
-  onCs2PremierChange: (value: string) => void;
-  onCs2FaceitChange: (value: string) => void;
   onRefresh: () => Promise<void>;
 };
 
 export default function GameProfilesPanel({
   profile,
   selectedRoles,
-  cs2Premier,
-  cs2Faceit,
   pendingRiotId,
   onPendingRiotIdChange,
   pendingSteamUrl,
   onPendingSteamUrlChange,
   onToggleRole,
-  onCs2PremierChange,
-  onCs2FaceitChange,
   onRefresh,
 }: GameProfilesPanelProps) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [cs2Premier, setCs2Premier] = useState(profile.cs2PeakPremierRank ?? "NA");
+  const [cs2Faceit, setCs2Faceit] = useState(profile.cs2FaceitRank ?? "NA");
+  const [savingRanks, setSavingRanks] = useState(false);
+  const [ranksMessage, setRanksMessage] = useState<string | null>(null);
+
+  useEffect(() => {
+    setCs2Premier(profile.cs2PeakPremierRank ?? "NA");
+    setCs2Faceit(profile.cs2FaceitRank ?? "NA");
+  }, [profile.cs2PeakPremierRank, profile.cs2FaceitRank]);
+
+  const cs2RanksDirty = useMemo(() => {
+    return (
+      cs2Premier.trim() !== (profile.cs2PeakPremierRank ?? "NA").trim() ||
+      cs2Faceit.trim() !== (profile.cs2FaceitRank ?? "NA").trim()
+    );
+  }, [profile, cs2Premier, cs2Faceit]);
+
+  const canSaveCs2Ranks =
+    cs2RanksDirty && cs2Premier.trim().length > 0 && cs2Faceit.trim().length > 0;
 
   async function refreshValorantRank() {
     setBusy(true);
@@ -75,6 +86,34 @@ export default function GameProfilesPanel({
     }
   }
 
+  async function saveCs2Ranks() {
+    if (!canSaveCs2Ranks) return;
+    setSavingRanks(true);
+    setRanksMessage(null);
+    setError(null);
+    try {
+      const res = await fetch("/api/profile/game-profile", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          cs2PeakPremierRank: cs2Premier.trim(),
+          cs2FaceitRank: cs2Faceit.trim(),
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setError(data.error ?? "Could not save CS2 ranks.");
+        return;
+      }
+      setRanksMessage("CS2 ranks saved.");
+      await onRefresh();
+    } catch {
+      setError("Could not save CS2 ranks.");
+    } finally {
+      setSavingRanks(false);
+    }
+  }
+
   return (
     <div className="space-y-6">
       <div className="border-b border-white/[0.06] pb-4">
@@ -92,6 +131,12 @@ export default function GameProfilesPanel({
           <span>{error}</span>
         </div>
       )}
+
+      {ranksMessage ? (
+        <div className="flex items-center gap-3 rounded-xl border border-emerald-500/20 bg-emerald-500/[0.08] px-4 py-3 text-sm text-emerald-300">
+          <span>{ranksMessage}</span>
+        </div>
+      ) : null}
 
       {/* VALORANT INTEGRATION SECTION */}
       <div className="relative overflow-hidden rounded-3xl border border-white/[0.08] bg-white/[0.01] glass-strong p-6 space-y-4 border-l-4 border-l-[#ff4655]">
@@ -111,7 +156,7 @@ export default function GameProfilesPanel({
             </span>
           )}
         </div>
-        
+
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div className="rounded-2xl border border-white/[0.04] bg-[#070b19]/40 p-4">
             <p className="text-[10px] font-bold uppercase tracking-wider text-white/35">Riot ID</p>
@@ -129,7 +174,7 @@ export default function GameProfilesPanel({
               </div>
             )}
           </div>
-          
+
           <div className="rounded-2xl border border-white/[0.04] bg-[#070b19]/40 p-4 flex flex-col justify-between">
             <div>
               <p className="text-[10px] font-bold uppercase tracking-wider text-white/35">Competitive Rank</p>
@@ -149,7 +194,7 @@ export default function GameProfilesPanel({
             )}
           </div>
         </div>
-        
+
         {profile.riotPuuid && (
           <div className="border-t border-white/[0.06] pt-4 space-y-3">
             <div>
@@ -197,7 +242,7 @@ export default function GameProfilesPanel({
             </span>
           )}
         </div>
-        
+
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div className="rounded-2xl border border-white/[0.04] bg-[#070b19]/40 p-4">
             <p className="text-[10px] font-bold uppercase tracking-wider text-white/35">Steam Account</p>
@@ -218,7 +263,7 @@ export default function GameProfilesPanel({
               </div>
             )}
           </div>
-          
+
           <div className="rounded-2xl border border-white/[0.04] bg-[#070b19]/40 p-4">
             <p className="text-[10px] font-bold uppercase tracking-wider text-white/35">Play Stats</p>
             <div className="mt-3 flex items-center justify-between text-xs text-white/70">
@@ -229,19 +274,21 @@ export default function GameProfilesPanel({
             </div>
           </div>
         </div>
-        
+
         {profile.steamId64 && (
           <div className="border-t border-white/[0.06] pt-4 space-y-4">
             <div>
               <h5 className="text-[11px] font-bold uppercase tracking-wider text-white/40">Competitive Skill Levels</h5>
-              <p className="text-[10px] text-white/30">Enter rankings (e.g. Level 8, #15000, or NA if not ranked)</p>
+              <p className="text-[10px] text-white/30">
+                Defaults to NA until you update. Cup registration uses your latest saved ranks.
+              </p>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <label className="mb-2 block text-[10px] font-bold uppercase tracking-wider text-white/35">Faceit Rank</label>
                 <input
                   value={cs2Faceit}
-                  onChange={(e) => onCs2FaceitChange(e.target.value)}
+                  onChange={(e) => setCs2Faceit(e.target.value)}
                   placeholder="Level 8 or NA"
                   className="w-full rounded-xl border border-white/10 bg-[#0c1428]/60 px-4 py-2.5 text-xs text-white placeholder:text-white/30 focus:border-[#e65a23]/50 focus:outline-none transition-all"
                 />
@@ -250,12 +297,24 @@ export default function GameProfilesPanel({
                 <label className="mb-2 block text-[10px] font-bold uppercase tracking-wider text-white/35">Peak Premier Rank</label>
                 <input
                   value={cs2Premier}
-                  onChange={(e) => onCs2PremierChange(e.target.value)}
+                  onChange={(e) => setCs2Premier(e.target.value)}
                   placeholder="#18432 or NA"
                   className="w-full rounded-xl border border-white/10 bg-[#0c1428]/60 px-4 py-2.5 text-xs text-white placeholder:text-white/30 focus:border-[#e65a23]/50 focus:outline-none transition-all"
                 />
               </div>
             </div>
+            <button
+              type="button"
+              onClick={saveCs2Ranks}
+              disabled={savingRanks || !canSaveCs2Ranks}
+              className={`rounded-xl px-4 py-2.5 text-xs font-semibold uppercase tracking-wider transition-all ${
+                canSaveCs2Ranks
+                  ? "bg-[#e65a23]/20 border border-[#e65a23]/40 text-white hover:bg-[#e65a23]/30 cursor-pointer"
+                  : "border border-white/10 bg-white/5 text-white/35 cursor-not-allowed"
+              } disabled:opacity-60`}
+            >
+              {savingRanks ? "Saving…" : "Save CS ranks"}
+            </button>
           </div>
         )}
       </div>

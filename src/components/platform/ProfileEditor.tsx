@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { signOut } from "next-auth/react";
+import { useSearchParams } from "next/navigation";
 import type { ValorantRole } from "@prisma/client";
 import { computeAgeFromDateOfBirth } from "@/lib/date-age";
 import AccountInfoPanel from "@/components/platform/AccountInfoPanel";
@@ -32,6 +33,7 @@ function rolesEqual(a: ValorantRole[], b: ValorantRole[]) {
 }
 
 export default function ProfileEditor() {
+  const searchParams = useSearchParams();
   const [profile, setProfile] = useState<FullProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -42,8 +44,6 @@ export default function ProfileEditor() {
   const [dateOfBirth, setDateOfBirth] = useState("");
   const [olympusId, setOlympusId] = useState("");
   const [selectedRoles, setSelectedRoles] = useState<ValorantRole[]>([]);
-  const [cs2Premier, setCs2Premier] = useState("");
-  const [cs2Faceit, setCs2Faceit] = useState("");
 
   const [pendingRiotId, setPendingRiotId] = useState("");
   const [pendingSteamUrl, setPendingSteamUrl] = useState("");
@@ -85,8 +85,6 @@ export default function ProfileEditor() {
         setDateOfBirth(p.dateOfBirth ?? "");
         setOlympusId(p.olympusId ?? "");
         setSelectedRoles(p.valorantRoles ?? []);
-        setCs2Premier(p.cs2PeakPremierRank ?? "");
-        setCs2Faceit(p.cs2FaceitRank ?? "");
       }
     } finally {
       setLoading(false);
@@ -96,6 +94,12 @@ export default function ProfileEditor() {
   useEffect(() => {
     load();
   }, [load]);
+
+  useEffect(() => {
+    const tab = searchParams.get("tab");
+    if (tab === "games") setActiveTab("games");
+    else if (tab === "profile") setActiveTab("profile");
+  }, [searchParams]);
 
   const accountDirty = useMemo(() => {
     if (!profile) return false;
@@ -110,26 +114,17 @@ export default function ProfileEditor() {
     return !rolesEqual(selectedRoles, profile.valorantRoles ?? []);
   }, [profile, selectedRoles]);
 
-  const cs2Dirty = useMemo(() => {
-    if (!profile) return false;
-    return (
-      cs2Premier.trim() !== (profile.cs2PeakPremierRank ?? "").trim() ||
-      cs2Faceit.trim() !== (profile.cs2FaceitRank ?? "").trim()
-    );
-  }, [profile, cs2Premier, cs2Faceit]);
-
   const linksDirty = useMemo(() => {
     if (!profile) return false;
     return pendingRiotId.trim() !== "" || pendingSteamUrl.trim() !== "";
   }, [profile, pendingRiotId, pendingSteamUrl]);
 
-  const hasChanges = accountDirty || rolesDirty || cs2Dirty || linksDirty;
+  const hasChanges = accountDirty || rolesDirty || linksDirty;
 
   const canSave = useMemo(() => {
     if (!hasChanges) return false;
     if (accountDirty && (!dateOfBirth || !olympusId.trim())) return false;
     if (rolesDirty && selectedRoles.length === 0) return false;
-    if (cs2Dirty && (!cs2Premier.trim() || !cs2Faceit.trim())) return false;
     return true;
   }, [
     hasChanges,
@@ -138,9 +133,6 @@ export default function ProfileEditor() {
     olympusId,
     rolesDirty,
     selectedRoles,
-    cs2Dirty,
-    cs2Premier,
-    cs2Faceit,
     linksDirty,
     pendingRiotId,
     pendingSteamUrl,
@@ -193,10 +185,6 @@ export default function ProfileEditor() {
     }
     if (rolesDirty) {
       body.valorantRoles = selectedRoles;
-    }
-    if (cs2Dirty) {
-      body.cs2PeakPremierRank = cs2Premier.trim();
-      body.cs2FaceitRank = cs2Faceit.trim();
     }
 
     if (Object.keys(body).length > 0) {
@@ -403,8 +391,6 @@ export default function ProfileEditor() {
             <GameProfilesPanel
               profile={profile}
               selectedRoles={selectedRoles}
-              cs2Premier={cs2Premier}
-              cs2Faceit={cs2Faceit}
               pendingRiotId={pendingRiotId}
               onPendingRiotIdChange={setPendingRiotId}
               pendingSteamUrl={pendingSteamUrl}
@@ -423,8 +409,6 @@ export default function ProfileEditor() {
                   return nextRoles;
                 });
               }}
-              onCs2PremierChange={setCs2Premier}
-              onCs2FaceitChange={setCs2Faceit}
               onRefresh={load}
             />
           )}

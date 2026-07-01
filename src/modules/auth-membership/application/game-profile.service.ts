@@ -12,6 +12,7 @@ import {
   validateValorantRoles,
   normalizeCs2PeakPremierRank,
   normalizeCs2FaceitRank,
+  CS2_RANK_DEFAULT,
 } from "../domain/game-profile";
 import { clearSignupSession } from "../infrastructure/signup-session";
 
@@ -37,7 +38,47 @@ export type PlayerGameProfile = {
   signupCompleted: boolean;
 };
 
+export async function ensureCs2RankDefaults(userId: string): Promise<void> {
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: {
+      steamId64: true,
+      playerProfile: {
+        select: {
+          playedGames: true,
+          cs2PeakPremierRank: true,
+          cs2FaceitRank: true,
+        },
+      },
+    },
+  });
+
+  const profile = user?.playerProfile;
+  if (!profile) return;
+
+  const playsCs2 =
+    profile.playedGames.includes("CS2") || user.steamId64 != null;
+  if (!playsCs2) return;
+
+  const data: { cs2PeakPremierRank?: string; cs2FaceitRank?: string } = {};
+  if (!profile.cs2PeakPremierRank?.trim()) {
+    data.cs2PeakPremierRank = CS2_RANK_DEFAULT;
+  }
+  if (!profile.cs2FaceitRank?.trim()) {
+    data.cs2FaceitRank = CS2_RANK_DEFAULT;
+  }
+
+  if (Object.keys(data).length === 0) return;
+
+  await prisma.playerProfile.update({
+    where: { userId },
+    data,
+  });
+}
+
 export async function getPlayerGameProfile(userId: string): Promise<PlayerGameProfile | null> {
+  await ensureCs2RankDefaults(userId);
+
   const user = await prisma.user.findUnique({
     where: { id: userId },
     include: {

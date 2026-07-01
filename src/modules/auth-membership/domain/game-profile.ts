@@ -51,6 +51,9 @@ export function normalizeCs2FaceitRank(raw: string): string | null {
   return trimmed;
 }
 
+/** Default when Steam is linked and ranks are unset. */
+export const CS2_RANK_DEFAULT = "NA";
+
 function isRankNa(value: string | null | undefined): boolean {
   if (!value?.trim()) return true;
   return value.trim().toUpperCase() === "NA";
