@@ -115,7 +115,7 @@ export default function BirthdaySection() {
     <section id="birthday" className="relative mx-auto w-full max-w-[var(--container)] scroll-mt-28 px-[clamp(1.25rem,_3vw,_4rem)] py-24 sm:py-32">
       {/* Background ambient glow */}
       <div className="pointer-events-none absolute inset-0 -z-10 flex items-center justify-center opacity-30">
-        <div className="h-[40rem] w-[40rem] rounded-full bg-[var(--color-iris)] blur-[120px]" />
+        <div className="h-[40rem] w-[40rem] rounded-full bg-[radial-gradient(circle,_var(--color-iris)_0%,_transparent_70%)]" />
       </div>
 
       {/* Tabs Selector Switcher */}
@@ -188,7 +188,7 @@ export default function BirthdaySection() {
                     fill
                     sizes="(max-width: 1024px) 100vw, 50vw"
                     className="object-cover"
-                    priority
+                    priority={tabId === "events"}
                   />
                   <div className="absolute bottom-8 left-8 z-20 max-w-[280px]">
                     <div className={`inline-flex items-center gap-2 rounded-full border border-white/20 bg-black/40 px-4 py-2 backdrop-blur-md mb-4`}>
