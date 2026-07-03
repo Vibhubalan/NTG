@@ -174,7 +174,7 @@ export default function PlansAndHostClient({ data }: { data: LoungeCommerceHomeD
           whileInView={{ opacity: 1, scale: 1 }}
           viewport={{ once: true }}
           transition={{ duration: 0.5, delay: 0.3 }}
-          className="group relative flex flex-col justify-between overflow-hidden rounded-[24px] border border-[var(--color-iris)]/50 bg-gradient-to-b from-[var(--color-iris)]/10 via-white/[0.02] to-transparent p-6 shadow-[0_0_30px_rgba(124,58,237,0.12)] transition-all duration-500 hover:-translate-y-1 hover:border-[var(--color-iris)] hover:shadow-[0_0_40px_rgba(124,58,237,0.22)] ring-1 ring-[var(--color-iris)]/25 xl:scale-[1.03]"
+          className="group relative flex flex-col justify-between overflow-hidden rounded-[24px] border border-[var(--color-iris)]/50 bg-gradient-to-b from-[var(--color-iris)]/10 via-white/[0.02] to-transparent p-6 shadow-[0_0_30px_rgba(124,58,237,0.12)] transition-all duration-500 hover:-translate-y-1 hover:border-[var(--color-iris)] hover:shadow-[0_0_40px_rgba(124,58,237,0.22)] ring-1 ring-[var(--color-iris)]/25"
         >
           {/* Subtle top edge highlight */}
           <div className="absolute inset-x-0 top-0 h-px w-full bg-gradient-to-r from-transparent via-[var(--color-iris)]/50 to-transparent" />
@@ -227,7 +227,7 @@ export default function PlansAndHostClient({ data }: { data: LoungeCommerceHomeD
           whileInView={{ opacity: 1, scale: 1 }}
           viewport={{ once: true }}
           transition={{ duration: 0.5, delay: 0.4 }}
-          className="group relative flex flex-col justify-between overflow-hidden rounded-[24px] border border-amber-500/50 bg-gradient-to-b from-amber-500/12 via-white/[0.02] to-transparent p-6 shadow-[0_0_30px_rgba(245,158,11,0.15)] transition-all duration-500 hover:-translate-y-1 hover:border-amber-400 hover:shadow-[0_0_40px_rgba(245,158,11,0.25)] ring-1 ring-amber-500/25 xl:scale-[1.03]"
+          className="group relative flex flex-col justify-between overflow-hidden rounded-[24px] border border-amber-500/50 bg-gradient-to-b from-amber-500/12 via-white/[0.02] to-transparent p-6 shadow-[0_0_30px_rgba(245,158,11,0.15)] transition-all duration-500 hover:-translate-y-1 hover:border-amber-400 hover:shadow-[0_0_40px_rgba(245,158,11,0.25)] ring-1 ring-amber-500/25"
         >
           {/* Subtle top edge highlight */}
           <div className="absolute inset-x-0 top-0 h-px w-full bg-gradient-to-r from-transparent via-amber-400/50 to-transparent" />
