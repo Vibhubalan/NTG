@@ -118,7 +118,7 @@ export default function ReviewCarousel({ className = "", delay = 0, variants }: 
         whileInView: "visible",
         viewport: { once: true, margin: "-80px" }
       } : {})}
-      className={`group glass-strong relative flex h-full min-h-[260px] flex-col overflow-hidden rounded-3xl border border-white/[0.08] p-6 sm:p-7 ${className}`}
+      className={`group glass-strong relative flex h-full min-h-[340px] sm:min-h-[260px] flex-col overflow-hidden rounded-3xl border border-white/[0.08] p-6 sm:p-7 ${className}`}
     >
       <div className="pointer-events-none absolute inset-0 -z-10 bg-[radial-gradient(110%_70%_at_100%_0%,rgba(124,58,237,0.22),transparent_55%)]" />
       <div className="pointer-events-none absolute inset-0 -z-10 bg-[radial-gradient(80%_60%_at_0%_100%,rgba(34,211,238,0.14),transparent_55%)]" />
@@ -172,8 +172,7 @@ export default function ReviewCarousel({ className = "", delay = 0, variants }: 
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
                 transition={{ duration: 0.55, ease: "easeOut" }}
-                className="absolute inset-0 line-clamp-5 font-display text-base leading-snug tracking-[-0.005em] text-white/90 sm:line-clamp-6 lg:line-clamp-[7]"
-                style={{ fontSize: "18px" }}
+                className="absolute inset-0 line-clamp-[8] overflow-hidden font-display text-[15px] sm:text-[18px] leading-relaxed sm:leading-snug tracking-[-0.005em] text-white/90 sm:line-clamp-6 lg:line-clamp-[7]"
                 title={active.text}
               >
                 <span aria-hidden>&ldquo;</span>
