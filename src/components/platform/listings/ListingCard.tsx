@@ -18,17 +18,21 @@ export default function ListingCard({ listing }: Props) {
   return (
     <Link
       href={`/listings/${listing.slug}`}
-      className="group relative flex aspect-[4/3] w-full flex-col overflow-hidden rounded-2xl border bg-[#080f1c]/80 p-4 transition-all duration-300 hover:-translate-y-0.5 sm:aspect-square sm:p-5"
+      className="group relative flex aspect-[4/3] w-full flex-col overflow-hidden rounded-2xl border bg-[#080f1c]/80 p-4 transition-all duration-300 hover:-translate-y-0.5 sm:aspect-square sm:p-5 isolate [transform:translateZ(0)]"
       style={{
         borderColor: withHexAlpha(accent, 0.26),
         boxShadow: `0 12px 40px -24px ${withHexAlpha(accent, 0.28)}`,
       }}
     >
-      <div
-        aria-hidden
-        className="pointer-events-none absolute -right-8 -top-8 h-24 w-24 rounded-full blur-[48px] opacity-30 transition-opacity group-hover:opacity-50 sm:-right-10 sm:-top-10 sm:h-32 sm:w-32 sm:blur-[56px] sm:opacity-35 sm:group-hover:opacity-55"
-        style={{ background: accent }}
-      />
+      <div className="pointer-events-none absolute inset-0 overflow-hidden rounded-2xl">
+        <div
+          aria-hidden
+          className="absolute -right-8 -top-8 h-24 w-24 rounded-full opacity-30 transition-opacity group-hover:opacity-50 sm:-right-10 sm:-top-10 sm:h-32 sm:w-32 sm:opacity-35 sm:group-hover:opacity-55"
+          style={{
+            background: `radial-gradient(circle, ${accent} 0%, transparent 70%)`
+          }}
+        />
+      </div>
       <div
         aria-hidden
         className="pointer-events-none absolute inset-0 opacity-[0.08]"
