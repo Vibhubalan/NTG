@@ -399,7 +399,7 @@ export default function ValorantRankingsBoard({ data }: Props) {
 
       {/* Increased max-width to make it "zoomed and big" */}
       <div 
-        className={`relative w-full mx-auto pb-20 transition-opacity duration-700 ease-in-out ${
+        className={`relative w-full mx-auto max-w-6xl pb-20 transition-opacity duration-700 ease-in-out ${
           showRest ? "opacity-100" : "opacity-0 pointer-events-none"
         }`}
       >
