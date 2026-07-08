@@ -362,7 +362,7 @@ export default function TournamentCalendar({ tournaments }: Props) {
         <div className="lg:col-span-4 flex flex-col min-w-0">
           <div className="rounded-2xl border border-white/[0.08] bg-[#0E0E0E]/60 p-5 shadow-xl backdrop-blur-md flex flex-col flex-1 h-full min-h-[350px]">
             {/* Selected Date Title */}
-            <div className="border-b border-white/[0.06] pb-4 mb-4">
+            <div className="border-b border-white/[0.06] pb-3 mb-3">
               <p className="text-[10px] font-black uppercase tracking-[0.25em] text-[var(--color-brand)]">Selected Date</p>
               <h3 className="font-display text-base font-bold text-white mt-1">
                 {selectedDate.toLocaleDateString("en-IN", {
@@ -458,14 +458,14 @@ export default function TournamentCalendar({ tournaments }: Props) {
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
                     exit={{ opacity: 0 }}
-                    className="flex flex-col flex-1 h-full justify-center py-6 text-center"
+                    className="flex flex-col pt-[2px] pb-[18px] text-center"
                   >
                     <p className="text-xs text-white/35">No matches scheduled for this date.</p>
 
                     {/* Month Schedule Fallback */}
                     {currentMonthTournaments.length > 0 ? (
-                      <div className="mt-6 text-left">
-                        <p className="text-[9px] font-black uppercase tracking-[0.2em] text-white/30 mb-3 border-t border-white/[0.06] pt-4">
+                      <div className="mt-[18px] text-left">
+                        <p className="text-[9px] font-black uppercase tracking-[0.2em] text-white/30 mb-[9px] border-t border-white/[0.06] pt-3">
                           All Cups in {monthName}
                         </p>
                         <div className="space-y-2">
