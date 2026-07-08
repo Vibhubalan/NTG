@@ -7,4 +7,5 @@ export type TournamentVaultProps = {
   tournaments: TournamentDisplay[];
   registration: TournamentRegistrationBanner | null;
   auction?: ActiveAuctionBanner | null;
+  hideHeader?: boolean;
 };

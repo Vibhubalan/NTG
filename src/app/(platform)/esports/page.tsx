@@ -6,7 +6,7 @@ import { prisma } from "@core/database/client";
 import { rankIconUrl } from "@/lib/valorant-rank";
 import { sortTournamentsByHostingOrder, sortTournamentsByHostingOrderNewestFirst } from "@/lib/tournament-display";
 import EsportsRegistrationSlides from "@/components/platform/EsportsRegistrationSlides";
-import TournamentCalendar from "@/components/platform/TournamentCalendar";
+import TournamentVaultSection from "@/components/tournaments/TournamentVaultSection";
 
 export const dynamic = "force-dynamic";
 
@@ -324,10 +324,16 @@ export default async function EsportsHubPage() {
         </Link>
       )}
 
-      {/* Interactive Calendar Section */}
-      {scheduleTournaments.length > 0 && (
-        <TournamentCalendar tournaments={scheduleTournaments} />
-      )}
+      {/* Cups we've hosted section */}
+      <div className="rounded-[2rem] border border-white/[0.06] bg-[#0A0A0A]/40 p-6 backdrop-blur-md sm:p-8">
+        <div className="mb-8">
+          <h2 className="font-display text-2xl font-black tracking-tight text-transparent bg-gradient-to-r from-white via-white to-white/70 bg-clip-text sm:text-3xl">
+            Cups we&apos;ve <span className="font-display italic font-light text-white/55">hosted.</span>
+          </h2>
+          <p className="mt-1 ml-0.5 text-sm text-white/40">Our latest community cups. Every champion etched into the lounge&apos;s history.</p>
+        </div>
+        <TournamentVaultSection hideHeader={true} />
+      </div>
 
 
       {/* Glassmorphic Navigation Cards — moved to bottom */}

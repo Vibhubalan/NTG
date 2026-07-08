@@ -9,6 +9,9 @@ export type TournamentPreview = {
   registrationFormat: string | null;
   status: TournamentStatus;
   startsAt: string | null;
+  endsAt: string | null;
+  registrationOpensAt: string | null;
+  registrationClosesAt: string | null;
   registrationUrl: string | null;
   championName?: string | null;
   bracketUrl?: string | null;

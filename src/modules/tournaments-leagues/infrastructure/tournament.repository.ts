@@ -373,6 +373,9 @@ export class TournamentRepository {
     registrationFormat: TournamentFormat | null;
     status: TournamentStatus;
     startsAt: Date | null;
+    endsAt: Date | null;
+    registrationOpensAt: Date | null;
+    registrationClosesAt: Date | null;
     registrationUrl: string | null;
     format: string | null;
     bracketUrl: string | null;
@@ -399,6 +402,9 @@ export class TournamentRepository {
       registrationFormat: t.registrationFormat,
       status: t.status,
       startsAt: t.startsAt?.toISOString() ?? null,
+      endsAt: t.endsAt?.toISOString() ?? null,
+      registrationOpensAt: t.registrationOpensAt?.toISOString() ?? null,
+      registrationClosesAt: t.registrationClosesAt?.toISOString() ?? null,
       registrationUrl: t.registrationUrl,
       championName,
       bracketUrl: t.bracketUrl,

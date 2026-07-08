@@ -2,7 +2,7 @@ import Hero from "@/components/Hero";
 import SpecsRibbon from "@/components/SpecsRibbon";
 import Performance from "@/components/Performance";
 import Arsenal from "@/components/Arsenal";
-import TournamentVaultSection from "@/components/tournaments/TournamentVaultSection";
+import TournamentCalendarSection from "@/components/tournaments/TournamentCalendarSection";
 import NtgStandard from "@/components/NtgStandard";
 import VisitLounge from "@/components/VisitLounge";
 import PlansAndHostSection from "@/components/passes/PlansAndHostSection";
@@ -27,7 +27,7 @@ export default function MarketingHome() {
       <SpecsRibbon />
       <Performance />
       <Arsenal />
-      <TournamentVaultSection />
+      <TournamentCalendarSection />
       <NtgStandard />
       <PlansAndHostSection />
       <BirthdaySection />

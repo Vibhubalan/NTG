@@ -50,35 +50,44 @@ function AuctionCountdown({ endsAt }: { endsAt: string }) {
   );
 }
 
-export default function TournamentVault({ tournaments, registration, auction }: TournamentVaultProps) {
+export default function TournamentVault({ tournaments, registration, auction, hideHeader = false }: TournamentVaultProps) {
   const showBanner = registration?.active ?? false;
 
   return (
-    <section id="vault" className="relative mx-auto w-full max-w-6xl scroll-mt-28 px-5 py-24 sm:py-32">
+    <section
+      id="vault"
+      className={
+        hideHeader
+          ? "relative w-full"
+          : "relative mx-auto w-full max-w-6xl scroll-mt-28 px-5 py-24 sm:py-32"
+      }
+    >
       <div className="pointer-events-none absolute inset-0 -z-10 overflow-hidden">
         <div className="absolute right-1/3 top-1/2 h-[50vh] w-[50vh] rounded-full bg-[radial-gradient(circle,rgba(217,70,239,0.10),transparent_65%)] blur-3xl" />
       </div>
 
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        whileInView={{ opacity: 1, y: 0 }}
-        viewport={{ once: true }}
-        transition={{ duration: 0.6 }}
-        className="mb-14 flex flex-col items-start gap-4 sm:flex-row sm:items-end sm:justify-between"
-      >
-        <div>
-          <span className="text-[10px] font-medium uppercase tracking-[0.4em] text-[var(--color-brand)]/80">
-            03 · Trophy Room
-          </span>
-          <h2 className="mt-3 font-display text-4xl font-semibold tracking-[-0.02em] text-white sm:text-5xl">
-            Cups <span className="font-display italic font-light text-white/55">we&apos;ve</span>{" "}
-            <span className="text-gradient-iris">hosted.</span>
-          </h2>
-        </div>
-        <p className="max-w-sm text-white/55">
-          Our latest five cups. Every champion etched into the lounge&apos;s history.
-        </p>
-      </motion.div>
+      {!hideHeader && (
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true }}
+          transition={{ duration: 0.6 }}
+          className="mb-14 flex flex-col items-start gap-4 sm:flex-row sm:items-end sm:justify-between"
+        >
+          <div>
+            <span className="text-[10px] font-medium uppercase tracking-[0.4em] text-[var(--color-brand)]/80">
+              03 · Trophy Room
+            </span>
+            <h2 className="mt-3 font-display text-4xl font-semibold tracking-[-0.02em] text-white sm:text-5xl">
+              Cups <span className="font-display italic font-light text-white/55">we&apos;ve</span>{" "}
+              <span className="text-gradient-iris">hosted.</span>
+            </h2>
+          </div>
+          <p className="max-w-sm text-white/55">
+            Our latest five cups. Every champion etched into the lounge&apos;s history.
+          </p>
+        </motion.div>
+      )}
 
       {auction ? (
         <aside

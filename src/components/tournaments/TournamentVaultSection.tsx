@@ -3,7 +3,11 @@ import { toTournamentDisplay } from "@/lib/tournament-display";
 import TournamentVault from "@/components/TournamentVault";
 import type { TournamentVaultProps } from "@/components/tournaments/types";
 
-export default async function TournamentVaultSection() {
+type SectionProps = {
+  hideHeader?: boolean;
+};
+
+export default async function TournamentVaultSection({ hideHeader = false }: SectionProps) {
   let props: TournamentVaultProps = { tournaments: [], registration: null };
 
   try {
@@ -41,5 +45,5 @@ export default async function TournamentVaultSection() {
     props = { tournaments: [], registration: null };
   }
 
-  return <TournamentVault {...props} />;
+  return <TournamentVault {...props} hideHeader={hideHeader} />;
 }
