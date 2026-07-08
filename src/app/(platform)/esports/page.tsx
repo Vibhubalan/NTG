@@ -4,8 +4,9 @@ import { getPlayerGameProfile } from "@auth-membership/index";
 import { listActiveRegistrationBanners, listTournamentPreviews, getValorantRankings } from "@tournaments-leagues/index";
 import { prisma } from "@core/database/client";
 import { rankIconUrl } from "@/lib/valorant-rank";
-import { formatMonthYear, sortTournamentsByHostingOrder, sortTournamentsByHostingOrderNewestFirst, toTournamentDisplay } from "@/lib/tournament-display";
+import { sortTournamentsByHostingOrder, sortTournamentsByHostingOrderNewestFirst } from "@/lib/tournament-display";
 import EsportsRegistrationSlides from "@/components/platform/EsportsRegistrationSlides";
+import TournamentCalendar from "@/components/platform/TournamentCalendar";
 
 export const dynamic = "force-dynamic";
 
@@ -323,74 +324,9 @@ export default async function EsportsHubPage() {
         </Link>
       )}
 
-      {/* Timeline Schedule Section */}
+      {/* Interactive Calendar Section */}
       {scheduleTournaments.length > 0 && (
-        <div className="rounded-[2rem] border border-white/[0.06] bg-[#0A0A0A]/40 p-6 backdrop-blur-md sm:p-8">
-          <div className="mb-8">
-            <h2 className="font-display text-2xl font-bold tracking-tight text-white sm:text-3xl">Competitive Schedule</h2>
-            <p className="mt-1 text-sm text-white/40">Keep track of ongoing, upcoming, and completed tournament stages</p>
-          </div>
-
-          <div className="relative border-l border-white/10 pl-6 space-y-8 ml-2">
-            {scheduleTournaments.map((t) => {
-              const display = toTournamentDisplay(t);
-              let badgeColor = "text-white/40 bg-white/5 border-white/10";
-              let pingColor = "";
-              if (t.status === "IN_PROGRESS") {
-                badgeColor = "text-rose-400 bg-rose-500/10 border-rose-500/20";
-                pingColor = "bg-rose-500";
-              } else if (t.status === "REGISTRATION_OPEN") {
-                badgeColor = "text-emerald-400 bg-emerald-500/10 border-emerald-500/20";
-                pingColor = "bg-emerald-500";
-              } else if (t.status === "UPCOMING") {
-                badgeColor = "text-cyan-400 bg-cyan-500/10 border-cyan-500/20";
-              } else if (t.status === "COMPLETED") {
-                badgeColor = "text-white/40 bg-white/5 border-white/10";
-              }
-
-              return (
-                <div key={t.id} className="relative group">
-                  <span className="absolute -left-[31px] top-1.5 flex h-4.5 w-4.5 items-center justify-center rounded-full bg-[#0F0F0F] border-2 border-white/10 group-hover:border-white/30 transition-colors">
-                    {pingColor && (
-                      <span className="relative flex h-2 w-2">
-                        <span className={`absolute inline-flex h-full w-full animate-ping rounded-full opacity-75 ${pingColor}`} />
-                        <span className={`relative inline-flex h-2 w-2 rounded-full ${pingColor}`} />
-                      </span>
-                    )}
-                  </span>
-
-                  <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <span className={`rounded-full border px-2.5 py-0.5 text-[9px] font-black uppercase tracking-wider ${badgeColor}`}>
-                          {t.status.replace("_", " ")}
-                        </span>
-                        {display.game && (
-                          <span className="text-[10px] font-medium text-white/30 uppercase tracking-widest">
-                            {display.game}
-                          </span>
-                        )}
-                      </div>
-                      <h3 className="mt-2 font-display text-lg font-bold text-white group-hover:text-[var(--color-brand)] transition-colors">
-                        {t.name}
-                      </h3>
-                      <p className="mt-1 text-xs text-white/40">
-                        {formatMonthYear(t.startsAt)}
-                      </p>
-                    </div>
-
-                    <div className="shrink-0">
-                      <Link href={`/esports/tournaments/${t.slug}`} className="inline-flex items-center gap-1.5 text-xs font-semibold text-white/60 hover:text-white transition-colors">
-                        Details
-                        <span>→</span>
-                      </Link>
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
+        <TournamentCalendar tournaments={scheduleTournaments} />
       )}
 
 

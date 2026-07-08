@@ -40,7 +40,7 @@ export default function StatusBadge({ status, variant = "default" }: Props) {
 
   return (
     <span
-      className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[10px] font-medium uppercase tracking-[0.2em] ring-1 ring-inset ${styles[v]}`}
+      className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[10px] font-medium uppercase tracking-[0.2em] ring-1 ring-inset whitespace-nowrap ${styles[v]}`}
     >
       {(v === "live" || v === "open") && (
         <span className="relative flex h-1.5 w-1.5">
