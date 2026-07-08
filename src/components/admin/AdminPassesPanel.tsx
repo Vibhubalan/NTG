@@ -215,7 +215,11 @@ export default function AdminPassesPanel({ initialPlans }: { initialPlans: Gamep
                 className={inputClass}
                 type="number"
                 value={form.sortOrder}
-                onChange={(e) => setForm({ ...form, sortOrder: e.target.value })}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  const cleaned = (val.length > 1 && val.startsWith("0")) ? val.replace(/^0+/, "") : val;
+                  setForm({ ...form, sortOrder: cleaned });
+                }}
               />
             </label>
             <label className="space-y-1 sm:col-span-2">
@@ -248,7 +252,11 @@ export default function AdminPassesPanel({ initialPlans }: { initialPlans: Gamep
                 className={inputClass}
                 type="number"
                 value={form.priceDay}
-                onChange={(e) => setForm({ ...form, priceDay: e.target.value })}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  const cleaned = (val.length > 1 && val.startsWith("0")) ? val.replace(/^0+/, "") : val;
+                  setForm({ ...form, priceDay: cleaned });
+                }}
               />
             </label>
             <label className="space-y-1">
@@ -257,7 +265,11 @@ export default function AdminPassesPanel({ initialPlans }: { initialPlans: Gamep
                 className={inputClass}
                 type="number"
                 value={form.priceNight}
-                onChange={(e) => setForm({ ...form, priceNight: e.target.value })}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  const cleaned = (val.length > 1 && val.startsWith("0")) ? val.replace(/^0+/, "") : val;
+                  setForm({ ...form, priceNight: cleaned });
+                }}
               />
             </label>
             <label className="space-y-1">
@@ -266,7 +278,11 @@ export default function AdminPassesPanel({ initialPlans }: { initialPlans: Gamep
                 className={inputClass}
                 type="number"
                 value={form.priceSingle}
-                onChange={(e) => setForm({ ...form, priceSingle: e.target.value })}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  const cleaned = (val.length > 1 && val.startsWith("0")) ? val.replace(/^0+/, "") : val;
+                  setForm({ ...form, priceSingle: cleaned });
+                }}
               />
             </label>
             <label className="space-y-1">
@@ -275,7 +291,11 @@ export default function AdminPassesPanel({ initialPlans }: { initialPlans: Gamep
                 className={inputClass}
                 type="number"
                 value={form.priceController}
-                onChange={(e) => setForm({ ...form, priceController: e.target.value })}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  const cleaned = (val.length > 1 && val.startsWith("0")) ? val.replace(/^0+/, "") : val;
+                  setForm({ ...form, priceController: cleaned });
+                }}
               />
             </label>
             <label className="space-y-1">

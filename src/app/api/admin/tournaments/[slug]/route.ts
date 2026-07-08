@@ -77,6 +77,17 @@ export async function PATCH(req: Request, { params }: Props) {
     hideAfter: body.hideAfter as string | null | undefined,
     teams: body.teams as string[] | undefined,
     registrationFormat: body.registrationFormat as "AUCTION" | "STANDARD" | null | undefined,
+    format: body.format as import("@prisma/client").BracketType | undefined,
+    coCaptainSlots: body.coCaptainSlots as number | undefined,
+    startingBudget: body.startingBudget as number | undefined,
+    rosterSize: body.rosterSize as number | undefined,
+    minBidIncrement: body.minBidIncrement as number | undefined,
+    auctionStartsAt: normalizeOptionalDateTime(body.auctionStartsAt),
+    auctionEndsAt: normalizeOptionalDateTime(body.auctionEndsAt),
+    groupCount: body.groupCount as number | null | undefined,
+    teamsPerGroup: body.teamsPerGroup as number | null | undefined,
+    advancePerGroup: body.advancePerGroup as number | null | undefined,
+    rankPoints: body.rankPoints as { rank: string; floor: number }[] | null | undefined,
     });
   } catch (err) {
     console.error("[admin/tournaments PATCH]", err);

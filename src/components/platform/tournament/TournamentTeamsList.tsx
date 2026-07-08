@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import type { GameSlug } from "@prisma/client";
-import type { TournamentTeamView } from "@core/contracts";
+import type { TournamentTeamView, TournamentTeamPlayerView } from "@core/contracts";
 
 type Props = {
   teams: string[];
@@ -11,15 +11,30 @@ type Props = {
   game?: GameSlug;
 };
 
+const ROLE_BADGE: Record<string, { label: string; color: string }> = {
+  CAPTAIN: { label: "Captain", color: "#f6c177" },
+  CO_CAPTAIN: { label: "Co-Captain", color: "#a78bfa" },
+  PLAYER: { label: "Player", color: "#5eead4" },
+};
+
+const ROLE_ORDER: Record<string, number> = { CAPTAIN: 0, CO_CAPTAIN: 1, PLAYER: 2 };
+
+function sortByRole(players: TournamentTeamPlayerView[]): TournamentTeamPlayerView[] {
+  return [...players].sort(
+    (a, b) => (ROLE_ORDER[a.participantRole ?? "PLAYER"] ?? 2) - (ROLE_ORDER[b.participantRole ?? "PLAYER"] ?? 2),
+  );
+}
+
 function TeamPreviewScreen({
   team,
-  accentHex,
+  game,
   onClose,
 }: {
   team: TournamentTeamView;
-  accentHex: string;
+  game?: GameSlug;
   onClose: () => void;
 }) {
+  const isFifa = game === "EA_FC26";
   const handleKeyDown = useCallback(
     (e: KeyboardEvent) => {
       if (e.key === "Escape") onClose();
@@ -62,36 +77,34 @@ function TeamPreviewScreen({
 
       <div className="flex-1 overflow-y-auto px-4 py-6 sm:px-6">
         <p className="mb-5 text-[10px] font-medium uppercase tracking-[0.28em] text-white/35">
-          Squad · {team.players.length} players
+          Squad · {team.players.length} {team.players.length === 1 ? "player" : "players"}
         </p>
 
-        <ul className="mx-auto max-w-lg space-y-3">
-          {team.players.map((player) => (
-            <li
-              key={player.id}
-              className="rounded-2xl border border-white/[0.08] bg-white/[0.03] p-5"
-            >
-              <div className="flex items-start justify-between gap-3">
-                <p className="font-display text-base font-semibold text-white">{player.displayName}</p>
+        <ul className="mx-auto max-w-lg space-y-2.5">
+          {sortByRole(team.players).map((player) => {
+            const role = player.participantRole ?? "PLAYER";
+            const badge = ROLE_BADGE[role] ?? ROLE_BADGE.PLAYER;
+            const secondary = isFifa ? player.olympusId : player.riotId;
+            return (
+              <li
+                key={player.id}
+                className="flex items-center justify-between gap-3 rounded-2xl border border-white/[0.07] bg-white/[0.025] px-4 py-3.5"
+              >
+                <div className="min-w-0">
+                  <p className="font-display text-[15px] font-semibold text-white truncate">{player.displayName}</p>
+                  {secondary ? (
+                    <p className="mt-0.5 truncate text-xs text-white/45">{secondary}</p>
+                  ) : null}
+                </div>
                 <span
                   className="shrink-0 rounded-full px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider"
-                  style={{
-                    background: `${accentHex}18`,
-                    color: accentHex,
-                    boxShadow: `inset 0 0 0 1px ${accentHex}33`,
-                  }}
+                  style={{ background: `${badge.color}1a`, color: badge.color, boxShadow: `inset 0 0 0 1px ${badge.color}40` }}
                 >
-                  {player.participantRole === "CAPTAIN" ? "Captain" : "Player"}
+                  {badge.label}
                 </span>
-              </div>
-              <dl className="mt-4 space-y-2.5 text-sm">
-                <div className="flex justify-between gap-4">
-                  <dt className="text-white/40">Olympus ID</dt>
-                  <dd className="text-right text-white/85">{player.olympusId ?? "—"}</dd>
-                </div>
-              </dl>
-            </li>
-          ))}
+              </li>
+            );
+          })}
         </ul>
       </div>
     </div>
@@ -134,14 +147,15 @@ export default function TournamentTeamsList({
         <ul className="grid gap-3 sm:grid-cols-2">
           {rows.map((team, index) => {
             const hasPlayers = team.players.length > 0;
-            const canPreview = isFifa && hasPlayers;
+            const canPreview = hasPlayers;
+            const captainName = team.players.find((p) => p.participantRole === "CAPTAIN")?.displayName;
 
             return (
               <li key={team.id}>
                 <button
                   type="button"
                   onClick={() => canPreview && setPreviewTeam(team)}
-                  disabled={!canPreview && isFifa}
+                  disabled={!hasPlayers}
                   className={`flex w-full items-center gap-4 rounded-[1.15rem] border border-white/[0.06] bg-[#0A0A0A]/70 px-5 py-4 text-left backdrop-blur-sm transition-colors ${
                     canPreview
                       ? "cursor-pointer hover:border-white/[0.12] hover:bg-[#0A0A0A]/85 active:scale-[0.99]"
@@ -170,15 +184,15 @@ export default function TournamentTeamsList({
                     <span className="font-display text-lg font-semibold tracking-[-0.01em] text-white/90">
                       {team.name}
                     </span>
-                    {hasPlayers && !isFifa ? (
+                    {hasPlayers ? (
                       <p className="mt-0.5 truncate text-xs text-white/40">
-                        {team.players.map((p) => p.displayName).join(" · ")}
+                        {captainName ? <span className="text-white/55">{captainName}</span> : null}
+                        {captainName ? " · " : ""}
+                        {team.players.length} {team.players.length === 1 ? "player" : "players"}
                       </p>
-                    ) : hasPlayers && isFifa ? (
-                      <p className="mt-0.5 text-xs text-white/40">
-                        {team.players.length} players
-                      </p>
-                    ) : null}
+                    ) : (
+                      <p className="mt-0.5 text-xs text-white/30">Registration in progress</p>
+                    )}
                   </div>
                   {canPreview ? (
                     <svg
@@ -208,7 +222,7 @@ export default function TournamentTeamsList({
       {previewTeam ? (
         <TeamPreviewScreen
           team={previewTeam}
-          accentHex={accentHex}
+          game={game}
           onClose={() => setPreviewTeam(null)}
         />
       ) : null}

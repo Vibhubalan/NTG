@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useRef, useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import type { GameSlug } from "@prisma/client";
@@ -32,6 +32,7 @@ type Props = {
   registrationOpen: boolean;
   rulebookUrl?: string | null;
   preview: RegistrationPreview | null;
+  coCaptainSlots: number;
 };
 
 type Step = "role" | "captain" | "confirm";
@@ -82,6 +83,7 @@ export default function TournamentRegisterForm({
   registrationOpen,
   rulebookUrl,
   preview,
+  coCaptainSlots,
 }: Props) {
   const router = useRouter();
   const submitting = useRef(false);
@@ -90,12 +92,39 @@ export default function TournamentRegisterForm({
   const [participantRole, setParticipantRole] = useState<"CAPTAIN" | "PLAYER" | null>(null);
   const [teamName, setTeamName] = useState("");
   const [partnerUsername, setPartnerUsername] = useState("");
+  const coCaptainCount = coCaptainSlots;
+  const [coCaptainUsernames, setCoCaptainUsernames] = useState<string[]>(["", "", "", ""]);
   const [logoUrl, setLogoUrl] = useState<string | null>(null);
   const [logoUploading, setLogoUploading] = useState(false);
   const [acceptedTerms, setAcceptedTerms] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
+  const [eligibleUsernames, setEligibleUsernames] = useState<string[]>([]);
+  const [activeInputIndex, setActiveInputIndex] = useState<number | null>(null);
+
+  useEffect(() => {
+    if (coCaptainSlots > 0 && slug && slug !== "undefined") {
+      console.log(`[TournamentRegisterForm] Fetching eligible co-captains for slug: "${slug}"`);
+      fetch(`/api/tournaments/${slug}/eligible-co-captains`)
+        .then((res) => {
+          console.log(`[TournamentRegisterForm] Response status for co-captains fetch:`, res.status);
+          if (!res.ok) {
+            throw new Error(`HTTP error! status: ${res.status}`);
+          }
+          return res.json();
+        })
+        .then((data) => {
+          console.log(`[TournamentRegisterForm] Eligible co-captains data:`, data);
+          if (data.usernames) {
+            setEligibleUsernames(data.usernames);
+          }
+        })
+        .catch((err) => console.error("[TournamentRegisterForm] Error fetching co-captains:", err));
+    } else {
+      console.log(`[TournamentRegisterForm] Skipping co-captains fetch: coCaptainSlots=${coCaptainSlots}, slug="${slug}"`);
+    }
+  }, [slug, coCaptainSlots]);
 
   const inputClass =
     "w-full rounded-xl border border-white/[0.08] bg-white/[0.03] px-4 py-3 text-sm text-white placeholder:text-white/30 focus:border-[var(--color-brand)]/45 focus:outline-none";
@@ -210,10 +239,32 @@ export default function TournamentRegisterForm({
     setLoading(true);
     setError(null);
 
+    if (participantRole === "CAPTAIN" && coCaptainCount > 0) {
+      const activeNames = coCaptainUsernames.slice(0, coCaptainCount).map(u => u.trim());
+      if (activeNames.some(name => name === "")) {
+        setError("Please fill in all co-captain username fields.");
+        submitting.current = false;
+        setLoading(false);
+        return;
+      }
+      if (new Set(activeNames.map(u => u.toLowerCase())).size !== activeNames.length) {
+        setError("Duplicate co-captain usernames are not allowed.");
+        submitting.current = false;
+        setLoading(false);
+        return;
+      }
+    }
+
     try {
       const body =
         participantRole === "CAPTAIN"
-          ? { participantRole, teamName: teamName.trim(), logoUrl: logoUrl!, acceptedTerms: true }
+          ? {
+              participantRole,
+              teamName: teamName.trim(),
+              logoUrl: logoUrl!,
+              coCaptainUsernames: coCaptainUsernames.slice(0, coCaptainCount).map(u => u.trim()),
+              acceptedTerms: true,
+            }
           : { participantRole, acceptedTerms: true };
 
       const res = await fetch(`/api/tournaments/${slug}/register`, {
@@ -331,12 +382,76 @@ export default function TournamentRegisterForm({
               </button>
               {logoUrl ? <p className="mt-1 truncate text-[10px] text-emerald-300/80">{logoUrl}</p> : null}
             </div>
-            <div className="flex gap-2">
+
+            {coCaptainSlots > 0 && (
+              <div className="space-y-2 border-t border-white/[0.06] pt-3 animate-in fade-in duration-200">
+                <label className="text-[10px] font-bold uppercase tracking-wider text-white/40">Co-Captains ({coCaptainSlots})</label>
+                <div className="space-y-2 mt-2 pl-2 border-l border-[var(--color-brand)]/20 animate-in slide-in-from-top-1 duration-200">
+                  {Array.from({ length: coCaptainSlots }).map((_, i) => {
+                    const currentVal = coCaptainUsernames[i] ?? "";
+                    const otherSelected = coCaptainUsernames.filter((_, idx) => idx !== i).map(u => u.trim().toLowerCase());
+                    const suggestions = eligibleUsernames.filter(name => {
+                      const matchesSearch = name.toLowerCase().includes(currentVal.toLowerCase());
+                      const notAlreadySelected = !otherSelected.includes(name.toLowerCase());
+                      return matchesSearch && notAlreadySelected;
+                    });
+
+                    return (
+                      <div key={i} className="relative">
+                        <input
+                          className={inputClass}
+                          placeholder={`Co-captain #${i + 1} NTG username`}
+                          value={coCaptainUsernames[i] ?? ""}
+                          onFocus={() => setActiveInputIndex(i)}
+                          onBlur={() => {
+                            // Small delay so that onMouseDown on the suggestions triggers first
+                            setTimeout(() => {
+                              setActiveInputIndex((curr) => curr === i ? null : curr);
+                            }, 180);
+                          }}
+                          onChange={(e) => {
+                            const next = [...coCaptainUsernames];
+                            next[i] = e.target.value;
+                            setCoCaptainUsernames(next);
+                          }}
+                        />
+                        {activeInputIndex === i && suggestions.length > 0 && (
+                          <ul className="absolute left-0 right-0 z-50 mt-1 max-h-48 overflow-y-auto rounded-xl border border-white/[0.08] bg-[#0A0E1A]/95 p-1.5 shadow-2xl backdrop-blur-md animate-in fade-in slide-in-from-top-1 duration-150">
+                            {suggestions.map((name) => (
+                              <li key={name}>
+                                <button
+                                  type="button"
+                                  onMouseDown={() => {
+                                    const next = [...coCaptainUsernames];
+                                    next[i] = name;
+                                    setCoCaptainUsernames(next);
+                                    setActiveInputIndex(null);
+                                  }}
+                                  className="w-full rounded-lg px-3.5 py-2 text-left text-xs font-medium text-white/70 hover:bg-white/[0.06] hover:text-white transition-all duration-150"
+                                >
+                                  {name}
+                                </button>
+                              </li>
+                            ))}
+                          </ul>
+                        )}
+                      </div>
+                    );
+                  })}
+                  <p className="text-[10px] text-white/35 leading-relaxed">
+                    Enter the NTG username of a player who has <strong className="text-white/55">already registered</strong> for this
+                    cup. They&apos;ll be moved from the player pool onto your team as a co-captain.
+                  </p>
+                </div>
+              </div>
+            )}
+
+            <div className="flex gap-2 pt-2 border-t border-white/[0.06]">
               <button type="button" onClick={() => setStep("role")} className="rounded-full border border-white/10 px-4 py-2 text-xs text-white/50">Back</button>
               <button
                 type="button"
                 onClick={() => setStep("confirm")}
-                disabled={!teamName.trim() || !logoUrl}
+                disabled={!teamName.trim() || !logoUrl || (coCaptainCount > 0 && coCaptainUsernames.slice(0, coCaptainCount).some(u => !u.trim()))}
                 className="cta flex-1 rounded-full py-2.5 text-xs font-semibold uppercase tracking-[0.16em] disabled:opacity-50"
               >
                 Continue
@@ -351,6 +466,14 @@ export default function TournamentRegisterForm({
               Registering as <strong className="text-white">{participantRole === "CAPTAIN" ? "Captain" : "Player"}</strong>
               {participantRole === "CAPTAIN" && teamName ? (
                 <> for <strong className="text-white">{teamName}</strong></>
+              ) : null}
+              {participantRole === "CAPTAIN" && coCaptainCount > 0 ? (
+                <span className="block mt-1 text-xs text-white/40">
+                  Inviting {coCaptainCount} co-captain(s):{" "}
+                  <strong className="text-white/60">
+                    {coCaptainUsernames.slice(0, coCaptainCount).join(", ")}
+                  </strong>
+                </span>
               ) : null}
             </p>
             <RegistrationTermsAgreement

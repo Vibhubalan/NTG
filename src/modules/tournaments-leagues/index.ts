@@ -3,11 +3,13 @@ export {
   getTournamentBySlug,
   getTournamentDetail,
   getActiveRegistrationBanner,
+  getActiveAuction,
   listActiveRegistrationBanners,
   getLeaderboardPreview,
   getValorantRankings,
   recordMatchResult,
 } from "./application/tournament.service";
+export type { ActiveAuction } from "./application/tournament.service";
 export {
   syncUserRank,
   syncAllLinkedPlayers,

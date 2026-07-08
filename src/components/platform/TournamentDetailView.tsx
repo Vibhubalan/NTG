@@ -191,6 +191,7 @@ export default function TournamentDetailView({
                   registrationOpen={tournament.registrationOpen}
                   rulebookUrl={tournament.rulebookUrl}
                   preview={registrationPreview ?? null}
+                  coCaptainSlots={tournament.coCaptainSlots}
                 />
               </div>
             ) : null}

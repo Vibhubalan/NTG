@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import Link from "next/link";
 import BrandIcon from "./ui/BrandIcon";
@@ -7,7 +8,49 @@ import { allowPastTournamentClicks } from "@/lib/env";
 import StatusBadge from "@/components/platform/ui/StatusBadge";
 import type { TournamentVaultProps } from "./tournaments/types";
 
-export default function TournamentVault({ tournaments, registration }: TournamentVaultProps) {
+function AuctionCountdown({ endsAt }: { endsAt: string }) {
+  const [timeLeft, setTimeLeft] = useState<string>("");
+
+  useEffect(() => {
+    const target = new Date(endsAt).getTime();
+
+    function update() {
+      const now = Date.now();
+      const diff = target - now;
+      if (diff <= 0) {
+        setTimeLeft("Ended");
+        return;
+      }
+
+      const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+      const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+      const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+      const seconds = Math.floor((diff % (1000 * 60)) / 1000);
+
+      const parts: string[] = [];
+      if (days > 0) parts.push(`${days}d`);
+      if (hours > 0 || days > 0) parts.push(`${hours}h`);
+      parts.push(`${minutes}m`);
+      parts.push(`${seconds}s`);
+
+      setTimeLeft(parts.join(" "));
+    }
+
+    update();
+    const interval = setInterval(update, 1000);
+    return () => clearInterval(interval);
+  }, [endsAt]);
+
+  if (!timeLeft) return null;
+
+  return (
+    <span className="font-mono text-[10px] font-bold bg-[var(--color-magenta)]/15 px-2 py-0.5 rounded border border-[var(--color-magenta)]/30 text-[var(--color-magenta)] lowercase">
+      Ends in: {timeLeft}
+    </span>
+  );
+}
+
+export default function TournamentVault({ tournaments, registration, auction }: TournamentVaultProps) {
   const showBanner = registration?.active ?? false;
 
   return (
@@ -36,6 +79,42 @@ export default function TournamentVault({ tournaments, registration }: Tournamen
           Our latest five cups. Every champion etched into the lounge&apos;s history.
         </p>
       </motion.div>
+
+      {auction ? (
+        <aside
+          className="mb-8 flex flex-col gap-3 rounded-2xl border border-[var(--color-magenta)]/30 bg-[var(--color-magenta)]/[0.06] px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-5"
+          role="status"
+          aria-live="polite"
+        >
+          <div className="min-w-0">
+            <p className="flex items-center flex-wrap gap-2 text-[10px] font-medium uppercase tracking-[0.32em] text-[var(--color-magenta)]">
+              <span className="relative flex h-1.5 w-1.5 shrink-0">
+                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-current opacity-60" />
+                <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-current" />
+              </span>
+              <span>Auction is live</span>
+              {auction.endsAt ? (
+                <>
+                  <span className="text-white/20 font-light select-none">|</span>
+                  <AuctionCountdown endsAt={auction.endsAt} />
+                </>
+              ) : null}
+            </p>
+            <p className="mt-1 font-display text-base font-medium text-white sm:text-lg">
+              {auction.name} draft is happening now.
+            </p>
+          </div>
+          <Link
+            href={`/esports/tournaments/${auction.slug}`}
+            className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-[var(--color-magenta)]/45 bg-[var(--color-magenta)]/15 px-4 py-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--color-magenta)] transition-colors hover:bg-[var(--color-magenta)]/25"
+          >
+            Enter Auction
+            <svg viewBox="0 0 24 24" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth={2}>
+              <path d="M5 12h14M13 6l6 6-6 6" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          </Link>
+        </aside>
+      ) : null}
 
       {showBanner && registration ? (
         <aside

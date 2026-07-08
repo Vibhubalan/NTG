@@ -284,7 +284,11 @@ export default function AdminHostPanel({
               className={inputClass}
               type="number"
               value={logoForm.sortOrder}
-              onChange={(e) => setLogoForm({ ...logoForm, sortOrder: e.target.value })}
+              onChange={(e) => {
+                const val = e.target.value;
+                const cleaned = (val.length > 1 && val.startsWith("0")) ? val.replace(/^0+/, "") : val;
+                setLogoForm({ ...logoForm, sortOrder: cleaned });
+              }}
             />
           </label>
           <label className="flex items-center gap-2 text-sm text-white/70 sm:mt-6">

@@ -22,6 +22,7 @@ export type TournamentRegisterInput = {
   logoUrl?: string;
   valorantRoles?: ValorantRole[];
   cs2PeakPremierRank?: string;
+  coCaptainUsernames?: string[];
 };
 
 export type FifaRegisterInput = {
@@ -299,6 +300,48 @@ export async function registerForTournament(
         return { ok: false, error: "Team logo is required." };
       }
 
+      const coCapUsernames = (input.coCaptainUsernames ?? []).map((u) => u.trim()).filter(Boolean);
+      if (coCapUsernames.length > tournament.coCaptainSlots) {
+        return { ok: false, error: `This tournament only allows up to ${tournament.coCaptainSlots} co-captain(s).` };
+      }
+      if (new Set(coCapUsernames.map((u) => u.toLowerCase())).size !== coCapUsernames.length) {
+        return { ok: false, error: "Duplicate co-captain usernames are not allowed." };
+      }
+
+      // Co-captains must already be registered as a PLAYER in this cup (in the pool, not on a team).
+      // We upgrade their existing registration to CO_CAPTAIN and attach it to the new team.
+      const coCapRegs: { userId: string; email: string | null; name: string | null; registrationId: string }[] = [];
+      for (const cleanName of coCapUsernames) {
+        const coCapUser = await findUserByUsername(cleanName);
+        if (!coCapUser) {
+          return { ok: false, error: `Co-captain "${cleanName}" not found.` };
+        }
+        if (coCapUser.id === userId) {
+          return { ok: false, error: "You cannot add yourself as a co-captain." };
+        }
+        const ccReg = await prisma.tournamentRegistration.findFirst({
+          where: { tournamentId: tournament.id, userId: coCapUser.id },
+        });
+        if (!ccReg) {
+          return {
+            ok: false,
+            error: `"${cleanName}" must register for this cup as a player before you can add them as a co-captain.`,
+          };
+        }
+        if (ccReg.participantRole !== "PLAYER") {
+          return { ok: false, error: `"${cleanName}" is already a captain or co-captain and cannot be added.` };
+        }
+        if (ccReg.teamId) {
+          return { ok: false, error: `"${cleanName}" is already assigned to a team.` };
+        }
+        coCapRegs.push({
+          userId: coCapUser.id,
+          email: coCapUser.email,
+          name: coCapUser.name,
+          registrationId: ccReg.id,
+        });
+      }
+
       const sortOrder = (tournament.tournamentTeams[0]?.sortOrder ?? -1) + 1;
 
       const result = await prisma.$transaction(async (tx) => {
@@ -325,6 +368,17 @@ export async function registerForTournament(
           data: { sourceRegistrationId: reg.id },
         });
 
+        for (const cc of coCapRegs) {
+          await tx.tournamentRegistration.update({
+            where: { id: cc.registrationId },
+            data: {
+              participantRole: "CO_CAPTAIN",
+              teamId: team.id,
+              teamName: input.teamName!.trim(),
+            },
+          });
+        }
+
         return reg;
       });
 
@@ -334,8 +388,19 @@ export async function registerForTournament(
         name: user.name,
         action: "TOURNAMENT_REGISTER",
         target: slug,
-        details: `Registered for cup "${tournament.name}" as Captain of ${input.teamName!.trim()}.`,
+        details: `Registered for cup "${tournament.name}" as Captain of ${input.teamName!.trim()} with ${coCapRegs.length} co-captain(s).`,
       });
+
+      for (const cc of coCapRegs) {
+        await logUserActivity({
+          userId: cc.userId,
+          email: cc.email,
+          name: cc.name,
+          action: "TOURNAMENT_REGISTER",
+          target: slug,
+          details: `Promoted to Co-Captain of ${input.teamName!.trim()} in cup "${tournament.name}" (by Captain).`,
+        });
+      }
 
       return { ok: true, registrationId: result.id };
     }

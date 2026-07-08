@@ -4,6 +4,7 @@ import type {
   BracketType,
   GameSlug,
   PlacementRole,
+  TournamentFormat,
   TournamentStatus,
 } from "@prisma/client";
 import { Prisma } from "@prisma/client";
@@ -22,7 +23,7 @@ export type CreateTournamentInput = {
   seasonId?: string;
   status?: TournamentStatus;
   format?: BracketType;
-  registrationFormat?: "AUCTION" | "STANDARD" | null;
+  registrationFormat?: TournamentFormat | null;
   description?: string;
   startsAt?: string;
   endsAt?: string;
@@ -74,7 +75,17 @@ export type UpdateTournamentInput = Partial<
   prizePool?: number | null;
   hideAfter?: string | null;
   teams?: string[];
-  registrationFormat?: "AUCTION" | "STANDARD" | null;
+  registrationFormat?: TournamentFormat | null;
+  coCaptainSlots?: number;
+  startingBudget?: number;
+  rosterSize?: number;
+  minBidIncrement?: number;
+  auctionStartsAt?: string | null;
+  auctionEndsAt?: string | null;
+  groupCount?: number | null;
+  teamsPerGroup?: number | null;
+  advancePerGroup?: number | null;
+  rankPoints?: { rank: string; floor: number }[] | null;
 };
 
 function parsePrizeSplit(value: unknown): PrizeSplitRow[] | null {
@@ -223,7 +234,33 @@ export type AdminCupFieldsSnapshot = {
   autoManageStatus: boolean;
   bracketUrl: string | null;
   rulebookUrl: string | null;
+  format: BracketType | null;
+  coCaptainSlots: number;
+  startingBudget: number;
+  rosterSize: number;
+  minBidIncrement: number;
+  auctionStartsAt: string | null;
+  auctionEndsAt: string | null;
+  groupCount: number | null;
+  teamsPerGroup: number | null;
+  advancePerGroup: number | null;
+  rankPoints: { rank: string; floor: number }[] | null;
 };
+
+function parseRankPoints(value: unknown): { rank: string; floor: number }[] | null {
+  if (!Array.isArray(value)) return null;
+  const rows = value
+    .map((r) => {
+      if (!r || typeof r !== "object") return null;
+      const o = r as Record<string, unknown>;
+      const rank = typeof o.rank === "string" ? o.rank.trim() : "";
+      const floor = Number(o.floor);
+      if (!rank || !Number.isFinite(floor)) return null;
+      return { rank, floor };
+    })
+    .filter((r): r is { rank: string; floor: number } => r !== null);
+  return rows.length ? rows : null;
+}
 
 function parseCarouselImages(value: unknown): string[] {
   if (!Array.isArray(value)) return [];
@@ -255,6 +292,17 @@ export function toAdminCupFieldsSnapshot(
     autoManageStatus: t.autoManageStatus,
     bracketUrl: t.bracketUrl,
     rulebookUrl: t.rulebookUrl,
+    format: t.format,
+    coCaptainSlots: t.coCaptainSlots,
+    startingBudget: t.startingBudget,
+    rosterSize: t.rosterSize,
+    minBidIncrement: t.minBidIncrement,
+    auctionStartsAt: t.auctionStartsAt?.toISOString() ?? null,
+    auctionEndsAt: t.auctionEndsAt?.toISOString() ?? null,
+    groupCount: t.groupCount,
+    teamsPerGroup: t.teamsPerGroup,
+    advancePerGroup: t.advancePerGroup,
+    rankPoints: parseRankPoints(t.rankPoints),
   };
 }
 
@@ -325,6 +373,25 @@ export async function updateTournamentFull(
   if (input.showOnEsportsHub !== undefined) data.showOnEsportsHub = input.showOnEsportsHub;
   if (input.registrationFormat !== undefined) {
     data.registrationFormat = (input.registrationFormat as import("@prisma/client").TournamentFormat | null) ?? null;
+  }
+  if (input.coCaptainSlots !== undefined) data.coCaptainSlots = input.coCaptainSlots;
+  if (input.startingBudget !== undefined) data.startingBudget = input.startingBudget;
+  if (input.rosterSize !== undefined) data.rosterSize = input.rosterSize;
+  if (input.minBidIncrement !== undefined) data.minBidIncrement = input.minBidIncrement;
+  if (input.auctionStartsAt !== undefined) {
+    data.auctionStartsAt = input.auctionStartsAt ? new Date(input.auctionStartsAt) : null;
+  }
+  if (input.auctionEndsAt !== undefined) {
+    data.auctionEndsAt = input.auctionEndsAt ? new Date(input.auctionEndsAt) : null;
+  }
+  if (input.groupCount !== undefined) data.groupCount = input.groupCount;
+  if (input.teamsPerGroup !== undefined) data.teamsPerGroup = input.teamsPerGroup;
+  if (input.advancePerGroup !== undefined) data.advancePerGroup = input.advancePerGroup;
+  if (input.rankPoints !== undefined) {
+    data.rankPoints =
+      input.rankPoints && input.rankPoints.length
+        ? (input.rankPoints as unknown as Prisma.InputJsonValue)
+        : Prisma.JsonNull;
   }
   if (input.hideAfter !== undefined) {
     data.hideAfter =

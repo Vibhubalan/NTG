@@ -34,7 +34,7 @@ export default async function TournamentDetailPage({ params }: Props) {
   // Auction handoff: routes the user to the right screen; the auction app re-checks access server-side.
   const auctionView = admin.ok
     ? "auctioneer"
-    : tournament.userParticipantRole === "CAPTAIN"
+    : tournament.userParticipantRole === "CAPTAIN" || tournament.userParticipantRole === "CO_CAPTAIN"
       ? "captain"
       : "observe";
   const auctionEligible =
@@ -43,10 +43,9 @@ export default async function TournamentDetailPage({ params }: Props) {
     !!serverEnv.auctionUrl &&
     !!serverEnv.auctionJwtSecret;
   // Admins can always enter; players enter only while IN_PROGRESS, see it disabled once COMPLETED.
-  const auctionHref =
-    auctionEligible && (admin.ok || tournament.status === "IN_PROGRESS")
-      ? auctionLink(tournament.id, auctionView, userId)
-      : null;
+  const auctionHref = auctionEligible
+    ? auctionLink(tournament.id, auctionView, userId)
+    : null;
   const auctionEnded = auctionEligible && !admin.ok && tournament.status === "COMPLETED";
 
   return (

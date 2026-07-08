@@ -54,6 +54,25 @@ export async function getActiveRegistrationBanner(): Promise<TournamentRegistrat
   return tournamentRepo.findActiveRegistrationBanner();
 }
 
+export type ActiveAuction = { slug: string; name: string; endsAt: string | null };
+
+/** The auction whose live window (auctionStartsAt..auctionEndsAt) currently contains now, if any. */
+export async function getActiveAuction(): Promise<ActiveAuction | null> {
+  const now = new Date();
+  const t = await prisma.tournament.findFirst({
+    where: {
+      registrationFormat: "AUCTION",
+      status: { not: "CANCELLED" },
+      auctionStartsAt: { lte: now },
+      auctionEndsAt: { gte: now },
+    },
+    orderBy: { auctionStartsAt: "desc" },
+    select: { slug: true, name: true, auctionEndsAt: true },
+  });
+  if (!t) return null;
+  return { slug: t.slug, name: t.name, endsAt: t.auctionEndsAt?.toISOString() ?? null };
+}
+
 export async function listActiveRegistrationBanners(): Promise<TournamentRegistrationBanner[]> {
   return tournamentRepo.findActiveRegistrationBanners();
 }

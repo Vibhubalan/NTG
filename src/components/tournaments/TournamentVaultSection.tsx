@@ -35,6 +35,7 @@ export default async function TournamentVaultSection() {
         };
       }),
       registration: previews.registration,
+      auction: previews.auction,
     };
   } catch {
     props = { tournaments: [], registration: null };

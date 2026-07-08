@@ -57,6 +57,17 @@ type TournamentData = {
   game: string;
   gameLabel: string | null;
   registrationFormat: string | null;
+  format: string | null;
+  coCaptainSlots: number;
+  startingBudget: number;
+  rosterSize: number;
+  minBidIncrement: number;
+  auctionStartsAt: string | null;
+  auctionEndsAt: string | null;
+  groupCount: number | null;
+  teamsPerGroup: number | null;
+  advancePerGroup: number | null;
+  rankPoints: { rank: string; floor: number }[] | null;
   seasonId: string | null;
   status: string;
   description: string | null;
@@ -108,6 +119,32 @@ const checkboxLabelClass =
 
 const SUPPORTS_FORMAT = ["VALORANT", "CS2"];
 
+/** Default Valorant rank → auction points (mirrors the auction app's DEFAULT_RANK_TABLES). */
+const DEFAULT_VALORANT_RANK_POINTS: { rank: string; floor: number }[] = [
+  { rank: "Immortal", floor: 12 },
+  { rank: "Ascendant", floor: 10 },
+  { rank: "Diamond", floor: 8 },
+  { rank: "Platinum", floor: 6 },
+  { rank: "Gold", floor: 4 },
+  { rank: "Silver", floor: 2 },
+  { rank: "Bronze", floor: 1 },
+  { rank: "Iron", floor: 1 },
+  { rank: "Unranked", floor: 1 },
+];
+
+/** Tier accent dots for the rank-points editor. */
+const RANK_DOT: Record<string, string> = {
+  Immortal: "#b45e6b",
+  Ascendant: "#22c55e",
+  Diamond: "#b794f4",
+  Platinum: "#5eead4",
+  Gold: "#f6c177",
+  Silver: "#cbd5e1",
+  Bronze: "#b08d57",
+  Iron: "#8a8f98",
+  Unranked: "#6b7280",
+};
+
 type CupFields = Omit<
   TournamentData,
   "slug" | "tournamentTeams" | "registrations" | "poolPlayers" | "placements" | "hideAfter"
@@ -139,6 +176,17 @@ function getSavePayload(form: TournamentData) {
     registrationFormat: SUPPORTS_FORMAT.includes(form.game)
       ? (form.registrationFormat ?? "AUCTION")
       : null,
+    format: form.format || null,
+    coCaptainSlots: form.coCaptainSlots,
+    startingBudget: form.startingBudget,
+    rosterSize: form.rosterSize,
+    minBidIncrement: form.minBidIncrement,
+    auctionStartsAt: form.auctionStartsAt || null,
+    auctionEndsAt: form.auctionEndsAt || null,
+    groupCount: form.groupCount,
+    teamsPerGroup: form.teamsPerGroup,
+    advancePerGroup: form.advancePerGroup,
+    rankPoints: form.rankPoints,
   };
 }
 
@@ -177,7 +225,7 @@ export default function AdminTournamentEditor({
   const tournamentTeams = initial.tournamentTeams;
   const poolPlayers = initial.poolPlayers;
   const [activeTab, setActiveTab] = useState<
-    "general" | "media" | "prizes" | "standings" | "registrations" | "teams"
+    "general" | "auction" | "media" | "prizes" | "standings" | "registrations" | "teams"
   >("general");
   const initialMvpRole = initial.placements.find((p) => p.role === "MVP");
   const initialMvpUser = initialMvpRole?.user;
@@ -455,6 +503,17 @@ export default function AdminTournamentEditor({
           bracketUrl: emptyToNull(form.bracketUrl),
           rulebookUrl: emptyToNull(form.rulebookUrl),
           registrationFormat: SUPPORTS_FORMAT.includes(form.game) ? (form.registrationFormat ?? "AUCTION") : null,
+          format: form.format || null,
+          coCaptainSlots: form.coCaptainSlots,
+          startingBudget: form.startingBudget,
+          rosterSize: form.rosterSize,
+          minBidIncrement: form.minBidIncrement,
+          auctionStartsAt: form.auctionStartsAt || null,
+          auctionEndsAt: form.auctionEndsAt || null,
+          groupCount: form.groupCount,
+          teamsPerGroup: form.teamsPerGroup,
+          advancePerGroup: form.advancePerGroup,
+          rankPoints: form.rankPoints,
         }),
       });
       const data = await readJsonResponse(res);
@@ -609,7 +668,7 @@ export default function AdminTournamentEditor({
 
   const editorTabs = [
     {
-      id: "general",
+      id: "general" as const,
       label: "General",
       icon: (
         <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
@@ -617,8 +676,21 @@ export default function AdminTournamentEditor({
         </svg>
       ),
     },
+    ...(form.registrationFormat === "AUCTION"
+      ? [
+          {
+            id: "auction" as const,
+            label: "Auction",
+            icon: (
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M3 6l3 1m0 0l-3 9a5.002 5.002 0 006.001 0M6 7l3 9M6 7l6-2m6 2l3-1m-3 1l-3 9a5.002 5.002 0 006.001 0M18 7l3 9m-3-9l-6-2m0-2v2m0 16V5m0 16H9m3 0h3" />
+              </svg>
+            ),
+          },
+        ]
+      : []),
     {
-      id: "media",
+      id: "media" as const,
       label: "Media",
       icon: (
         <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
@@ -627,7 +699,7 @@ export default function AdminTournamentEditor({
       ),
     },
     {
-      id: "prizes",
+      id: "prizes" as const,
       label: "Prizes",
       icon: (
         <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
@@ -636,7 +708,7 @@ export default function AdminTournamentEditor({
       ),
     },
     {
-      id: "standings",
+      id: "standings" as const,
       label: "Results & MVP",
       icon: (
         <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
@@ -645,7 +717,7 @@ export default function AdminTournamentEditor({
       ),
     },
     {
-      id: "registrations",
+      id: "registrations" as const,
       label: "Registrations",
       icon: (
         <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
@@ -654,7 +726,7 @@ export default function AdminTournamentEditor({
       ),
     },
     {
-      id: "teams",
+      id: "teams" as const,
       label: "Teams",
       icon: (
         <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
@@ -835,20 +907,89 @@ export default function AdminTournamentEditor({
                       <p className="mt-0.5 text-[10px] leading-relaxed text-white/40">Captain registers full 5-player team upfront. All 5 must have NTG accounts.</p>
                     </button>
                   </div>
-                  {form.registrationFormat === "AUCTION" && (
-                    <button
-                      type="button"
-                      onClick={createAuction}
-                      disabled={loading}
-                      className="cta mt-1 inline-flex rounded-full px-5 py-2 text-[11px] font-semibold uppercase tracking-[0.16em] disabled:opacity-50"
-                    >
-                      Create Auction
-                    </button>
-                  )}
                 </div>
               )}
 
 
+            </AdminSection>
+
+            <AdminSection
+              title="Competition Format"
+              showsOn="How the tournament runs — used to generate brackets and fixtures"
+            >
+              <div className="space-y-3">
+                <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                  {([
+                    ["SINGLE_ELIMINATION", "Single Elimination"],
+                    ["DOUBLE_ELIMINATION", "Double Elimination"],
+                    ["ROUND_ROBIN", "Round Robin"],
+                    ["SWISS", "Swiss System"],
+                    ["GSL", "GSL (Dual Tournament Format)"],
+                    ["GROUP_PLAYOFFS", "Group Stage → Playoffs"],
+                    ["LEAGUE", "League Format"],
+                    ["HYBRID", "Hybrid Format (Custom Combination)"],
+                  ] as const).map(([value, label]) => (
+                    <button
+                      key={value}
+                      type="button"
+                      onClick={() => setForm({ ...form, format: form.format === value ? null : value })}
+                      className={`rounded-xl border px-4 py-3 text-left text-sm transition-all ${
+                        form.format === value
+                          ? "border-emerald-500/40 bg-emerald-500/[0.08] text-emerald-200"
+                          : "border-white/10 bg-white/[0.02] text-white/60 hover:border-white/20"
+                      }`}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
+                {(form.format === "GSL" || form.format === "GROUP_PLAYOFFS") && (
+                  <div className="grid grid-cols-3 gap-3">
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-bold uppercase tracking-wider text-white/40">Groups</label>
+                      <input
+                        type="number"
+                        min={1}
+                        className={inputClass}
+                        value={form.groupCount === 0 || form.groupCount === null ? "" : form.groupCount}
+                        placeholder="0"
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          setForm({ ...form, groupCount: val === "" ? null : Number(val) });
+                        }}
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-bold uppercase tracking-wider text-white/40">Teams / group</label>
+                      <input
+                        type="number"
+                        min={1}
+                        className={inputClass}
+                        value={form.teamsPerGroup === 0 || form.teamsPerGroup === null ? "" : form.teamsPerGroup}
+                        placeholder="0"
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          setForm({ ...form, teamsPerGroup: val === "" ? null : Number(val) });
+                        }}
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-bold uppercase tracking-wider text-white/40">Advance / group</label>
+                      <input
+                        type="number"
+                        min={1}
+                        className={inputClass}
+                        value={form.advancePerGroup === 0 || form.advancePerGroup === null ? "" : form.advancePerGroup}
+                        placeholder="0"
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          setForm({ ...form, advancePerGroup: val === "" ? null : Number(val) });
+                        }}
+                      />
+                    </div>
+                  </div>
+                )}
+              </div>
             </AdminSection>
 
             <AdminSection
@@ -1024,6 +1165,170 @@ export default function AdminTournamentEditor({
           </div>
         )}
 
+        {activeTab === "auction" && form.registrationFormat === "AUCTION" && (
+          <div className="space-y-6 animate-in fade-in duration-200">
+            <AdminSection
+              title="Auction Draft Setup"
+              showsOn="Auction economy and settings used by the bidding platform"
+            >
+              <div className="mt-2 space-y-4 rounded-xl border border-cyan-500/20 bg-cyan-500/[0.03] p-4">
+                <p className="text-[11px] font-bold uppercase tracking-wider text-cyan-200/80">Auction Draft Settings</p>
+                <p className="-mt-2 text-[10px] leading-relaxed text-white/40">
+                  Configure budget, roster limits, and minimum bidding increments. Rank point values are set inside the auction app. Save changes to apply.
+                </p>
+                <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-bold uppercase tracking-wider text-white/40">Co-Captain Slots</label>
+                    <select
+                      className={inputClass}
+                      value={form.coCaptainSlots}
+                      onChange={(e) => setForm({ ...form, coCaptainSlots: Number(e.target.value) })}
+                    >
+                      {[0, 1, 2, 3, 4].map((n) => (
+                        <option key={n} value={n} className="bg-[#0a1020]">
+                          {n === 0 ? "0 — Captain only" : `${n} co-captain${n > 1 ? "s" : ""}`}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                   <div className="space-y-1">
+                    <label className="text-[10px] font-bold uppercase tracking-wider text-white/40">Starting Budget</label>
+                    <input
+                      type="number"
+                      min={0}
+                      className={inputClass}
+                      value={form.startingBudget === 0 ? "" : form.startingBudget}
+                      placeholder="0"
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        setForm({ ...form, startingBudget: val === "" ? 0 : Number(val) });
+                      }}
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-bold uppercase tracking-wider text-white/40">Roster Size (picks)</label>
+                    <input
+                      type="number"
+                      min={1}
+                      className={inputClass}
+                      value={form.rosterSize === 0 ? "" : form.rosterSize}
+                      placeholder="0"
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        setForm({ ...form, rosterSize: val === "" ? 0 : Number(val) });
+                      }}
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-bold uppercase tracking-wider text-white/40">Min Bid Increment</label>
+                    <input
+                      type="number"
+                      min={1}
+                      className={inputClass}
+                      value={form.minBidIncrement === 0 ? "" : form.minBidIncrement}
+                      placeholder="0"
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        setForm({ ...form, minBidIncrement: val === "" ? 0 : Number(val) });
+                      }}
+                    />
+                  </div>
+                </div>
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 border-t border-white/[0.04] pt-4">
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-bold uppercase tracking-wider text-white/40">Auction Starts</label>
+                    <input
+                      type="datetime-local"
+                      className={inputClass}
+                      value={toLocalDatetime(form.auctionStartsAt)}
+                      onChange={(e) =>
+                        setForm({ ...form, auctionStartsAt: e.target.value ? new Date(e.target.value).toISOString() : null })
+                      }
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-bold uppercase tracking-wider text-white/40">Auction Ends</label>
+                    <input
+                      type="datetime-local"
+                      className={inputClass}
+                      value={toLocalDatetime(form.auctionEndsAt)}
+                      onChange={(e) =>
+                        setForm({ ...form, auctionEndsAt: e.target.value ? new Date(e.target.value).toISOString() : null })
+                      }
+                    />
+                  </div>
+                </div>
+                <p className="text-[10px] leading-relaxed text-white/35">
+                  The &quot;Auction is live&quot; countdown banner displays on the homepage while the auction is live.
+                </p>
+
+                {form.game === "VALORANT" && (
+                  <div className="space-y-3 border-t border-white/[0.04] pt-4">
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <label className="text-[11px] font-bold uppercase tracking-wider text-white/55">Rank Points</label>
+                        <p className="mt-0.5 text-[10px] leading-relaxed text-white/35">
+                          Base points every player of a rank starts at. Sent to the auction app on Create — still editable there.
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setForm({ ...form, rankPoints: DEFAULT_VALORANT_RANK_POINTS })}
+                        className="shrink-0 rounded-full border border-white/10 px-3 py-1 text-[10px] font-medium uppercase tracking-wider text-white/50 transition-colors hover:border-cyan-400/40 hover:text-cyan-200"
+                      >
+                        Reset
+                      </button>
+                    </div>
+                    <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4">
+                      {(form.rankPoints ?? DEFAULT_VALORANT_RANK_POINTS).map((row, i) => (
+                        <div
+                          key={row.rank}
+                          className="rounded-xl border border-white/[0.08] bg-white/[0.02] px-3 py-2.5 transition-colors focus-within:border-cyan-400/40 focus-within:bg-cyan-500/[0.04]"
+                        >
+                          <div className="flex items-center gap-1.5">
+                            <span className="h-2 w-2 rounded-full" style={{ background: RANK_DOT[row.rank] ?? "#6b7280" }} />
+                            <span className="text-[11px] font-medium text-white/70">{row.rank}</span>
+                          </div>
+                          <input
+                            type="number"
+                            min={0}
+                            aria-label={`${row.rank} points`}
+                            value={row.floor === 0 ? "" : row.floor}
+                            placeholder="0"
+                            onChange={(e) => {
+                              const val = e.target.value;
+                              const num = val === "" ? 0 : Number(val);
+                              const base = form.rankPoints ?? DEFAULT_VALORANT_RANK_POINTS;
+                              const next = base.map((r, j) => (j === i ? { ...r, floor: num } : r));
+                              setForm({ ...form, rankPoints: next });
+                            }}
+                            className="mt-2 w-full rounded-md border border-white/10 bg-[#0a1020]/60 px-2.5 py-1.5 text-sm font-mono tabular-nums text-white focus:border-cyan-500/40 focus:outline-none"
+                          />
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                <div className="border-t border-white/[0.04] pt-4 flex flex-col sm:flex-row items-center justify-between gap-4">
+                  <div>
+                    <h4 className="text-xs font-semibold text-white/80">Initialize Auction Instance</h4>
+                    <p className="text-[10px] text-white/40 mt-0.5">Sends current configurations to register the cup in the auction platform.</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={createAuction}
+                    disabled={loading}
+                    className="cta inline-flex rounded-full px-5 py-2.5 text-[11px] font-semibold uppercase tracking-[0.16em] disabled:opacity-50"
+                  >
+                    {loading ? "Sending..." : "Create / Reset Auction"}
+                  </button>
+                </div>
+              </div>
+            </AdminSection>
+          </div>
+        )}
+
         {/* Tab 2: Branding & Media */}
         {activeTab === "media" && (
           <div className="space-y-6 animate-in fade-in duration-200">
@@ -1072,7 +1377,11 @@ export default function AdminTournamentEditor({
                     type="number"
                     className={inputClass}
                     value={form.prizePool ?? ""}
-                    onChange={(e) => setForm({ ...form, prizePool: e.target.value || null })}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      const cleaned = (val.length > 1 && val.startsWith("0")) ? val.replace(/^0+/, "") : val;
+                      setForm({ ...form, prizePool: cleaned || null });
+                    }}
                     placeholder="e.g. 15000"
                   />
                 </div>
@@ -1114,7 +1423,11 @@ export default function AdminTournamentEditor({
                             type="number"
                             className={`${inputClass} pl-7`}
                             value={row.amount}
-                            onChange={(e) => updateSplit(i, "amount", e.target.value)}
+                            onChange={(e) => {
+                              const val = e.target.value;
+                              const cleaned = (val.length > 1 && val.startsWith("0")) ? val.replace(/^0+/, "") : val;
+                              updateSplit(i, "amount", cleaned);
+                            }}
                             placeholder="Amount"
                           />
                         </div>
@@ -1351,7 +1664,7 @@ export default function AdminTournamentEditor({
                         <tr key={r.id} className="border-b border-white/[0.04]">
                           <td className="px-3 py-2 font-medium text-white/85">{r.displayName ?? "—"}</td>
                           <td className="px-3 py-2">{r.email ?? "—"}</td>
-                          <td className="px-3 py-2">{r.participantRole === "CAPTAIN" ? "Captain" : "Player"}</td>
+                          <td className="px-3 py-2">{r.participantRole === "CAPTAIN" ? "Captain" : r.participantRole === "CO_CAPTAIN" ? "Co-Captain" : "Player"}</td>
                           <td className="px-3 py-2">{r.teamName ?? "—"}</td>
                           {form.game === "CS2" ? (
                             <>
@@ -1454,7 +1767,11 @@ export default function AdminTournamentEditor({
                             }
                             
                             const displayPlayers = matchingRegs.length > 0 
-                              ? matchingRegs.map(r => ({ id: r.id, name: r.displayName, role: r.participantRole }))
+                              ? matchingRegs.map(r => ({
+                                  id: r.id,
+                                  name: r.displayName,
+                                  role: r.participantRole === "CO_CAPTAIN" ? "Co-Captain" : r.participantRole === "CAPTAIN" ? "Captain" : "Player"
+                                }))
                               : team.players.map(p => ({ id: p.id, name: p.displayName, role: "Player" }));
 
                             return displayPlayers.map((p) => (

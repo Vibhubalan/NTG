@@ -33,16 +33,27 @@ enum TournamentStatus {
   IN_PROGRESS
   COMPLETED
   CANCELLED
+  AUCTION_OPEN
+  AUCTION_LIVE
+  AUCTION_COMPLETED
 }
 
 enum BracketType {
   SINGLE_ELIMINATION
   DOUBLE_ELIMINATION
+  ROUND_ROBIN
+  SWISS
+  GSL
+  GROUP_PLAYOFFS
+  LEAGUE
+  HYBRID
 }
 
 enum TournamentFormat {
   AUCTION
   STANDARD
+  SOLO
+  DUO
 }
 
 enum MatchStatus {
@@ -85,6 +96,7 @@ enum PlayedGame {
 enum RegistrationParticipantRole {
   CAPTAIN
   PLAYER
+  CO_CAPTAIN
 }
 
 enum ValorantRole {
@@ -110,6 +122,7 @@ enum UserActivityAction {
   STEAM_UNLINK
   TOURNAMENT_REGISTER
   TOURNAMENT_UNREGISTER
+  LISTING_APPLY
 }
 
 enum GamepassCategory {
@@ -286,6 +299,19 @@ model Tournament {
   status               TournamentStatus  @default(DRAFT)
   format               BracketType?
   registrationFormat   TournamentFormat?
+  // Auction economy (admin-controlled; points/rank prices live in the auction app)
+  coCaptainSlots       Int               @default(0)
+  startingBudget       Int               @default(150)
+  rosterSize           Int               @default(5)
+  minBidIncrement      Int               @default(1)
+  auctionStartsAt      DateTime?
+  auctionEndsAt        DateTime?
+  // Competition format group settings (used by GSL / GROUP_PLAYOFFS)
+  groupCount           Int?
+  teamsPerGroup        Int?
+  advancePerGroup      Int?
+  // Valorant auction rank -> points table: [{ "rank": "Diamond", "floor": 8 }, ...]
+  rankPoints           Json?
   description          String?
   posterUrl            String?
   hubBannerUrl         String?

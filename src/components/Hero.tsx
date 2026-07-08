@@ -1,6 +1,9 @@
 import { whatsappInquiryUrl } from "@/lib/env";
+import { getActiveAuction } from "@tournaments-leagues/index";
+import AuctionLiveButton from "@/components/AuctionLiveButton";
 
-export default function Hero() {
+export default async function Hero() {
+  const activeAuction = await getActiveAuction();
   return (
     <section
       id="top"
@@ -73,6 +76,12 @@ export default function Hero() {
               Explore Games
             </a>
           </div>
+
+          {activeAuction && (
+            <div className="mt-6 animate-in fade-in slide-in-from-top-1 duration-300">
+              <AuctionLiveButton auction={activeAuction} />
+            </div>
+          )}
         </div>
       </div>
     </section>
