@@ -7,6 +7,8 @@ import type {
 import { TournamentRepository } from "../infrastructure/tournament.repository";
 import { LeaderboardRepository } from "../infrastructure/leaderboard.repository";
 import { fetchChallongeBracket } from "@/lib/challonge-api";
+import { resolveAuctionHeroPhase, type HeroCupPhase } from "../domain/auction-hero-phase";
+import { syncRegistrationStatus } from "./admin-tournament.service";
 
 const tournamentRepo = new TournamentRepository();
 const leaderboardRepo = new LeaderboardRepository();
@@ -56,8 +58,67 @@ export async function getActiveRegistrationBanner(): Promise<TournamentRegistrat
 
 export type ActiveAuction = { slug: string; name: string; endsAt: string | null };
 
+export type HeroCupStatus = {
+  slug: string;
+  name: string;
+  phase: HeroCupPhase;
+  countdownEndsAt: string | null;
+};
+
+/** Nearest upcoming auction cup phase for the homepage hero CTA strip. */
+export async function getHeroCupStatus(): Promise<HeroCupStatus | null> {
+  await syncRegistrationStatus().catch(() => {});
+
+  const now = new Date();
+  const tournaments = await prisma.tournament.findMany({
+    where: {
+      registrationFormat: "AUCTION",
+      status: { notIn: ["CANCELLED", "COMPLETED"] },
+      registrationOpensAt: { not: null },
+      auctionStartsAt: { not: null },
+      auctionEndsAt: { not: null },
+      startsAt: { not: null },
+      endsAt: { not: null },
+    },
+    orderBy: { startsAt: "asc" },
+    select: {
+      slug: true,
+      name: true,
+      registrationFormat: true,
+      registrationOpensAt: true,
+      auctionStartsAt: true,
+      auctionEndsAt: true,
+      startsAt: true,
+      endsAt: true,
+      status: true,
+    },
+  });
+
+  for (const t of tournaments) {
+    const resolved = resolveAuctionHeroPhase(t, now);
+    if (!resolved) continue;
+    return {
+      slug: t.slug,
+      name: t.name,
+      phase: resolved.phase,
+      countdownEndsAt: resolved.countdownEndsAt.toISOString(),
+    };
+  }
+
+  return null;
+}
+
 /** The auction whose live window (auctionStartsAt..auctionEndsAt) currently contains now, if any. */
 export async function getActiveAuction(): Promise<ActiveAuction | null> {
+  const hero = await getHeroCupStatus();
+  if (hero?.phase === "auction_live") {
+    return {
+      slug: hero.slug,
+      name: hero.name,
+      endsAt: hero.countdownEndsAt,
+    };
+  }
+
   const now = new Date();
   const t = await prisma.tournament.findFirst({
     where: {

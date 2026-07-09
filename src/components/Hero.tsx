@@ -1,12 +1,12 @@
 import Link from "next/link";
-import { getActiveAuction } from "@tournaments-leagues/index";
-import AuctionLiveButton from "@/components/AuctionLiveButton";
+import { getHeroCupStatus } from "@tournaments-leagues/index";
+import HeroCupStatusBanner from "@/components/HeroCupStatusBanner";
 
 const heroCtaBase =
   "inline-flex h-10 w-full cursor-pointer select-none items-center justify-center gap-1.5 whitespace-nowrap rounded-full px-3 text-[10px] font-semibold uppercase tracking-[0.12em] transition-all hover:scale-[1.03] active:scale-[0.98] sm:h-12 sm:gap-2 sm:px-5 sm:text-sm sm:tracking-[0.18em]";
 
 export default async function Hero() {
-  const activeAuction = await getActiveAuction();
+  const heroCup = await getHeroCupStatus();
   return (
     <section
       id="top"
@@ -91,11 +91,11 @@ export default async function Hero() {
             </Link>
           </div>
 
-          {activeAuction && (
+          {heroCup ? (
             <div className="mt-6 animate-in fade-in slide-in-from-top-1 duration-300">
-              <AuctionLiveButton auction={activeAuction} />
+              <HeroCupStatusBanner cup={heroCup} />
             </div>
-          )}
+          ) : null}
         </div>
       </div>
     </section>

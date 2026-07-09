@@ -298,11 +298,14 @@ export default function AdminTournamentEditor({
     if (
       form.autoManageStatus &&
       form.registrationOpensAt &&
-      form.startsAt
+      (isAuctionFormat ? form.auctionStartsAt : form.startsAt)
     ) {
       const now = Date.now();
       const opens = new Date(form.registrationOpensAt).getTime();
-      const closes = new Date(form.startsAt).getTime() - 60_000;
+      const closeAnchor = isAuctionFormat
+        ? new Date(form.auctionStartsAt!).getTime()
+        : new Date(form.startsAt!).getTime();
+      const closes = closeAnchor - 60_000;
       return now >= opens && now < closes;
     }
     return form.status === "REGISTRATION_OPEN";
@@ -486,15 +489,46 @@ export default function AdminTournamentEditor({
         setLoading(false);
         return;
       }
-      const opens = new Date(form.registrationOpensAt).getTime();
-      const closes = new Date(form.startsAt).getTime() - 60_000;
-      const ends = new Date(form.endsAt).getTime();
-      if (opens >= closes) {
-        setMessage("Registration must open before it closes (1 minute before cup start).");
+      if (isAuctionFormat && (!form.auctionStartsAt || !form.auctionEndsAt)) {
+        setMessage("Auction cups require auction start and auction end dates.");
         setLoading(false);
         return;
       }
-      if (closes >= ends) {
+      const opens = new Date(form.registrationOpensAt).getTime();
+      const closeAnchor = isAuctionFormat
+        ? new Date(form.auctionStartsAt!).getTime()
+        : new Date(form.startsAt).getTime();
+      const closes = closeAnchor - 60_000;
+      const ends = new Date(form.endsAt).getTime();
+      const auctionEnd = isAuctionFormat ? new Date(form.auctionEndsAt!).getTime() : null;
+      const starts = new Date(form.startsAt).getTime();
+      if (opens >= closes) {
+        setMessage(
+          isAuctionFormat
+            ? "Registration must open before it closes (1 minute before auction starts)."
+            : "Registration must open before it closes (1 minute before cup start).",
+        );
+        setLoading(false);
+        return;
+      }
+      if (isAuctionFormat && auctionEnd !== null) {
+        if (closes >= new Date(form.auctionStartsAt!).getTime()) {
+          setMessage("Auction must start after registration closes.");
+          setLoading(false);
+          return;
+        }
+        if (new Date(form.auctionStartsAt!).getTime() >= auctionEnd) {
+          setMessage("Auction end must be after auction start.");
+          setLoading(false);
+          return;
+        }
+        if (auctionEnd >= starts) {
+          setMessage("Cup start must be after the auction ends.");
+          setLoading(false);
+          return;
+        }
+      }
+      if (isAuctionFormat ? starts >= ends : closes >= ends) {
         setMessage("Cup end must be after cup start.");
         setLoading(false);
         return;
@@ -1079,7 +1113,9 @@ export default function AdminTournamentEditor({
                       </a>{" "}
                       and the cup register form.
                       {form.autoManageStatus
-                        ? " Auto-manage will close registration 1 minute before cup start."
+                        ? isAuctionFormat
+                          ? " Auto-manage will close registration 1 minute before auction starts."
+                          : " Auto-manage will close registration 1 minute before cup start."
                         : " Change status manually when you want to close it."}
                     </p>
                   ) : form.autoManageStatus ? (
@@ -1142,7 +1178,9 @@ export default function AdminTournamentEditor({
                     }
                   />
                   <p className="text-xs text-white/35">
-                    Registration closes automatically 1 minute before cup start. No separate end date needed.
+                    {isAuctionFormat
+                      ? "Registration closes automatically 1 minute before auction starts. No separate end date needed."
+                      : "Registration closes automatically 1 minute before cup start. No separate end date needed."}
                   </p>
                 </div>
                 <div className="space-y-1">

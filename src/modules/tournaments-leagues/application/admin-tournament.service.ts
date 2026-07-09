@@ -13,6 +13,7 @@ import {
   computeAutoStatus,
   getRegistrationCloseAt,
   hasValidAutoSchedule,
+  isAuctionCup,
   validateAutoSchedule,
 } from "../domain/tournament-schedule";
 
@@ -435,35 +436,59 @@ export async function updateTournamentFull(
         ? new Date(input.endsAt)
         : null
       : tournament.endsAt;
+  const nextFormat =
+    input.registrationFormat !== undefined
+      ? input.registrationFormat
+      : tournament.registrationFormat;
+  const nextAuctionStarts =
+    input.auctionStartsAt !== undefined
+      ? input.auctionStartsAt
+        ? new Date(input.auctionStartsAt)
+        : null
+      : tournament.auctionStartsAt;
+  const nextAuctionEnds =
+    input.auctionEndsAt !== undefined
+      ? input.auctionEndsAt
+        ? new Date(input.auctionEndsAt)
+        : null
+      : tournament.auctionEndsAt;
+
+  const scheduleInput = {
+    registrationFormat: nextFormat,
+    registrationOpensAt: nextOpens,
+    auctionStartsAt: nextAuctionStarts,
+    auctionEndsAt: nextAuctionEnds,
+    startsAt: nextStarts,
+    endsAt: nextEnds,
+  };
 
   if (nextAutoManage) {
-    const scheduleError = validateAutoSchedule({
-      registrationOpensAt: nextOpens,
-      startsAt: nextStarts,
-      endsAt: nextEnds,
-    });
+    const scheduleError = validateAutoSchedule(scheduleInput);
     if (scheduleError) return { ok: false, error: scheduleError };
 
-    if (nextStarts) {
-      data.registrationClosesAt = getRegistrationCloseAt(nextStarts);
+    const closeAnchor =
+      nextFormat === "AUCTION" && nextAuctionStarts
+        ? nextAuctionStarts
+        : nextStarts;
+    if (closeAnchor) {
+      data.registrationClosesAt = getRegistrationCloseAt(closeAnchor);
     }
   }
 
   await prisma.tournament.update({ where: { slug }, data });
 
-  if (nextAutoManage && hasValidAutoSchedule({
-    status: tournament.status,
-    autoManageStatus: true,
-    registrationOpensAt: nextOpens,
-    startsAt: nextStarts,
-    endsAt: nextEnds,
-  })) {
+  if (
+    nextAutoManage &&
+    hasValidAutoSchedule({
+      status: tournament.status,
+      autoManageStatus: true,
+      ...scheduleInput,
+    })
+  ) {
     const target = computeAutoStatus({
       status: tournament.status,
       autoManageStatus: true,
-      registrationOpensAt: nextOpens,
-      startsAt: nextStarts,
-      endsAt: nextEnds,
+      ...scheduleInput,
     });
     if (target && target !== tournament.status) {
       await prisma.tournament.update({ where: { slug }, data: { status: target } });
@@ -518,7 +543,9 @@ export async function syncRegistrationStatus(): Promise<{
     const target = computeAutoStatus(t, now);
     if (!target || target === t.status) continue;
 
-    const closeAt = t.startsAt ? getRegistrationCloseAt(t.startsAt) : null;
+    const closeAnchor =
+      isAuctionCup(t) && t.auctionStartsAt ? t.auctionStartsAt : t.startsAt;
+    const closeAt = closeAnchor ? getRegistrationCloseAt(closeAnchor) : null;
 
     await prisma.tournament.update({
       where: { id: t.id },

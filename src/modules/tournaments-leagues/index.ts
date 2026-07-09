@@ -4,12 +4,13 @@ export {
   getTournamentDetail,
   getActiveRegistrationBanner,
   getActiveAuction,
+  getHeroCupStatus,
   listActiveRegistrationBanners,
   getLeaderboardPreview,
   getValorantRankings,
   recordMatchResult,
 } from "./application/tournament.service";
-export type { ActiveAuction } from "./application/tournament.service";
+export type { ActiveAuction, HeroCupStatus } from "./application/tournament.service";
 export {
   syncUserRank,
   syncAllLinkedPlayers,
