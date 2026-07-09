@@ -96,7 +96,9 @@ export default function TournamentRegisterForm({
   const [step, setStep] = useState<Step>("role");
   const [participantRole, setParticipantRole] = useState<"CAPTAIN" | "PLAYER" | null>(null);
   const [teamName, setTeamName] = useState("");
-  const [coCaptainUsername, setCoCaptainUsername] = useState("");
+  const [coCaptainUsernames, setCoCaptainUsernames] = useState<string[]>(
+    () => Array.from({ length: coCaptainSlots }, () => ""),
+  );
   const [memberUsernames, setMemberUsernames] = useState(["", "", "", ""]);
   const [partnerUsername, setPartnerUsername] = useState("");
   const [acceptedTerms, setAcceptedTerms] = useState(false);
@@ -246,7 +248,13 @@ export default function TournamentRegisterForm({
           ? {
               participantRole,
               teamName: teamName.trim(),
-              coCaptainUsername: coCaptainUsername.trim(),
+              ...(coCaptainSlots > 0
+                ? {
+                    coCaptainUsernames: coCaptainUsernames
+                      .slice(0, coCaptainSlots)
+                      .map((u) => u.trim()),
+                  }
+                : {}),
               acceptedTerms: true,
             }
           : { participantRole, acceptedTerms: true };
@@ -385,6 +393,17 @@ export default function TournamentRegisterForm({
     );
   }
 
+  const captainCoCaptainsComplete =
+    coCaptainSlots === 0 ||
+    coCaptainUsernames.slice(0, coCaptainSlots).every((u) => u.trim().length >= 2);
+
+  const captainCardDescription =
+    coCaptainSlots === 0
+      ? "Team name only"
+      : coCaptainSlots === 1
+        ? "Team name and co-captain"
+        : `Team name and ${coCaptainSlots} co-captains`;
+
   return (
     <div className="shine-border rounded-[1.35rem] lg:sticky lg:top-28">
       <div className="shine-border-inner space-y-4 rounded-[1.35rem] bg-[#0a1020]/85 p-6 backdrop-blur-sm">
@@ -405,7 +424,7 @@ export default function TournamentRegisterForm({
               className="rounded-xl border border-white/10 bg-white/[0.03] px-4 py-4 text-left transition-colors hover:border-[var(--color-brand)]/40"
             >
               <p className="text-sm font-semibold text-white">Captain</p>
-              <p className="mt-1 text-xs text-white/40">Team name and co-captain</p>
+              <p className="mt-1 text-xs text-white/40">{captainCardDescription}</p>
             </button>
             <button
               type="button"
@@ -421,22 +440,37 @@ export default function TournamentRegisterForm({
         {step === "captain" && (
           <div className="space-y-3">
             <input className={inputClass} placeholder="Team name" value={teamName} onChange={(e) => setTeamName(e.target.value)} />
-            <input
-              className={inputClass}
-              placeholder="Co-captain username"
-              value={coCaptainUsername}
-              onChange={(e) => setCoCaptainUsername(e.target.value)}
-            />
-            <p className="text-xs text-white/40">
-              Your co-captain must be an NTG member with a complete game profile
-              {game === "CS2" ? " (Steam linked)" : game === "VALORANT" ? " (Riot ID linked)" : ""}.
-            </p>
+            {coCaptainSlots > 0 ? (
+              <>
+                {Array.from({ length: coCaptainSlots }, (_, index) => (
+                  <input
+                    key={index}
+                    className={inputClass}
+                    placeholder={
+                      coCaptainSlots === 1
+                        ? "Co-captain username"
+                        : `Co-captain ${index + 1} username`
+                    }
+                    value={coCaptainUsernames[index] ?? ""}
+                    onChange={(e) => {
+                      const next = [...coCaptainUsernames];
+                      next[index] = e.target.value;
+                      setCoCaptainUsernames(next);
+                    }}
+                  />
+                ))}
+                <p className="text-xs text-white/40">
+                  {coCaptainSlots === 1 ? "Your co-captain" : "Each co-captain"} must be an NTG member with a complete game profile
+                  {game === "CS2" ? " (Steam linked)" : game === "VALORANT" ? " (Riot ID linked)" : ""}.
+                </p>
+              </>
+            ) : null}
             <div className="flex gap-2">
               <button type="button" onClick={() => setStep("role")} className="rounded-full border border-white/10 px-4 py-2 text-xs text-white/50">Back</button>
               <button
                 type="button"
                 onClick={() => setStep("confirm")}
-                disabled={!teamName.trim() || !coCaptainUsername.trim()}
+                disabled={!teamName.trim() || !captainCoCaptainsComplete}
                 className="cta flex-1 rounded-full py-2.5 text-xs font-semibold uppercase tracking-[0.16em] disabled:opacity-50"
               >
                 Continue
@@ -453,10 +487,19 @@ export default function TournamentRegisterForm({
                 <>
                   {" "}
                   for <strong className="text-white">{teamName}</strong>
-                  {coCaptainUsername.trim() ? (
+                  {coCaptainSlots > 0 &&
+                  coCaptainUsernames.slice(0, coCaptainSlots).some((u) => u.trim()) ? (
                     <>
                       {" "}
-                      with co-captain <strong className="text-white">{coCaptainUsername.trim()}</strong>
+                      with{" "}
+                      {coCaptainSlots === 1 ? "co-captain" : "co-captains"}{" "}
+                      <strong className="text-white">
+                        {coCaptainUsernames
+                          .slice(0, coCaptainSlots)
+                          .map((u) => u.trim())
+                          .filter(Boolean)
+                          .join(", ")}
+                      </strong>
                     </>
                   ) : null}
                 </>

@@ -25,6 +25,7 @@ export async function POST(req: Request, { params }: Props) {
     participantRole?: RegistrationParticipantRole;
     teamName?: string;
     coCaptainUsername?: string;
+    coCaptainUsernames?: string[];
     memberUsernames?: string[];
   };
   try {

@@ -274,7 +274,7 @@ export default function AdminTournamentEditor({
   } | null>(null);
   const [addRole, setAddRole] = useState<"PLAYER" | "CAPTAIN">("PLAYER");
   const [addTeamName, setAddTeamName] = useState("");
-  const [addCoCaptainUsername, setAddCoCaptainUsername] = useState("");
+  const [addCoCaptainUsernames, setAddCoCaptainUsernames] = useState(["", "", "", ""]);
   const [addMemberUsernames, setAddMemberUsernames] = useState(["", "", "", ""]);
   const [addingMember, setAddingMember] = useState(false);
 
@@ -386,8 +386,10 @@ export default function AdminTournamentEditor({
           userId: selectedMember.id,
           participantRole,
           teamName: participantRole === "CAPTAIN" ? addTeamName.trim() : undefined,
-          coCaptainUsername:
-            participantRole === "CAPTAIN" && isAuctionFormat ? addCoCaptainUsername.trim() : undefined,
+          coCaptainUsernames:
+            participantRole === "CAPTAIN" && isAuctionFormat && form.coCaptainSlots > 0
+              ? addCoCaptainUsernames.slice(0, form.coCaptainSlots).map((u) => u.trim())
+              : undefined,
           memberUsernames:
             participantRole === "CAPTAIN" && isStandardFormat
               ? addMemberUsernames.map((u) => u.trim())
@@ -403,7 +405,7 @@ export default function AdminTournamentEditor({
       setMemberSearch("");
       setMemberResults([]);
       setAddTeamName("");
-      setAddCoCaptainUsername("");
+      setAddCoCaptainUsernames(["", "", "", ""]);
       setAddMemberUsernames(["", "", "", ""]);
       setAddRole("PLAYER");
       setMessage("Member added to cup.");
@@ -982,7 +984,7 @@ export default function AdminTournamentEditor({
                       }`}
                     >
                       <p className="text-sm font-semibold">Auction Draft</p>
-                      <p className="mt-0.5 text-[10px] leading-relaxed text-white/40">Captains register team name + co-captain. Players join the pool. Admin assigns after auction.</p>
+                      <p className="mt-0.5 text-[10px] leading-relaxed text-white/40">Captains register a team name{form.coCaptainSlots > 0 ? ` and up to ${form.coCaptainSlots} co-captain${form.coCaptainSlots > 1 ? "s" : ""}` : ""}. Players join the pool. Admin assigns after auction.</p>
                     </button>
                     <button
                       type="button"
@@ -1001,85 +1003,6 @@ export default function AdminTournamentEditor({
               )}
 
 
-            </AdminSection>
-
-            <AdminSection
-              title="Competition Format"
-              showsOn="How the tournament runs — used to generate brackets and fixtures"
-            >
-              <div className="space-y-3">
-                <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-                  {([
-                    ["SINGLE_ELIMINATION", "Single Elimination"],
-                    ["DOUBLE_ELIMINATION", "Double Elimination"],
-                    ["ROUND_ROBIN", "Round Robin"],
-                    ["SWISS", "Swiss System"],
-                    ["GSL", "GSL (Dual Tournament Format)"],
-                    ["GROUP_PLAYOFFS", "Group Stage → Playoffs"],
-                    ["LEAGUE", "League Format"],
-                    ["HYBRID", "Hybrid Format (Custom Combination)"],
-                  ] as const).map(([value, label]) => (
-                    <button
-                      key={value}
-                      type="button"
-                      onClick={() => setForm({ ...form, format: form.format === value ? null : value })}
-                      className={`rounded-xl border px-4 py-3 text-left text-sm transition-all ${
-                        form.format === value
-                          ? "border-emerald-500/40 bg-emerald-500/[0.08] text-emerald-200"
-                          : "border-white/10 bg-white/[0.02] text-white/60 hover:border-white/20"
-                      }`}
-                    >
-                      {label}
-                    </button>
-                  ))}
-                </div>
-                {(form.format === "GSL" || form.format === "GROUP_PLAYOFFS") && (
-                  <div className="grid grid-cols-3 gap-3">
-                    <div className="space-y-1">
-                      <label className="text-[10px] font-bold uppercase tracking-wider text-white/40">Groups</label>
-                      <input
-                        type="number"
-                        min={1}
-                        className={inputClass}
-                        value={form.groupCount === 0 || form.groupCount === null ? "" : form.groupCount}
-                        placeholder="0"
-                        onChange={(e) => {
-                          const val = e.target.value;
-                          setForm({ ...form, groupCount: val === "" ? null : Number(val) });
-                        }}
-                      />
-                    </div>
-                    <div className="space-y-1">
-                      <label className="text-[10px] font-bold uppercase tracking-wider text-white/40">Teams / group</label>
-                      <input
-                        type="number"
-                        min={1}
-                        className={inputClass}
-                        value={form.teamsPerGroup === 0 || form.teamsPerGroup === null ? "" : form.teamsPerGroup}
-                        placeholder="0"
-                        onChange={(e) => {
-                          const val = e.target.value;
-                          setForm({ ...form, teamsPerGroup: val === "" ? null : Number(val) });
-                        }}
-                      />
-                    </div>
-                    <div className="space-y-1">
-                      <label className="text-[10px] font-bold uppercase tracking-wider text-white/40">Advance / group</label>
-                      <input
-                        type="number"
-                        min={1}
-                        className={inputClass}
-                        value={form.advancePerGroup === 0 || form.advancePerGroup === null ? "" : form.advancePerGroup}
-                        placeholder="0"
-                        onChange={(e) => {
-                          const val = e.target.value;
-                          setForm({ ...form, advancePerGroup: val === "" ? null : Number(val) });
-                        }}
-                      />
-                    </div>
-                  </div>
-                )}
-              </div>
             </AdminSection>
 
             <AdminSection
@@ -1250,6 +1173,35 @@ export default function AdminTournamentEditor({
                     }
                   />
                 </div>
+                {form.registrationFormat === "AUCTION" ? (
+                  <>
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-bold uppercase tracking-wider text-white/40">Auction Starts</label>
+                      <input
+                        type="datetime-local"
+                        className={inputClass}
+                        value={toLocalDatetime(form.auctionStartsAt)}
+                        onChange={(e) =>
+                          setForm({ ...form, auctionStartsAt: e.target.value ? new Date(e.target.value).toISOString() : null })
+                        }
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-bold uppercase tracking-wider text-white/40">Auction Ends</label>
+                      <input
+                        type="datetime-local"
+                        className={inputClass}
+                        value={toLocalDatetime(form.auctionEndsAt)}
+                        onChange={(e) =>
+                          setForm({ ...form, auctionEndsAt: e.target.value ? new Date(e.target.value).toISOString() : null })
+                        }
+                      />
+                    </div>
+                    <p className="text-xs text-white/35 sm:col-span-2">
+                      The &quot;Auction is live&quot; countdown banner displays on the homepage while the auction is live.
+                    </p>
+                  </>
+                ) : null}
               </div>
             </AdminSection>
           </div>
@@ -1324,34 +1276,6 @@ export default function AdminTournamentEditor({
                     />
                   </div>
                 </div>
-                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 border-t border-white/[0.04] pt-4">
-                  <div className="space-y-1">
-                    <label className="text-[10px] font-bold uppercase tracking-wider text-white/40">Auction Starts</label>
-                    <input
-                      type="datetime-local"
-                      className={inputClass}
-                      value={toLocalDatetime(form.auctionStartsAt)}
-                      onChange={(e) =>
-                        setForm({ ...form, auctionStartsAt: e.target.value ? new Date(e.target.value).toISOString() : null })
-                      }
-                    />
-                  </div>
-                  <div className="space-y-1">
-                    <label className="text-[10px] font-bold uppercase tracking-wider text-white/40">Auction Ends</label>
-                    <input
-                      type="datetime-local"
-                      className={inputClass}
-                      value={toLocalDatetime(form.auctionEndsAt)}
-                      onChange={(e) =>
-                        setForm({ ...form, auctionEndsAt: e.target.value ? new Date(e.target.value).toISOString() : null })
-                      }
-                    />
-                  </div>
-                </div>
-                <p className="text-[10px] leading-relaxed text-white/35">
-                  The &quot;Auction is live&quot; countdown banner displays on the homepage while the auction is live.
-                </p>
-
                 {form.game === "VALORANT" && (
                   <div className="space-y-3 border-t border-white/[0.04] pt-4">
                     <div className="flex items-start justify-between gap-3">
@@ -1741,17 +1665,28 @@ export default function AdminTournamentEditor({
                               ))}
                             </div>
                           </>
-                        ) : (
+                        ) : form.coCaptainSlots > 0 ? (
                           <>
-                            <label className="text-[10px] font-bold uppercase tracking-wider text-white/40">Co-captain username</label>
-                            <input
-                              className={inputClass}
-                              value={addCoCaptainUsername}
-                              onChange={(e) => setAddCoCaptainUsername(e.target.value)}
-                              placeholder="NTG username"
-                            />
+                            <label className="text-[10px] font-bold uppercase tracking-wider text-white/40">
+                              Co-captain username{form.coCaptainSlots > 1 ? "s" : ""}
+                            </label>
+                            <div className="grid gap-2 sm:grid-cols-2">
+                              {Array.from({ length: form.coCaptainSlots }, (_, index) => (
+                                <input
+                                  key={index}
+                                  className={inputClass}
+                                  value={addCoCaptainUsernames[index] ?? ""}
+                                  onChange={(e) => {
+                                    const next = [...addCoCaptainUsernames];
+                                    next[index] = e.target.value;
+                                    setAddCoCaptainUsernames(next);
+                                  }}
+                                  placeholder={`Co-captain ${index + 1}`}
+                                />
+                              ))}
+                            </div>
                           </>
-                        )}
+                        ) : null}
                       </div>
                     </>
                   ) : null}
@@ -1764,7 +1699,11 @@ export default function AdminTournamentEditor({
                     !selectedMember ||
                     (addRole === "CAPTAIN" &&
                       (!addTeamName.trim() ||
-                        (isAuctionFormat && !addCoCaptainUsername.trim()) ||
+                        (isAuctionFormat &&
+                          form.coCaptainSlots > 0 &&
+                          !addCoCaptainUsernames
+                            .slice(0, form.coCaptainSlots)
+                            .every((u) => u.trim().length >= 2)) ||
                         (isStandardFormat && !addMemberUsernames.every((u) => u.trim().length >= 2))))
                   }
                   className="rounded-xl bg-indigo-600 px-5 py-2.5 text-xs font-bold text-white hover:bg-indigo-500 disabled:opacity-50 transition-colors"
@@ -1883,7 +1822,11 @@ export default function AdminTournamentEditor({
                   <p className="text-xs text-white/50">
                     {isAuctionFormat ? (
                       <>
-                        <span className="font-semibold text-white/70">Auction rosters:</span> captains register with a co-captain at signup.
+                        <span className="font-semibold text-white/70">Auction rosters:</span> captains register with a team name
+                        {form.coCaptainSlots > 0
+                          ? ` and ${form.coCaptainSlots} co-captain${form.coCaptainSlots > 1 ? "s" : ""}`
+                          : ""}{" "}
+                        at signup.
                         After the draft, assign players from the pool to each team below.
                       </>
                     ) : isStandardFormat ? (
@@ -1950,7 +1893,9 @@ export default function AdminTournamentEditor({
                               return (
                                 <p className="text-xs text-white/30 italic">
                                   {isAuctionFormat
-                                    ? "Captain and co-captain appear here after team registration."
+                                    ? form.coCaptainSlots > 0
+                                      ? "Captain and co-captain(s) appear here after team registration."
+                                      : "Captain appears here after team registration."
                                     : "Team roster appears here after registration."}
                                 </p>
                               );
