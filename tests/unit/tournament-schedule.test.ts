@@ -8,7 +8,10 @@ import {
   isTournamentRegistrationLive,
   validateAutoSchedule,
 } from "@tournaments-leagues/domain/tournament-schedule";
-import { resolveAuctionHeroPhase } from "@tournaments-leagues/domain/auction-hero-phase";
+import {
+  resolveAuctionHeroPhase,
+  resolveEffectivePublicAuction,
+} from "@tournaments-leagues/domain/auction-hero-phase";
 
 const standard = {
   status: "REGISTRATION_OPEN" as TournamentStatus,
@@ -20,6 +23,8 @@ const standard = {
 };
 
 const auction = {
+  slug: "auc-cup-test",
+  name: "AUC CUP TEST",
   status: "REGISTRATION_OPEN" as TournamentStatus,
   autoManageStatus: true,
   registrationFormat: "AUCTION",
@@ -91,6 +96,31 @@ describe("tournament-schedule", () => {
         new Date("2026-06-10T19:00:00Z"),
       ),
     ).toBe(true);
+  });
+});
+
+describe("resolveEffectivePublicAuction", () => {
+  const t = { autoManageStatus: true, auctionStartsAt: auction.auctionStartsAt, auctionEndsAt: auction.auctionEndsAt };
+
+  it("auto-computes on during the live window regardless of stored value", () => {
+    expect(resolveEffectivePublicAuction(false, t, new Date("2026-07-17T11:00:00Z"))).toBe(true);
+  });
+
+  it("auto-computes off before the window starts", () => {
+    expect(resolveEffectivePublicAuction(true, t, new Date("2026-07-10T12:00:00Z"))).toBe(false);
+  });
+
+  it("auto-computes off after the window ends", () => {
+    expect(resolveEffectivePublicAuction(true, t, new Date("2026-07-19T12:00:00Z"))).toBe(false);
+  });
+
+  it("falls back to the stored value when auto-manage is off", () => {
+    expect(resolveEffectivePublicAuction(true, { ...t, autoManageStatus: false })).toBe(true);
+    expect(resolveEffectivePublicAuction(false, { ...t, autoManageStatus: false })).toBe(false);
+  });
+
+  it("falls back to the stored value when auction dates aren't set", () => {
+    expect(resolveEffectivePublicAuction(true, { ...t, auctionStartsAt: null })).toBe(true);
   });
 });
 

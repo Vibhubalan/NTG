@@ -63,3 +63,24 @@ export function resolveAuctionHeroPhase(
 
   return null;
 }
+
+/**
+ * Whether the "Enter Live Auction" button should be publicly visible.
+ * When auto-manage is on and both auction dates are set, visibility is computed
+ * live from the auction window — overriding whatever's stored on the toggle.
+ * Otherwise falls back to the manually-stored value.
+ */
+export function resolveEffectivePublicAuction(
+  stored: boolean,
+  t: {
+    autoManageStatus: boolean;
+    auctionStartsAt: Date | string | null;
+    auctionEndsAt: Date | string | null;
+  },
+  now: Date = new Date(),
+): boolean {
+  if (!t.autoManageStatus || !t.auctionStartsAt || !t.auctionEndsAt) return stored;
+  const start = new Date(t.auctionStartsAt);
+  const end = new Date(t.auctionEndsAt);
+  return now >= start && now < end;
+}

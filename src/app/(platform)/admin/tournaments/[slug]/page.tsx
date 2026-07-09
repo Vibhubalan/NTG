@@ -12,6 +12,7 @@ import type { PrizeSplitRow } from "@core/contracts";
 import { prisma } from "@core/database/client";
 import { getSession } from "@core/auth/session";
 import { auctionLink } from "@/lib/auction-link";
+import { resolveEffectivePublicAuction } from "@tournaments-leagues/domain/auction-hero-phase";
 
 export const metadata = { title: "Edit Cup" };
 
@@ -72,7 +73,7 @@ export default async function AdminTournamentEditPage({ params }: Props) {
     groupCount: t.groupCount,
     teamsPerGroup: t.teamsPerGroup,
     advancePerGroup: t.advancePerGroup,
-    publicAuction: row?.publicAuction ?? false,
+    publicAuction: resolveEffectivePublicAuction(row?.publicAuction ?? false, t),
     rankPoints: (t.rankPoints as { rank: string; floor: number }[] | null) ?? null,
     bracketUrl: t.bracketUrl,
     rulebookUrl: t.rulebookUrl,

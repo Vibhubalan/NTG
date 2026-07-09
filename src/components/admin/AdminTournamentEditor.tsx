@@ -1380,36 +1380,47 @@ export default function AdminTournamentEditor({
                 </div>
 
                 {/* Public Auction Visibility Toggle */}
-                <div className="border-t border-white/[0.04] pt-4 flex items-center justify-between">
-                  <div>
-                    <h4 className="text-xs font-semibold text-white/80">Public Auction Visibility</h4>
-                    <p className="text-[10px] text-white/40 mt-0.5">
-                      When enabled, the "Enter Auction" button becomes visible to all registered users on the tournament details page.
-                    </p>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      const nextVal = !form.publicAuction;
-                      setForm({ ...form, publicAuction: nextVal });
-                      // Save immediately when toggled
-                      fetch(`/api/admin/tournaments/${form.slug}`, {
-                        method: "PATCH",
-                        headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify({ publicAuction: nextVal }),
-                      });
-                    }}
-                    className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
-                      form.publicAuction ? "bg-cyan-500" : "bg-white/[0.12]"
-                    }`}
-                  >
-                    <span
-                      className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
-                        form.publicAuction ? "translate-x-5" : "translate-x-0"
-                      }`}
-                    />
-                  </button>
-                </div>
+                {(() => {
+                  const autoManaged = !!(form.autoManageStatus && form.auctionStartsAt && form.auctionEndsAt);
+                  return (
+                    <div className="border-t border-white/[0.04] pt-4 flex items-center justify-between">
+                      <div>
+                        <h4 className="text-xs font-semibold text-white/80">Public Auction Visibility</h4>
+                        <p className="text-[10px] text-white/40 mt-0.5">
+                          When enabled, the "Enter Auction" button becomes visible to all registered users on the tournament details page.
+                        </p>
+                        {autoManaged && (
+                          <p className="text-[10px] text-cyan-300/70 mt-1">
+                            Auto-managed by the auction schedule — on automatically during the live window, off otherwise.
+                          </p>
+                        )}
+                      </div>
+                      <button
+                        type="button"
+                        disabled={autoManaged}
+                        onClick={() => {
+                          const nextVal = !form.publicAuction;
+                          setForm({ ...form, publicAuction: nextVal });
+                          // Save immediately when toggled
+                          fetch(`/api/admin/tournaments/${form.slug}`, {
+                            method: "PATCH",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify({ publicAuction: nextVal }),
+                          });
+                        }}
+                        className={`relative inline-flex h-6 w-11 shrink-0 rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                          autoManaged ? "cursor-not-allowed opacity-60" : "cursor-pointer"
+                        } ${form.publicAuction ? "bg-cyan-500" : "bg-white/[0.12]"}`}
+                      >
+                        <span
+                          className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                            form.publicAuction ? "translate-x-5" : "translate-x-0"
+                          }`}
+                        />
+                      </button>
+                    </div>
+                  );
+                })()}
 
                 {/* Direct Link to Auction Site */}
                 {auctionHref && (
