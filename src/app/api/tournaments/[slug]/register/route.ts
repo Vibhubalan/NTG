@@ -6,6 +6,7 @@ import {
   registerForTournament,
   registerStandardTeam,
   registerFifaTeam,
+  getValorantRegistrationProfileCard,
 } from "@tournaments-leagues/index";
 import {
   tournamentRegisterSchema,
@@ -17,6 +18,19 @@ import { NextResponse } from "next/server";
 export const dynamic = "force-dynamic";
 
 type Props = { params: Promise<{ slug: string }> };
+
+async function registrationResponse(
+  slug: string,
+  userId: string,
+  registrationId: string,
+  game: string,
+) {
+  const profileCard =
+    game === "VALORANT"
+      ? await getValorantRegistrationProfileCard(slug, userId)
+      : null;
+  return NextResponse.json({ registrationId, profileCard });
+}
 
 export async function POST(req: Request, { params }: Props) {
   if (!serverEnv.databaseUrl) {
@@ -58,7 +72,7 @@ export async function POST(req: Request, { params }: Props) {
     if (!result.ok) {
       return NextResponse.json({ error: result.error }, { status: 400 });
     }
-    return NextResponse.json({ registrationId: result.registrationId });
+    return registrationResponse(slug, auth.userId, result.registrationId, tournament.game);
   }
 
   if (tournament.registrationFormat === "STANDARD") {
@@ -73,7 +87,7 @@ export async function POST(req: Request, { params }: Props) {
     if (!result.ok) {
       return NextResponse.json({ error: result.error }, { status: 400 });
     }
-    return NextResponse.json({ registrationId: result.registrationId });
+    return registrationResponse(slug, auth.userId, result.registrationId, tournament.game);
   }
 
   const parsed = tournamentRegisterSchema.safeParse(body);
@@ -90,5 +104,5 @@ export async function POST(req: Request, { params }: Props) {
     return NextResponse.json({ error: result.error }, { status: 400 });
   }
 
-  return NextResponse.json({ registrationId: result.registrationId });
+  return registrationResponse(slug, auth.userId, result.registrationId, tournament.game);
 }

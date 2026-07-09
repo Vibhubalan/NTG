@@ -3,7 +3,7 @@ import TournamentDetailView from "@/components/platform/TournamentDetailView";
 import { fetchChallongeBracket } from "@/lib/challonge-api";
 import { getSession } from "@core/auth/session";
 import { requireAdmin } from "@core/auth/require-admin";
-import { getTournamentDetail, getRegistrationEligibility } from "@tournaments-leagues/index";
+import { getTournamentDetail, getRegistrationEligibility, getValorantRegistrationProfileCard } from "@tournaments-leagues/index";
 import { serverEnv } from "@core/config/env.server";
 import { auctionLink } from "@/lib/auction-link";
 
@@ -30,6 +30,10 @@ export default async function TournamentDetailPage({ params }: Props) {
   const registrationPreview = userId
     ? await getRegistrationEligibility(slug, userId)
     : null;
+  const registrationProfileCard =
+    userId && raw.game === "VALORANT" && raw.userRegistered
+      ? await getValorantRegistrationProfileCard(slug, userId)
+      : null;
 
   // Auction handoff: routes the user to the right screen; the auction app re-checks access server-side.
   const auctionView = admin.ok
@@ -55,6 +59,7 @@ export default async function TournamentDetailPage({ params }: Props) {
         bracket={bracket}
         isLoggedIn={!!userId}
         registrationPreview={registrationPreview}
+        registrationProfileCard={registrationProfileCard}
       />
       {auctionHref ? (
         <div className="mt-16 text-center">

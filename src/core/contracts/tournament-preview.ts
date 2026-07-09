@@ -12,6 +12,7 @@ export type TournamentPreview = {
   endsAt: string | null;
   registrationOpensAt: string | null;
   registrationClosesAt: string | null;
+  auctionStartsAt?: string | null;
   registrationUrl: string | null;
   championName?: string | null;
   bracketUrl?: string | null;

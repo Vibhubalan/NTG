@@ -27,7 +27,7 @@ type CalendarCell = {
 // Phase band rendered across multi-day spans (Apple Calendar style)
 type EventBand = {
   tournamentId: string;
-  phase: "registration" | "tournament";
+  phase: "registration" | "auction" | "tournament";
   color: string;      // hex
   isStart: boolean;
   isEnd: boolean;
@@ -231,6 +231,23 @@ export default function TournamentCalendar({ tournaments, defaultToToday = false
           }
         }
 
+        // ── Auction day (start only) ───────────────────────────────
+        if (t.registrationFormat === "AUCTION" && t.auctionStartsAt) {
+          const auctionDay = toMidnight(new Date(t.auctionStartsAt));
+          if (cellTs === auctionDay.getTime()) {
+            bands.push({
+              tournamentId: t.id,
+              phase: "auction",
+              color: "#d946ef",
+              isStart: true,
+              isEnd: true,
+              isActualStart: true,
+              isActualEnd: true,
+              label: "Auction",
+            });
+          }
+        }
+
         // ── Tournament band ────────────────────────────────────────
         if (t.startsAt && t.endsAt) {
           const tourStart = toMidnight(new Date(t.startsAt));
@@ -292,7 +309,13 @@ export default function TournamentCalendar({ tournaments, defaultToToday = false
           if (selTs >= start && selTs <= end) isActive = true;
         }
 
-        // 2. Is tournament active?
+        // 2. Is auction day?
+        if (t.registrationFormat === "AUCTION" && t.auctionStartsAt) {
+          const auctionDay = toMidnight(new Date(t.auctionStartsAt)).getTime();
+          if (selTs === auctionDay) isActive = true;
+        }
+
+        // 3. Is tournament active?
         if (t.startsAt) {
           const start = toMidnight(new Date(t.startsAt)).getTime();
           const end = t.endsAt ? toMidnight(new Date(t.endsAt)).getTime() : start;
@@ -302,12 +325,17 @@ export default function TournamentCalendar({ tournaments, defaultToToday = false
         return isActive;
       })
       .map((t) => {
-        let activePhase: "REGISTRATION" | "TOURNAMENT" | "UPCOMING" = "UPCOMING";
+        let activePhase: "REGISTRATION" | "AUCTION" | "TOURNAMENT" | "UPCOMING" = "UPCOMING";
 
         if (t.registrationOpensAt && t.registrationClosesAt) {
           const start = toMidnight(new Date(t.registrationOpensAt)).getTime();
           const end = toMidnight(new Date(t.registrationClosesAt)).getTime();
           if (selTs >= start && selTs <= end) activePhase = "REGISTRATION";
+        }
+
+        if (t.registrationFormat === "AUCTION" && t.auctionStartsAt) {
+          const auctionDay = toMidnight(new Date(t.auctionStartsAt)).getTime();
+          if (selTs === auctionDay) activePhase = "AUCTION";
         }
 
         if (t.startsAt) {
@@ -431,6 +459,9 @@ export default function TournamentCalendar({ tournaments, defaultToToday = false
                   }
                   if (b.phase === "registration" && b.isActualEnd) {
                     return { text: `${shortName} CLOSES`, color: b.color };
+                  }
+                  if (b.phase === "auction" && b.isActualStart) {
+                    return { text: `${shortName} AUCTION`, color: b.color };
                   }
                   if (b.phase === "tournament" && b.isActualStart) {
                     return { text: `${shortName} PLAY`, color: b.color };
@@ -670,7 +701,11 @@ export default function TournamentCalendar({ tournaments, defaultToToday = false
                               backgroundColor: `${t.display.hex}08`,
                             }}
                           >
-                            {t.activePhase === "REGISTRATION" ? "🟣 Registration Open" : "🟢 Tournament Day"}
+                            {t.activePhase === "REGISTRATION"
+                              ? "🟣 Registration Open"
+                              : t.activePhase === "AUCTION"
+                                ? "🟣 Auction Day"
+                                : "🟢 Tournament Day"}
                           </span>
                         </div>
 
@@ -693,6 +728,15 @@ export default function TournamentCalendar({ tournaments, defaultToToday = false
                               <>
                                 Registration Closes: <span className="font-semibold text-white/80">
                                   {t.registrationClosesAt ? new Date(t.registrationClosesAt).toLocaleDateString("en-IN", {
+                                    day: "numeric",
+                                    month: "short",
+                                  }) : "—"}
+                                </span>
+                              </>
+                            ) : t.activePhase === "AUCTION" ? (
+                              <>
+                                Auction Day: <span className="font-semibold text-white/80">
+                                  {t.auctionStartsAt ? new Date(t.auctionStartsAt).toLocaleDateString("en-IN", {
                                     day: "numeric",
                                     month: "short",
                                   }) : "—"}

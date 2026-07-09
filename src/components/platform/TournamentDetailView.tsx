@@ -3,12 +3,13 @@ import StatusBadge from "@/components/platform/ui/StatusBadge";
 import TournamentBracket from "@/components/platform/tournament/TournamentBracket";
 import TournamentBracketEmpty from "@/components/platform/tournament/TournamentBracketEmpty";
 import TournamentFinalResults from "@/components/platform/tournament/TournamentFinalResults";
-import TournamentPlayersRegistered from "@/components/platform/tournament/TournamentPlayersRegistered";
+import TournamentScheduleCard from "@/components/platform/tournament/TournamentScheduleCard";
 import TournamentTeamsList from "@/components/platform/tournament/TournamentTeamsList";
-import { gameMetaFor, formatRegistrationLabel } from "@/lib/tournament-display";
+import { gameMetaFor, formatRegistrationLabel, buildTournamentScheduleCardView } from "@/lib/tournament-display";
 import TournamentRegisterForm from "./TournamentRegisterForm";
 import type { RegistrationPreview } from "./TournamentRegisterForm";
 import type { TournamentDetail } from "@core/contracts";
+import type { ValorantRegistrationProfileCard } from "@core/contracts/registration-profile";
 import type { TournamentBracketView, FinalStandingView } from "@core/contracts/tournament-bracket";
 
 type Props = {
@@ -16,6 +17,7 @@ type Props = {
   bracket: TournamentBracketView | null;
   isLoggedIn: boolean;
   registrationPreview?: RegistrationPreview | null;
+  registrationProfileCard?: ValorantRegistrationProfileCard | null;
 };
 
 export default function TournamentDetailView({
@@ -23,6 +25,7 @@ export default function TournamentDetailView({
   bracket,
   isLoggedIn,
   registrationPreview,
+  registrationProfileCard,
 }: Props) {
   const meta = gameMetaFor(tournament.game);
   const dateStr = tournament.startsAt
@@ -74,6 +77,18 @@ export default function TournamentDetailView({
   const splitColors = ["text-amber-500/90", "text-slate-300/90", "text-amber-700/90"];
   const splitBadgeColors = ["bg-amber-500/20 text-amber-500", "bg-slate-300/20 text-slate-300", "bg-amber-700/20 text-amber-700"];
 
+  const showRegistrationSection =
+    tournament.registrationOpen ||
+    (tournament.userRegistered && tournament.game === "VALORANT");
+
+  const scheduleCard = buildTournamentScheduleCardView({
+    registrationFormat: tournament.registrationFormat,
+    registrationOpensAt: tournament.registrationOpensAt,
+    startsAt: tournament.startsAt,
+    endsAt: tournament.endsAt,
+    auctionStartsAt: tournament.auctionStartsAt,
+  });
+
   return (
     <article className="pb-24">
       <div className="relative mb-12 flex min-h-[24rem] flex-col justify-end overflow-hidden rounded-[2rem] border border-white/[0.08] p-8 shadow-2xl sm:min-h-[30rem] sm:p-12">
@@ -118,8 +133,8 @@ export default function TournamentDetailView({
         </div>
       </div>
 
-      <div className="grid gap-12 lg:grid-cols-[1fr_24rem]">
-        <div className="space-y-16">
+      <div className="grid gap-12 lg:grid-cols-[1fr_24rem] lg:items-start">
+        <div className="order-1 space-y-16 lg:col-start-1 lg:row-start-1">
           {showFinalResults ? (
             <TournamentFinalResults
               standings={standings}
@@ -127,23 +142,27 @@ export default function TournamentDetailView({
             />
           ) : null}
 
-
-          {showTeams ? (
-            <TournamentTeamsList
-              teams={tournament.teams}
-              teamDetails={tournament.teamDetails}
-              accentHex={meta.hex}
+          {showRegistrationSection ? (
+            <TournamentRegisterForm
+              layout="featured"
+              slug={tournament.slug}
               game={tournament.game}
               registrationFormat={tournament.registrationFormat}
+              isLoggedIn={isLoggedIn}
+              alreadyRegistered={tournament.userRegistered}
+              registrationOpen={tournament.registrationOpen}
+              rulebookUrl={tournament.rulebookUrl}
+              preview={registrationPreview ?? null}
+              coCaptainSlots={tournament.coCaptainSlots}
+              registrationProfileCard={registrationProfileCard ?? null}
             />
           ) : null}
         </div>
 
-        <aside className="space-y-8">
-          <div className="space-y-8">
-            <TournamentPlayersRegistered count={tournament.registrationCount} />
+        <aside className="order-2 space-y-8 lg:col-start-2 lg:row-start-1 lg:row-span-2">
+          <TournamentScheduleCard schedule={scheduleCard} />
 
-            {(tournament.prizePool || tournament.prizeNotes) && (
+          {(tournament.prizePool || tournament.prizeNotes) && (
               <div className="rounded-[1.5rem] border border-white/[0.08] bg-[#0A0A0A]/80 p-8 shadow-2xl backdrop-blur-xl">
                 <p className="text-[10px] font-medium uppercase tracking-[0.3em] text-white/40">Prizepool</p>
                 {tournament.prizePool ? (
@@ -181,24 +200,19 @@ export default function TournamentDetailView({
                 ) : null}
               </div>
             )}
-
-            {tournament.registrationOpen ? (
-              <div className="rounded-[1.5rem] border border-white/[0.08] bg-white/[0.02] p-8 shadow-xl backdrop-blur-md">
-                <TournamentRegisterForm
-                  slug={tournament.slug}
-                  game={tournament.game}
-                  registrationFormat={tournament.registrationFormat}
-                  isLoggedIn={isLoggedIn}
-                  alreadyRegistered={tournament.userRegistered}
-                  registrationOpen={tournament.registrationOpen}
-                  rulebookUrl={tournament.rulebookUrl}
-                  preview={registrationPreview ?? null}
-                  coCaptainSlots={tournament.coCaptainSlots}
-                />
-              </div>
-            ) : null}
-          </div>
         </aside>
+
+        {showTeams ? (
+          <div className="order-3 lg:col-start-1 lg:row-start-2">
+            <TournamentTeamsList
+              teams={tournament.teams}
+              teamDetails={tournament.teamDetails}
+              accentHex={meta.hex}
+              game={tournament.game}
+              registrationFormat={tournament.registrationFormat}
+            />
+          </div>
+        ) : null}
       </div>
 
       {showBracket && tournament.bracketUrl ? (

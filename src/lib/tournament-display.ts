@@ -115,3 +115,59 @@ export function formatParticipantRole(role: string): string {
       return role;
   }
 }
+
+export type TournamentScheduleCardView = {
+  registrationDate: string;
+  auctionDate: string;
+  tournamentDate: string;
+};
+
+const TBD = "To be decided";
+
+function formatScheduleDate(iso: string): string {
+  return new Date(iso).toLocaleDateString("en-IN", {
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+  });
+}
+
+function formatCupDateRange(startsAt: string, endsAt: string | null): string {
+  if (!endsAt) return formatScheduleDate(startsAt);
+
+  const start = new Date(startsAt);
+  const end = new Date(endsAt);
+  if (start.toDateString() === end.toDateString()) {
+    return formatScheduleDate(startsAt);
+  }
+
+  const sameMonth =
+    start.getMonth() === end.getMonth() && start.getFullYear() === end.getFullYear();
+  if (sameMonth) {
+    const monthYear = start.toLocaleDateString("en-IN", { month: "long", year: "numeric" });
+    return `${start.getDate()} – ${end.getDate()} ${monthYear}`;
+  }
+
+  return `${formatScheduleDate(startsAt)} – ${formatScheduleDate(endsAt)}`;
+}
+
+export function buildTournamentScheduleCardView(input: {
+  registrationFormat: string | null;
+  registrationOpensAt: string | null;
+  startsAt: string | null;
+  endsAt: string | null;
+  auctionStartsAt?: string | null;
+}): TournamentScheduleCardView {
+  return {
+    registrationDate: input.registrationOpensAt
+      ? formatScheduleDate(input.registrationOpensAt)
+      : TBD,
+    auctionDate:
+      input.registrationFormat === "AUCTION" && input.auctionStartsAt
+        ? formatScheduleDate(input.auctionStartsAt)
+        : TBD,
+    tournamentDate: input.startsAt
+      ? formatCupDateRange(input.startsAt, input.endsAt)
+      : TBD,
+  };
+}

@@ -46,6 +46,7 @@ export {
   registerStandardTeam,
   registerFifaTeam,
   getRegistrationEligibility,
+  getValorantRegistrationProfileCard,
   setTournamentPlacements,
   updateTournamentAdmin,
   adminAddTournamentRegistration,

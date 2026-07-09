@@ -291,6 +291,8 @@ export class TournamentRepository {
       registrationOpen: isRegistrationOpen(t),
       registrationOpensAt: t.registrationOpensAt?.toISOString() ?? null,
       registrationClosesAt: t.registrationClosesAt?.toISOString() ?? null,
+      auctionStartsAt: t.auctionStartsAt?.toISOString() ?? null,
+      auctionEndsAt: t.auctionEndsAt?.toISOString() ?? null,
       bracketUrl: t.bracketUrl ?? null,
       rulebookUrl: t.rulebookUrl ?? null,
       teams,
@@ -376,6 +378,7 @@ export class TournamentRepository {
     endsAt: Date | null;
     registrationOpensAt: Date | null;
     registrationClosesAt: Date | null;
+    auctionStartsAt?: Date | null;
     registrationUrl: string | null;
     format: string | null;
     bracketUrl: string | null;
@@ -405,6 +408,7 @@ export class TournamentRepository {
       endsAt: t.endsAt?.toISOString() ?? null,
       registrationOpensAt: t.registrationOpensAt?.toISOString() ?? null,
       registrationClosesAt: t.registrationClosesAt?.toISOString() ?? null,
+      auctionStartsAt: t.auctionStartsAt?.toISOString() ?? null,
       registrationUrl: t.registrationUrl,
       championName,
       bracketUrl: t.bracketUrl,

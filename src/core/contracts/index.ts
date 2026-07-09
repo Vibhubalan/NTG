@@ -18,6 +18,7 @@ export type {
   YoutubePreview,
 } from "./moments-gallery";
 export type { RegistrationResult } from "./registration";
+export type { ValorantRegistrationProfileCard } from "./registration-profile";
 export type {
   BracketMatchSlot,
   BracketMatchView,

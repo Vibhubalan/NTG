@@ -14,8 +14,14 @@ import {
 } from "@auth-membership/application/registration-helpers";
 import { ensureCs2RankDefaults } from "@auth-membership/application/game-profile.service";
 import { isTournamentRegistrationLive } from "../domain/registration-window";
-import { syncUserRank } from "./rank-sync.service";
+import { syncUserRank, fetchHenrikV2MmrBundle } from "./rank-sync.service";
 import { logUserActivity } from "@/lib/user-audit";
+import { normalizeHenrikRegion } from "@/lib/henrik-region";
+import {
+  resolveAuctionDisplayRank,
+  type ValorantRankSnapshot,
+} from "@/lib/valorant-registration-rank";
+import type { ValorantRegistrationProfileCard } from "@core/contracts/registration-profile";
 
 
 export type TournamentRegisterInput = {
@@ -55,10 +61,33 @@ export type RegistrationEligibility = {
   valorantRankTier: string | null;
 };
 
-async function getValorantRankSnapshot(userId: string): Promise<{
-  tier: string | null;
-  tierId: number | null;
-}> {
+type ValorantRegistrationSnapshots = {
+  current: ValorantRankSnapshot;
+  peak: ValorantRankSnapshot & { act: string | null };
+};
+
+async function fetchValorantPeakSnapshot(userId: string): Promise<ValorantRankSnapshot & { act: string | null }> {
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { riotGameName: true, riotTagLine: true, riotRegion: true },
+  });
+  if (!user?.riotGameName || !user.riotTagLine) {
+    return { tier: null, tierId: null, act: null };
+  }
+
+  const region = normalizeHenrikRegion(user.riotRegion);
+  const bundle = await fetchHenrikV2MmrBundle(region, user.riotGameName, user.riotTagLine).catch(
+    () => null,
+  );
+  const lifetime = bundle?.lifetime;
+  return {
+    tier: lifetime?.peakRankTier ?? null,
+    tierId: lifetime?.peakRankTierId ?? null,
+    act: lifetime?.peakAct ?? null,
+  };
+}
+
+async function getValorantRegistrationSnapshots(userId: string): Promise<ValorantRegistrationSnapshots> {
   let entry = await prisma.leaderboardEntry.findFirst({
     where: { userId, game: "VALORANT", scope: "TOWN" },
   });
@@ -73,9 +102,18 @@ async function getValorantRankSnapshot(userId: string): Promise<{
     });
   }
 
+  const peak = await fetchValorantPeakSnapshot(userId);
+
   return {
-    tier: entry?.rankTier ?? null,
-    tierId: entry?.rankTierId ?? null,
+    current: {
+      tier: entry?.rankTier ?? null,
+      tierId: entry?.rankTierId ?? null,
+    },
+    peak: {
+      tier: peak.tier,
+      tierId: peak.tierId,
+      act: peak.act,
+    },
   };
 }
 
@@ -248,6 +286,9 @@ type RegistrationSnapshotData = {
   snapshotCs2FaceitRank: string | null;
   snapshotRankTier: string | null;
   snapshotRankTierId: number | null;
+  snapshotPeakRankTier: string | null;
+  snapshotPeakRankTierId: number | null;
+  snapshotPeakAct: string | null;
   snapshotValorantRoles: ValorantRole[] | null;
 };
 
@@ -541,14 +582,20 @@ export async function registerStandardTeam(
 
   let snapshotRankTier: string | null = null;
   let snapshotRankTierId: number | null = null;
+  let snapshotPeakRankTier: string | null = null;
+  let snapshotPeakRankTierId: number | null = null;
+  let snapshotPeakAct: string | null = null;
   let snapshotValorantRoles: ValorantRole[] | null = null;
   let snapshotCs2PeakPremier: string | null = null;
   let snapshotCs2Faceit: string | null = null;
 
   if (tournament.game === GameSlug.VALORANT) {
-    const rank = await getValorantRankSnapshot(userId);
-    snapshotRankTier = rank.tier;
-    snapshotRankTierId = rank.tierId;
+    const snapshots = await getValorantRegistrationSnapshots(userId);
+    snapshotRankTier = snapshots.current.tier;
+    snapshotRankTierId = snapshots.current.tierId;
+    snapshotPeakRankTier = snapshots.peak.tier;
+    snapshotPeakRankTierId = snapshots.peak.tierId;
+    snapshotPeakAct = snapshots.peak.act;
     snapshotValorantRoles =
       input.valorantRoles?.length
         ? input.valorantRoles
@@ -568,6 +615,9 @@ export async function registerStandardTeam(
     ...userSnapshotFields(user),
     snapshotRankTier,
     snapshotRankTierId,
+    snapshotPeakRankTier,
+    snapshotPeakRankTierId,
+    snapshotPeakAct,
     snapshotValorantRoles: snapshotValorantRoles
       ? (snapshotValorantRoles as unknown as import("@prisma/client").Prisma.InputJsonValue)
       : undefined,
@@ -688,14 +738,20 @@ export async function registerForTournament(
 
   let snapshotRankTier: string | null = null;
   let snapshotRankTierId: number | null = null;
+  let snapshotPeakRankTier: string | null = null;
+  let snapshotPeakRankTierId: number | null = null;
+  let snapshotPeakAct: string | null = null;
   let snapshotValorantRoles: ValorantRole[] | null = null;
   let snapshotCs2PeakPremier: string | null = null;
   let snapshotCs2Faceit: string | null = null;
 
   if (tournament.game === GameSlug.VALORANT) {
-    const rank = await getValorantRankSnapshot(userId);
-    snapshotRankTier = rank.tier;
-    snapshotRankTierId = rank.tierId;
+    const snapshots = await getValorantRegistrationSnapshots(userId);
+    snapshotRankTier = snapshots.current.tier;
+    snapshotRankTierId = snapshots.current.tierId;
+    snapshotPeakRankTier = snapshots.peak.tier;
+    snapshotPeakRankTierId = snapshots.peak.tierId;
+    snapshotPeakAct = snapshots.peak.act;
     snapshotValorantRoles =
       input.valorantRoles?.length
         ? input.valorantRoles
@@ -715,6 +771,9 @@ export async function registerForTournament(
     ...userSnapshotFields(user),
     snapshotRankTier,
     snapshotRankTierId,
+    snapshotPeakRankTier,
+    snapshotPeakRankTierId,
+    snapshotPeakAct,
     snapshotValorantRoles: snapshotValorantRoles
       ? (snapshotValorantRoles as unknown as import("@prisma/client").Prisma.InputJsonValue)
       : undefined,
@@ -1102,6 +1161,9 @@ export async function buildRegistrationSnapshotForUser(
         snapshotCs2FaceitRank: string | null;
         snapshotRankTier: string | null;
         snapshotRankTierId: number | null;
+        snapshotPeakRankTier: string | null;
+        snapshotPeakRankTierId: number | null;
+        snapshotPeakAct: string | null;
         snapshotValorantRoles: ValorantRole[] | null;
       };
     }
@@ -1125,10 +1187,24 @@ export async function buildRegistrationSnapshotForUser(
   let snapshotCs2Faceit: string | null = null;
 
   if (game === GameSlug.VALORANT) {
-    const rank = await getValorantRankSnapshot(userId);
-    snapshotRankTier = rank.tier;
-    snapshotRankTierId = rank.tierId;
+    const snapshots = await getValorantRegistrationSnapshots(userId);
+    snapshotRankTier = snapshots.current.tier;
+    snapshotRankTierId = snapshots.current.tierId;
     snapshotValorantRoles = user.playerProfile?.valorantRoles ?? [];
+    return {
+      ok: true,
+      data: {
+        ...userSnapshotFields(user),
+        snapshotRankTier,
+        snapshotRankTierId,
+        snapshotPeakRankTier: snapshots.peak.tier,
+        snapshotPeakRankTierId: snapshots.peak.tierId,
+        snapshotPeakAct: snapshots.peak.act,
+        snapshotValorantRoles,
+        snapshotCs2PeakPremier,
+        snapshotCs2FaceitRank: snapshotCs2Faceit,
+      },
+    };
   }
 
   if (game === GameSlug.CS2) {
@@ -1143,10 +1219,86 @@ export async function buildRegistrationSnapshotForUser(
       ...userSnapshotFields(user),
       snapshotRankTier,
       snapshotRankTierId,
+      snapshotPeakRankTier: null,
+      snapshotPeakRankTierId: null,
+      snapshotPeakAct: null,
       snapshotValorantRoles,
       snapshotCs2PeakPremier,
       snapshotCs2FaceitRank: snapshotCs2Faceit,
     },
+  };
+}
+
+export async function getValorantRegistrationProfileCard(
+  slug: string,
+  userId: string,
+): Promise<ValorantRegistrationProfileCard | null> {
+  const tournament = await prisma.tournament.findUnique({
+    where: { slug },
+    select: { id: true, game: true },
+  });
+  if (!tournament || tournament.game !== GameSlug.VALORANT) return null;
+
+  const registration = await prisma.tournamentRegistration.findUnique({
+    where: {
+      tournamentId_userId: { tournamentId: tournament.id, userId },
+    },
+    select: {
+      snapshotDisplayName: true,
+      snapshotRiotId: true,
+      snapshotValorantRoles: true,
+      snapshotPeakRankTier: true,
+      snapshotPeakRankTierId: true,
+      teamName: true,
+    },
+  });
+  if (!registration) return null;
+
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    include: {
+      playerProfile: true,
+      leaderboard: {
+        where: { game: "VALORANT", scope: "TOWN" },
+        take: 1,
+      },
+    },
+  });
+  if (!user) return null;
+
+  const currentEntry = user.leaderboard[0];
+  const current: ValorantRankSnapshot = {
+    tier: currentEntry?.rankTier ?? null,
+    tierId: currentEntry?.rankTierId ?? null,
+  };
+  const peak: ValorantRankSnapshot = {
+    tier: registration.snapshotPeakRankTier,
+    tierId: registration.snapshotPeakRankTierId,
+  };
+  const auction = resolveAuctionDisplayRank(current, peak);
+  const roles = Array.isArray(registration.snapshotValorantRoles)
+    ? (registration.snapshotValorantRoles as ValorantRole[])
+    : (user.playerProfile?.valorantRoles ?? []);
+
+  return {
+    displayName:
+      registration.snapshotDisplayName ??
+      user.playerProfile?.displayName ??
+      user.name ??
+      "Player",
+    riotGameName: user.riotGameName ?? registration.snapshotRiotId?.split("#")[0]?.trim() ?? null,
+    riotId: registration.snapshotRiotId,
+    teamName: registration.teamName?.trim() || null,
+    valorantRoles: roles,
+    riotPlayerCard: user.riotPlayerCard,
+    riotPlayerCardWide: user.riotPlayerCardWide,
+    currentRankTier: current.tier,
+    currentRankTierId: current.tierId,
+    peakRankTier: peak.tier,
+    peakRankTierId: peak.tierId,
+    auctionRankTier: auction.tier ?? "Unranked",
+    auctionRankTierId: auction.tierId,
+    auctionRankSource: auction.source,
   };
 }
 

@@ -438,6 +438,9 @@ model TournamentRegistration {
   snapshotPhone           String?
   snapshotRankTier        String?
   snapshotRankTierId      Int?
+  snapshotPeakRankTier    String?
+  snapshotPeakRankTierId  Int?
+  snapshotPeakAct         String?
   snapshotValorantRoles   Json?
   snapshotCs2PeakPremier  String?
   snapshotCs2FaceitRank   String?
