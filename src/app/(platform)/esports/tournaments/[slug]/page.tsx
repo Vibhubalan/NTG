@@ -41,7 +41,15 @@ export default async function TournamentDetailPage({ params }: Props) {
     'SELECT "publicAuction" FROM "Tournament" WHERE id = $1 LIMIT 1',
     tournament.id
   );
-  const publicAuction = dbRow?.publicAuction ?? false;
+  let publicAuction = dbRow?.publicAuction ?? false;
+
+  // If auto-manage is active, visibility is determined dynamically by the auction dates
+  if (tournament.autoManageStatus && tournament.auctionStartsAt && tournament.auctionEndsAt) {
+    const now = new Date();
+    const start = new Date(tournament.auctionStartsAt);
+    const end = new Date(tournament.auctionEndsAt);
+    publicAuction = now >= start && now < end;
+  }
 
   // Auction handoff: routes the user to the right screen; the auction app re-checks access server-side.
   const auctionView = admin.ok
@@ -52,6 +60,7 @@ export default async function TournamentDetailPage({ params }: Props) {
   const auctionEligible =
     tournament.registrationFormat === "AUCTION" &&
     !!userId &&
+    tournament.userRegistered &&
     !!serverEnv.auctionUrl &&
     !!serverEnv.auctionJwtSecret;
   // Admins can always enter; players enter only while IN_PROGRESS, see it disabled once COMPLETED.

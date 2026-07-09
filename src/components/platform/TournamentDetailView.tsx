@@ -82,8 +82,7 @@ export default function TournamentDetailView({
   const splitBadgeColors = ["bg-amber-500/20 text-amber-500", "bg-slate-300/20 text-slate-300", "bg-amber-700/20 text-amber-700"];
 
   const showRegistrationSection =
-    tournament.registrationOpen ||
-    (tournament.userRegistered && tournament.game === "VALORANT");
+    tournament.registrationOpen || tournament.userRegistered;
 
   const scheduleCard = buildTournamentScheduleCardView({
     registrationFormat: tournament.registrationFormat,

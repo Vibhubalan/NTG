@@ -338,6 +338,7 @@ export class TournamentRepository {
       userRegistered: userId ? t.registrations.length > 0 : false,
       userParticipantRole: userId ? (t.registrations[0]?.participantRole ?? null) : null,
       coCaptainSlots: t.coCaptainSlots,
+      autoManageStatus: t.autoManageStatus,
     };
   }
 

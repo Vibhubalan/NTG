@@ -51,6 +51,7 @@ export type TournamentDetail = {
   userRegistered: boolean;
   userParticipantRole: "CAPTAIN" | "CO_CAPTAIN" | "PLAYER" | null;
   coCaptainSlots: number;
+  autoManageStatus: boolean;
 };
 
 export type PrizeSplitRow = {
