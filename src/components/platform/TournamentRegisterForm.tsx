@@ -85,79 +85,6 @@ function RegisterShell({
   );
 }
 
-function StepIndicator({
-  step,
-  participantRole,
-  featured = false,
-}: {
-  step: Step;
-  participantRole: "CAPTAIN" | "PLAYER" | null;
-  featured?: boolean;
-}) {
-  const steps = featured
-    ? [
-        { id: "role" as const, label: "Role" },
-        { id: "captain" as const, label: "Team" },
-        { id: "confirm" as const, label: "Confirm" },
-      ]
-    : participantRole === "PLAYER"
-      ? [
-          { id: "role" as const, label: "Role" },
-          { id: "confirm" as const, label: "Confirm" },
-        ]
-      : [
-          { id: "role" as const, label: "Role" },
-          { id: "captain" as const, label: "Team" },
-          { id: "confirm" as const, label: "Confirm" },
-        ];
-
-  const activeIndex = steps.findIndex((s) => s.id === step);
-  const featuredActiveIndex =
-    step === "role" ? 0 : step === "captain" ? 1 : 2;
-
-  return (
-    <div className="mb-3 flex items-center gap-1.5">
-      {steps.map((s, i) => {
-        const index = featured ? featuredActiveIndex : activeIndex;
-        const done = featured
-          ? participantRole === "PLAYER" && s.id === "captain"
-            ? false
-            : i < index
-          : i < activeIndex;
-        const skipped = featured && participantRole === "PLAYER" && s.id === "captain";
-        const active = featured ? i === featuredActiveIndex : i === activeIndex;
-        return (
-          <div key={s.id} className="flex flex-1 items-center gap-1.5">
-            <div
-              className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[9px] font-bold transition-colors ${
-                skipped
-                  ? "bg-white/[0.04] text-white/20"
-                  : active
-                    ? "bg-[var(--color-brand)] text-[#041018]"
-                    : done
-                      ? "bg-[var(--color-brand)]/20 text-[var(--color-brand)]"
-                      : "bg-white/[0.06] text-white/35"
-              }`}
-            >
-              {done && !skipped ? "✓" : i + 1}
-            </div>
-            <span
-              className={`text-[9px] font-semibold uppercase tracking-wider ${
-                skipped ? "text-white/20" : active ? "text-white/80" : "text-white/30"
-              }`}
-            >
-              {s.label}
-            </span>
-            {i < steps.length - 1 ? (
-              <div className={`h-px flex-1 ${done && !skipped ? "bg-[var(--color-brand)]/35" : "bg-white/[0.06]"}`} />
-            ) : null}
-          </div>
-        );
-      })}
-    </div>
-  );
-}
-
 function ProfilePreview({
   preview,
   game,
@@ -610,12 +537,6 @@ export default function TournamentRegisterForm({
             : "Agree to rules and confirm."
       }
     >
-      {layout === "featured" ? (
-        <StepIndicator step={step} participantRole={participantRole} featured />
-      ) : (
-        <StepIndicator step={step} participantRole={participantRole} />
-      )}
-
       <div className={layout === "featured" ? "flex min-h-[10.5rem] flex-col" : "space-y-3"}>
         <div className={layout === "featured" ? "flex-1" : undefined}>
         {step === "role" && layout === "featured" ? (
