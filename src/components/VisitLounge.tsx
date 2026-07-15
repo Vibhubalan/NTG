@@ -158,31 +158,31 @@ export default function VisitLounge() {
                 {/* Ambient white map pin silhouette behind the circular badge */}
                 <svg
                   viewBox="0 0 24 24"
-                  className="absolute left-1/2 top-1/2 h-16 w-16 -translate-x-1/2 -translate-y-[37.5%] text-white/35 select-none pointer-events-none z-10"
+                  className="absolute left-1/2 top-1/2 h-10 w-10 md:h-16 md:w-16 -translate-x-1/2 -translate-y-[37.5%] text-white/35 select-none pointer-events-none z-10"
                   fill="currentColor"
                 >
                   <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z" />
                 </svg>
-                <span className="relative flex h-10 w-10 items-center justify-center rounded-full bg-[var(--color-brand)] text-[#04221d] ring-2 ring-white/40 shadow-[0_0_18px_rgba(94,234,212,0.85)] md:shadow-[0_0_30px_rgba(94,234,212,0.95),0_0_60px_rgba(94,234,212,0.45)] z-20">
-                  <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none">
+                <span className="relative flex h-7 w-7 md:h-10 md:w-10 items-center justify-center rounded-full bg-[var(--color-brand)] text-[#04221d] ring-2 ring-white/40 shadow-[0_0_12px_rgba(94,234,212,0.85)] md:shadow-[0_0_30px_rgba(94,234,212,0.95),0_0_60px_rgba(94,234,212,0.45)] z-20">
+                  <svg viewBox="0 0 24 24" className="h-3.5 w-3.5 md:h-5 md:w-5" fill="none">
                     <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z" fill="currentColor" />
                     <circle cx="12" cy="9" r="2.5" fill="white" />
                   </svg>
                 </span>
               </div>
-              <div className="mt-3 relative z-20 whitespace-nowrap rounded-xl border border-[var(--color-brand)]/45 bg-[#0a1020]/95 px-4 py-2 text-center md:bg-[#0a1020]/90 md:shadow-[0_0_22px_rgba(94,234,212,0.28)] md:backdrop-blur">
-                <p className="font-display text-sm font-semibold tracking-wide text-white">
+              <div className="mt-2 md:mt-3 relative z-20 whitespace-nowrap rounded-xl border border-[var(--color-brand)]/45 bg-[#0a1020]/95 px-2.5 py-1 md:px-4 md:py-2 text-center md:bg-[#0a1020]/90 md:shadow-[0_0_22px_rgba(94,234,212,0.28)] md:backdrop-blur">
+                <p className="font-display text-[10px] md:text-sm font-semibold tracking-wide text-white">
                   Namma <span className="text-[var(--color-brand)]">Tulunad</span> Gaming
                 </p>
-                <p className="mt-0.5 text-[9px] uppercase tracking-[0.26em] text-white/55">
+                <p className="mt-0.5 text-[7px] md:text-[9px] uppercase tracking-[0.26em] text-white/55">
                   NTG Esports Lounge
                 </p>
               </div>
             </div>
 
             {/* Top-left pill */}
-            <div className="pointer-events-none absolute left-5 top-[17px] inline-flex items-center rounded-full border border-[var(--color-brand)]/40 bg-[#0a1020]/95 px-3 py-1 text-[10px] font-medium uppercase tracking-[0.28em] text-[var(--color-brand)] md:bg-[#0a1020]/85 md:shadow-[0_0_14px_rgba(94,234,212,0.2)] md:backdrop-blur z-30">
-              <span className="mr-1.5 inline-block h-1.5 w-1.5 rounded-full bg-[var(--color-brand)] md:shadow-[0_0_6px_rgba(94,234,212,0.95)]" />
+            <div className="pointer-events-none absolute left-5 top-[17px] inline-flex items-center rounded-full border border-[var(--color-brand)]/40 bg-[#0a1020]/95 px-2 py-0.5 md:px-3 md:py-1 text-[8px] md:text-[10px] font-medium uppercase tracking-[0.22em] md:tracking-[0.28em] text-[var(--color-brand)] md:bg-[#0a1020]/85 md:shadow-[0_0_14px_rgba(94,234,212,0.2)] md:backdrop-blur z-30">
+              <span className="mr-1.5 inline-block h-1 w-1 md:h-1.5 md:w-1.5 rounded-full bg-[var(--color-brand)] md:shadow-[0_0_6px_rgba(94,234,212,0.95)]" />
               Mangaluru
             </div>
 
@@ -190,10 +190,10 @@ export default function VisitLounge() {
               href={mapsSearchUrl(`${brand.name}, ${brand.address}, Mangaluru`)}
               target="_blank"
               rel="noopener noreferrer"
-              className="absolute bottom-[17px] right-5 inline-flex items-center gap-1.5 rounded-full border border-[var(--color-brand)]/35 bg-[#0a1020]/95 px-3 py-1.5 text-[10px] font-medium uppercase tracking-[0.22em] text-white/95 transition-colors hover:border-[var(--color-brand)]/65 hover:text-[var(--color-brand)] md:bg-[#0a1020]/80 md:shadow-[0_0_16px_rgba(94,234,212,0.15)] md:backdrop-blur z-30"
+              className="absolute bottom-[17px] right-5 inline-flex items-center gap-1 md:gap-1.5 rounded-full border border-[var(--color-brand)]/35 bg-[#0a1020]/95 px-2.5 py-1 md:px-3 md:py-1.5 text-[8px] md:text-[10px] font-medium uppercase tracking-[0.16em] md:tracking-[0.22em] text-white/95 transition-colors hover:border-[var(--color-brand)]/65 hover:text-[var(--color-brand)] md:bg-[#0a1020]/80 md:shadow-[0_0_16px_rgba(94,234,212,0.15)] md:backdrop-blur z-30"
             >
               Open in Maps
-              <svg viewBox="0 0 24 24" className="h-3 w-3" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+              <svg viewBox="0 0 24 24" className="h-2.5 w-2.5 md:h-3 md:w-3" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
                 <path d="M7 17L17 7" />
                 <path d="M8 7h9v9" />
               </svg>

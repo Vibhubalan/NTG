@@ -295,7 +295,7 @@ export default function PlansAndHostClient({ data }: { data: LoungeCommerceHomeD
                 href={whatsappInquiryUrl("Hi NTG Lounge, I'd like to ask about other packs available (5hr, 6hr, group discounts, etc.).")}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="group/btn relative flex w-full items-center justify-center gap-1.5 overflow-hidden rounded-full bg-cyan-500/10 border border-cyan-500/35 px-4 py-3.5 text-[11px] font-bold uppercase tracking-[0.15em] text-cyan-400 transition-all hover:bg-cyan-500 hover:text-black hover:shadow-[0_0_20px_rgba(34,211,238,0.3)]"
+                className="group/btn relative flex w-full max-w-[220px] mx-auto items-center justify-center gap-1.5 overflow-hidden rounded-full bg-cyan-500/10 border border-cyan-500/35 px-4 py-3.5 text-[11px] font-bold uppercase tracking-[0.15em] text-cyan-400 transition-all hover:bg-cyan-500 hover:text-black hover:shadow-[0_0_20px_rgba(34,211,238,0.3)]"
               >
                 <span>Contact Us</span>
                 <svg viewBox="0 0 24 24" className="h-3.5 w-3.5 transition-transform group-hover/btn:translate-x-0.5" fill="currentColor">

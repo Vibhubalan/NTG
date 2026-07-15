@@ -61,7 +61,7 @@ export default function Arsenal() {
 
       <motion.div
         variants={itemVariants}
-        className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-3 lg:grid-cols-3"
+        className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4"
       >
         {games.map((g) => (
           <motion.div
@@ -71,7 +71,7 @@ export default function Arsenal() {
               visible: { opacity: 1, y: 0, transition: { duration: 0.45, ease: "easeOut" } }
             }}
             style={{ ["--game" as string]: g.hex }}
-            className="group relative flex items-center gap-4 overflow-hidden rounded-2xl border border-white/[0.06] bg-white/[0.02] p-5 transition-all hover:border-white/15 hover:bg-white/[0.04]"
+            className="group relative flex items-center gap-3.5 overflow-hidden rounded-2xl border border-white/[0.06] bg-white/[0.02] p-4 sm:p-5 transition-all hover:border-white/15 hover:bg-white/[0.04]"
           >
             {/* Background art image (only for cards that have one) */}
             {g.bgImage && (
@@ -79,7 +79,7 @@ export default function Arsenal() {
                 src={g.bgImage}
                 alt=""
                 fill
-                sizes="(max-width: 640px) 50vw, 33vw"
+                sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 25vw"
                 className="object-cover origin-right scale-100 opacity-20 brightness-75 transition-all duration-500 ease-out group-hover:scale-110 group-hover:opacity-45 group-hover:brightness-110"
                 style={{ objectPosition: g.bgPosition || "right 15%" }}
                 loading="lazy"
@@ -87,9 +87,9 @@ export default function Arsenal() {
             )}
             <div className="absolute inset-0 bg-[radial-gradient(60%_80%_at_0%_50%,var(--game),transparent_70%)] opacity-[0.18] mix-blend-soft-light md:opacity-0 md:transition-opacity md:duration-500 md:group-hover:opacity-100" />
             <span
-              className="relative z-10 flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-white/[0.04] text-[var(--game)] ring-1 ring-inset ring-[var(--game)]/35 transition-all duration-500 max-md:scale-105 md:text-white/85 md:ring-white/10 md:group-hover:scale-105 md:group-hover:text-[var(--game)] md:group-hover:ring-[var(--game)]/40"
+              className="relative z-10 flex h-10 w-10 sm:h-12 sm:w-12 shrink-0 items-center justify-center rounded-xl bg-white/[0.04] text-[var(--game)] ring-1 ring-inset ring-[var(--game)]/35 transition-all duration-500 md:text-white/85 md:ring-white/10 md:group-hover:scale-105 md:group-hover:text-[var(--game)] md:group-hover:ring-[var(--game)]/40"
             >
-              <BrandIcon path={g.path} title={g.name} className="h-6 w-6" />
+              <BrandIcon path={g.path} title={g.name} className="h-5 w-5 sm:h-6 sm:w-6" />
             </span>
             <div className="relative z-10 min-w-0">
               <p className="truncate font-display text-base font-medium text-white">
@@ -103,10 +103,9 @@ export default function Arsenal() {
         ))}
       </motion.div>
 
-      {/* Platforms / services strip */}
       <motion.div
         variants={itemVariants}
-        className="mt-10 flex flex-col items-center justify-between gap-6 rounded-2xl border border-white/[0.06] bg-white/[0.02] px-6 py-[20px] sm:flex-row"
+        className="mt-10 flex flex-col items-start justify-between gap-6 rounded-2xl border border-white/[0.06] bg-white/[0.02] px-6 py-[20px] sm:flex-row sm:items-center"
       >
         <div className="flex items-center gap-5 text-white/55">
           <span className="text-[10px] uppercase tracking-[0.32em] text-white/35">
@@ -125,8 +124,8 @@ export default function Arsenal() {
           </div>
         </div>
 
-        <div className="flex items-center gap-5">
-          <span className="text-[10px] uppercase tracking-[0.32em] text-white/35">
+        <div className="flex items-start gap-5 sm:items-center">
+          <span className="text-[10px] uppercase tracking-[0.32em] text-white/35 pt-[7px] sm:pt-0">
             Also
           </span>
           <div className="flex flex-wrap items-center gap-1.5">

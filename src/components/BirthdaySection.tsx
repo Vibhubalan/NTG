@@ -130,7 +130,7 @@ export default function BirthdaySection() {
               <button
                 key={tabId}
                 onClick={() => setActiveTab(tabId)}
-                className={`relative rounded-full px-5 py-2.5 text-xs font-bold uppercase tracking-widest transition-colors duration-300 ${
+                className={`relative rounded-full px-3 py-2 text-[10px] font-bold uppercase tracking-wide transition-colors duration-300 sm:px-5 sm:py-2.5 sm:text-xs sm:tracking-widest ${
                   isTabActive ? "text-black" : "text-white/60 hover:text-white"
                 }`}
               >

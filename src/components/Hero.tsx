@@ -70,7 +70,7 @@ export default async function Hero() {
         <p
           className="leading-relaxed text-white/55"
           style={{
-            fontSize: "clamp(0.62rem, 2.4vw, 1.2rem)",
+            fontSize: "clamp(0.68rem, 2.6vw, 1.3rem)",
             maxWidth: "clamp(14.4rem, 64vw, 54.4rem)",
           }}
         >
