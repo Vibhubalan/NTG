@@ -34,8 +34,6 @@ export function mergeReviews(
 }
 
 /** Keep cards readable without dropping good reviews. */
-export function trimReviewText(text: string, max = 320): string {
-  const clean = text.trim();
-  if (clean.length <= max) return clean;
-  return `${clean.slice(0, max - 1).trimEnd()}…`;
+export function trimReviewText(text: string): string {
+  return text.trim();
 }
