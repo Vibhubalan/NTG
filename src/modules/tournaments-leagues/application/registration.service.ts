@@ -1317,7 +1317,63 @@ export async function setTournamentPlacements(
     ),
   ]);
 
+  const champion = placements.find((p) => p.role === "CHAMPION" && p.userId);
+  if (champion?.userId) {
+    await prisma.playerBadge.upsert({
+      where: {
+        userId_tournamentId_label: {
+          userId: champion.userId,
+          tournamentId: tournament.id,
+          label: `${tournament.name} WINNER`,
+        },
+      },
+      create: {
+        userId: champion.userId,
+        tournamentId: tournament.id,
+        label: `${tournament.name} WINNER`,
+      },
+      update: {},
+    });
+  }
+
   return { ok: true };
+}
+
+export type PlayerBadgeType = "WINNER" | "RUNNER_UP";
+
+export async function awardPlayerBadge(
+  userId: string,
+  tournamentId: string,
+  type: PlayerBadgeType,
+  awardedBy?: string,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const tournament = await prisma.tournament.findUnique({ where: { id: tournamentId }, select: { name: true } });
+  if (!tournament) return { ok: false, error: "Tournament not found." };
+
+  const label = `${tournament.name} ${type === "WINNER" ? "WINNER" : "RUNNER-UP"}`;
+
+  await prisma.playerBadge.upsert({
+    where: { userId_tournamentId_label: { userId, tournamentId, label } },
+    create: { userId, tournamentId, label, awardedBy: awardedBy ?? null },
+    update: {},
+  });
+
+  return { ok: true };
+}
+
+export async function removePlayerBadge(id: string): Promise<{ ok: true } | { ok: false; error: string }> {
+  await prisma.playerBadge.delete({ where: { id } }).catch(() => null);
+  return { ok: true };
+}
+
+export async function listAllPlayerBadges() {
+  return prisma.playerBadge.findMany({
+    include: {
+      user: { select: { id: true, name: true, email: true, playerProfile: { select: { displayName: true } } } },
+      tournament: { select: { name: true } },
+    },
+    orderBy: { awardedAt: "desc" },
+  });
 }
 
 export type UpdateTournamentAdminInput = {

@@ -32,9 +32,12 @@ function rolesEqual(a: ValorantRole[], b: ValorantRole[]) {
   return a.every((role) => b.includes(role));
 }
 
+type Badge = { id: string; label: string; awardedAt: string };
+
 export default function ProfileEditor() {
   const searchParams = useSearchParams();
   const [profile, setProfile] = useState<FullProfile | null>(null);
+  const [badges, setBadges] = useState<Badge[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
@@ -77,14 +80,21 @@ export default function ProfileEditor() {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await fetch("/api/profile/game-profile");
-      const data = await res.json();
-      if (res.ok && data.profile) {
+      const [profileRes, badgesRes] = await Promise.all([
+        fetch("/api/profile/game-profile"),
+        fetch("/api/profile/badges"),
+      ]);
+      const data = await profileRes.json();
+      if (profileRes.ok && data.profile) {
         const p = data.profile as FullProfile;
         setProfile(p);
         setDateOfBirth(p.dateOfBirth ?? "");
         setOlympusId(p.olympusId ?? "");
         setSelectedRoles(p.valorantRoles ?? []);
+      }
+      const badgesData = await badgesRes.json();
+      if (badgesRes.ok && Array.isArray(badgesData.badges)) {
+        setBadges(badgesData.badges);
       }
     } finally {
       setLoading(false);
@@ -297,6 +307,23 @@ export default function ProfileEditor() {
               </span>
             </div>
           </div>
+
+          {/* Trophy case — badges follow the player forever */}
+          {badges.length > 0 && (
+            <div className="w-full mt-6 border-t border-white/[0.06] pt-6 text-left">
+              <h4 className="text-[10px] font-bold uppercase tracking-[0.2em] text-white/35 mb-3">Trophy Case</h4>
+              <div className="flex flex-wrap gap-2">
+                {badges.map((b) => (
+                  <span
+                    key={b.id}
+                    className="inline-flex items-center gap-1.5 rounded-full border border-amber-500/25 bg-amber-500/10 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide text-amber-300"
+                  >
+                    🏆 {b.label}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
 
           {/* Quick Actions (Sign out, Browse cups) */}
           <div className="w-full mt-6 border-t border-white/[0.06] pt-6 flex flex-col gap-2">

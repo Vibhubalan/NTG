@@ -49,10 +49,14 @@ export {
   getValorantRegistrationProfileCard,
   switchPlayerToCaptain,
   setTournamentPlacements,
+  awardPlayerBadge,
+  removePlayerBadge,
+  listAllPlayerBadges,
   updateTournamentAdmin,
   adminAddTournamentRegistration,
   adminRemoveTournamentRegistration,
 } from "./application/registration.service";
+export type { PlayerBadgeType } from "./application/registration.service";
 export {
   listTournamentsAdmin,
   getTournamentAdmin,

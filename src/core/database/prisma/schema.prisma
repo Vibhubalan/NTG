@@ -208,6 +208,7 @@ model User {
   partnerRegistrations    TournamentRegistration[]  @relation("RegistrationPartner")
   matchSlots              MatchParticipant[]
   placements              TournamentPlacement[]
+  badges                  PlayerBadge[]
   leaderboard             LeaderboardEntry[]
   leaderboardRankAudits   LeaderboardRankAuditLog[]
   captainedTeams          TournamentTeam[]          @relation("TeamCaptain")
@@ -374,6 +375,7 @@ model Tournament {
   tournamentTeams TournamentTeam[]
   registrations   TournamentRegistration[]
   placements      TournamentPlacement[]
+  badges          PlayerBadge[]
 }
 
 model TournamentTeam {
@@ -519,6 +521,20 @@ model TournamentPlacement {
   teamLabel    String?
 
   @@unique([tournamentId, role])
+}
+
+model PlayerBadge {
+  id           String      @id @default(cuid())
+  userId       String
+  user         User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  label        String
+  tournamentId String?
+  tournament   Tournament? @relation(fields: [tournamentId], references: [id], onDelete: SetNull)
+  awardedAt    DateTime    @default(now())
+  awardedBy    String?
+
+  @@unique([userId, tournamentId, label])
+  @@index([userId])
 }
 
 model LeaderboardEntry {

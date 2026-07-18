@@ -1822,6 +1822,7 @@ export default function AdminTournamentEditor({
                       <tr>
                         <th className="px-3 py-2">Name</th>
                         <th className="px-3 py-2">Email</th>
+                        <th className="px-3 py-2">Phone</th>
                         <th className="px-3 py-2">Role</th>
                         <th className="px-3 py-2">Team</th>
                         {form.game === "CS2" ? (
@@ -1853,6 +1854,7 @@ export default function AdminTournamentEditor({
                         <tr key={r.id} className="border-b border-white/[0.04]">
                           <td className="px-3 py-2 font-medium text-white/85">{r.displayName ?? "—"}</td>
                           <td className="px-3 py-2">{r.email ?? "—"}</td>
+                          <td className="px-3 py-2 font-mono">{r.phone ?? "—"}</td>
                           <td className="px-3 py-2">{formatParticipantRole(r.participantRole)}</td>
                           <td className="px-3 py-2">{r.teamName ?? "—"}</td>
                           {form.game === "CS2" ? (
