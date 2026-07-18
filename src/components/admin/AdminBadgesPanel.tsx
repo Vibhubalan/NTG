@@ -289,11 +289,15 @@ export default function AdminBadgesPanel({
               type="button"
               disabled={selectedPlayers.length === 0 || !tournamentId || awarding}
               onClick={awardBadges}
-              className="w-full rounded-xl bg-amber-500 px-4 py-3 text-sm font-bold text-black transition-opacity disabled:opacity-40 sm:w-auto sm:px-6"
+              className="inline-flex w-full items-center justify-center gap-1.5 rounded-xl bg-amber-500 px-4 py-3 text-sm font-bold text-black transition-opacity disabled:opacity-40 sm:w-auto sm:px-6"
             >
-              {awarding
-                ? "Awarding..."
-                : `🏆 Award badge${selectedPlayers.length > 1 ? ` to ${selectedPlayers.length} players` : ""}`}
+              {awarding ? (
+                "Awarding..."
+              ) : (
+                <>
+                  <TrophyIcon /> Award badge{selectedPlayers.length > 1 ? ` to ${selectedPlayers.length} players` : ""}
+                </>
+              )}
             </button>
           </div>
         </AdminSection>

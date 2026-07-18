@@ -468,6 +468,13 @@ export default function AdminTournamentEditor({
   }
 
   async function createAuction() {
+    // The auction app reads settings (incl. rank points) straight from the DB, not from
+    // this form's in-memory state — save first so unsaved edits aren't sent as stale defaults.
+    if (isDirty) {
+      const saved = await saveAll();
+      if (!saved) return;
+    }
+
     setLoading(true);
     setMessage(null);
     try {
@@ -487,12 +494,12 @@ export default function AdminTournamentEditor({
       if (!form.registrationOpensAt || !form.startsAt || !form.endsAt) {
         setMessage("Auto-manage requires registration open, cup start, and cup end dates.");
         setLoading(false);
-        return;
+        return false;
       }
       if (isAuctionFormat && (!form.auctionStartsAt || !form.auctionEndsAt)) {
         setMessage("Auction cups require auction start and auction end dates.");
         setLoading(false);
-        return;
+        return false;
       }
       const opens = new Date(form.registrationOpensAt).getTime();
       const closeAnchor = isAuctionFormat
@@ -509,29 +516,29 @@ export default function AdminTournamentEditor({
             : "Registration must open before it closes (1 minute before cup start).",
         );
         setLoading(false);
-        return;
+        return false;
       }
       if (isAuctionFormat && auctionEnd !== null) {
         if (closes >= new Date(form.auctionStartsAt!).getTime()) {
           setMessage("Auction must start after registration closes.");
           setLoading(false);
-          return;
+          return false;
         }
         if (new Date(form.auctionStartsAt!).getTime() >= auctionEnd) {
           setMessage("Auction end must be after auction start.");
           setLoading(false);
-          return;
+          return false;
         }
         if (auctionEnd >= starts) {
           setMessage("Cup start must be after the auction ends.");
           setLoading(false);
-          return;
+          return false;
         }
       }
       if (isAuctionFormat ? starts >= ends : closes >= ends) {
         setMessage("Cup end must be after cup start.");
         setLoading(false);
-        return;
+        return false;
       }
     }
 
@@ -577,7 +584,7 @@ export default function AdminTournamentEditor({
       const data = await readJsonResponse(res);
       if (!res.ok) {
         setMessage(String(data.error ?? "Save failed."));
-        return;
+        return false;
       }
 
       if (data.tournament) {
@@ -600,7 +607,7 @@ export default function AdminTournamentEditor({
         const d = await readJsonResponse(pRes);
         if (!pRes.ok) {
           setMessage(String(d.error ?? "MVP save failed."));
-          return;
+          return false;
         }
         savedMvpRef.current = { enabled: mvpEnabled, userId: selectedMvp?.id ?? null };
       }
@@ -608,8 +615,10 @@ export default function AdminTournamentEditor({
       setMessage("All changes successfully saved.");
       setSavedStatus(true);
       setTimeout(() => setSavedStatus(false), 2500);
+      return true;
     } catch (err) {
       setMessage(err instanceof Error ? err.message : "Something went wrong.");
+      return false;
     } finally {
       setLoading(false);
     }
