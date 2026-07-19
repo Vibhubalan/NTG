@@ -211,10 +211,12 @@ export default function AdminTournamentEditor({
   initial,
   seasons,
   auctionHref,
+  auctionFinalized,
 }: {
   initial: TournamentData;
   seasons: { id: string; label: string }[];
   auctionHref?: string | null;
+  auctionFinalized?: boolean;
 }) {
   const router = useRouter();
   const { openDeleteConfirm, DeleteConfirmDialog } = useAdminDeleteConfirm();
@@ -252,6 +254,8 @@ export default function AdminTournamentEditor({
   const savedCupBaselineRef = useRef(getSavePayload(initialFormState));
 
   const [loading, setLoading] = useState(false);
+  const [confirmCreateAuction, setConfirmCreateAuction] = useState(false);
+  const [bypassAuctionSavedLock, setBypassAuctionSavedLock] = useState(false);
   const isDirty = useMemo(() => {
     const cupDirty = !savePayloadsEqual(getSavePayload(form), savedCupBaselineRef.current);
     const mvpDirty =
@@ -478,9 +482,17 @@ export default function AdminTournamentEditor({
     setLoading(true);
     setMessage(null);
     try {
-      const res = await fetch(`/api/admin/tournaments/${form.slug}/auction`, { method: "POST" });
+      const res = await fetch(`/api/admin/tournaments/${form.slug}/auction`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ bypass: bypassAuctionSavedLock }),
+      });
       const data = await readJsonResponse(res);
       setMessage(res.ok ? "Auction created." : String(data.error ?? "Failed to create auction."));
+      if (res.ok) {
+        setConfirmCreateAuction(false);
+        setBypassAuctionSavedLock(false);
+      }
     } finally {
       setLoading(false);
     }
@@ -1371,19 +1383,70 @@ export default function AdminTournamentEditor({
                   </div>
                 )}
 
-                <div className="border-t border-white/[0.04] pt-4 flex flex-col sm:flex-row items-center justify-between gap-4">
-                  <div>
-                    <h4 className="text-xs font-semibold text-white/80">Initialize Auction Instance</h4>
-                    <p className="text-[10px] text-white/40 mt-0.5">Sends current configurations to register the cup in the auction platform.</p>
+                <div className="border-t border-white/[0.04] pt-4 flex flex-col gap-4">
+                  <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+                    <div>
+                      <h4 className="text-xs font-semibold text-white/80">Initialize Auction Instance</h4>
+                      <p className="text-[10px] text-white/40 mt-0.5">
+                        Sends current configurations to register the cup in the auction platform. This wipes and rebuilds any existing auction for this cup.
+                      </p>
+                      {auctionFinalized && (
+                        <p className="mt-1 text-[10px] font-semibold text-amber-300">
+                          This auction has already been saved in the auction app. Resetting it is blocked by default.
+                        </p>
+                      )}
+                    </div>
+                    {!confirmCreateAuction && (
+                      <button
+                        type="button"
+                        onClick={() => setConfirmCreateAuction(true)}
+                        disabled={loading}
+                        className="cta inline-flex rounded-full px-5 py-2.5 text-[11px] font-semibold uppercase tracking-[0.16em] disabled:opacity-50"
+                      >
+                        Create / Reset Auction
+                      </button>
+                    )}
                   </div>
-                  <button
-                    type="button"
-                    onClick={createAuction}
-                    disabled={loading}
-                    className="cta inline-flex rounded-full px-5 py-2.5 text-[11px] font-semibold uppercase tracking-[0.16em] disabled:opacity-50"
-                  >
-                    {loading ? "Sending..." : "Create / Reset Auction"}
-                  </button>
+
+                  {confirmCreateAuction && (
+                    <div className="rounded-xl border border-amber-500/25 bg-amber-500/[0.06] p-4 space-y-3">
+                      <p className="text-xs text-amber-200">
+                        This will delete and rebuild the auction from scratch — any live progress, sold players, and
+                        team budgets in the auction app will be lost. This cannot be undone.
+                      </p>
+                      {auctionFinalized && (
+                        <label className="flex items-center gap-2 text-[11px] text-amber-200">
+                          <input
+                            type="checkbox"
+                            checked={bypassAuctionSavedLock}
+                            onChange={(e) => setBypassAuctionSavedLock(e.target.checked)}
+                          />
+                          I understand the auction was already saved, and want to reset it anyway.
+                        </label>
+                      )}
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={createAuction}
+                          disabled={loading || (auctionFinalized && !bypassAuctionSavedLock)}
+                          className="cta inline-flex rounded-full px-5 py-2.5 text-[11px] font-semibold uppercase tracking-[0.16em] disabled:opacity-50"
+                        >
+                          {loading ? "Sending..." : "Confirm Create / Reset"}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setConfirmCreateAuction(false);
+                            setBypassAuctionSavedLock(false);
+                          }}
+                          disabled={loading}
+                          className="rounded-full border border-white/10 px-4 py-2.5 text-[11px] font-semibold uppercase tracking-[0.16em] text-white/60 transition-colors hover:border-white/20 hover:text-white/80"
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 {/* Public Auction Visibility Toggle */}

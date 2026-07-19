@@ -8,7 +8,7 @@ export const dynamic = "force-dynamic";
 
 type Props = { params: Promise<{ slug: string }> };
 
-export async function POST(_req: Request, { params }: Props) {
+export async function POST(req: Request, { params }: Props) {
   if (!serverEnv.databaseUrl) {
     return NextResponse.json({ error: "Database not configured" }, { status: 503 });
   }
@@ -19,6 +19,9 @@ export async function POST(_req: Request, { params }: Props) {
   if (!serverEnv.auctionUrl || !serverEnv.auctionJwtSecret) {
     return NextResponse.json({ error: "Auction app is not configured." }, { status: 503 });
   }
+
+  const body = await req.json().catch(() => ({}));
+  const bypassSavedLock = (body as { bypass?: boolean }).bypass === true;
 
   const { slug } = await params;
   const tournament = await prisma.tournament.findUnique({
@@ -41,6 +44,17 @@ export async function POST(_req: Request, { params }: Props) {
   }
   if (tournament.registrationFormat !== "AUCTION") {
     return NextResponse.json({ error: "This cup is not an auction draft." }, { status: 400 });
+  }
+
+  const [existingSession] = await prisma.$queryRawUnsafe<{ finalized: boolean }[]>(
+    "SELECT finalized FROM auction_sessions WHERE tournament_id = $1 LIMIT 1",
+    tournament.id
+  );
+  if (existingSession?.finalized && !bypassSavedLock) {
+    return NextResponse.json(
+      { error: "This auction has already been saved. Enable the bypass option if you really need to reset it." },
+      { status: 409 },
+    );
   }
 
   const auctionBaseUrl = serverEnv.auctionUrl!.trim().replace(/\/+$/, "");
