@@ -151,7 +151,7 @@ export class TournamentRepository {
     await syncRegistrationStatus().catch(() => {});
     const rows = await prisma.tournament.findMany({
       where: { status: { notIn: ["DRAFT", "CANCELLED"] } },
-      orderBy: [{ startsAt: "asc" }, { createdAt: "asc" }],
+      orderBy: [{ startsAt: "desc" }, { createdAt: "desc" }],
       include: {
         season: true,
         placements: {
