@@ -53,11 +53,12 @@ export default async function TournamentDetailPage({ params }: Props) {
   const auctionEligible =
     tournament.registrationFormat === "AUCTION" &&
     !!userId &&
-    tournament.userRegistered &&
     !!serverEnv.auctionUrl &&
     !!serverEnv.auctionJwtSecret;
   // Admins can always enter, but only for tournaments that are actually auction-format.
-  // Normal registered users only see the button if publicAuction is enabled by the admin.
+  // Any logged-in main-site account sees the button if publicAuction is enabled by the
+  // admin — they don't need to be registered for this specific tournament, since the
+  // auction app grants them observer access regardless (only captains/admins get controls).
   const showEnterButton = tournament.registrationFormat === "AUCTION" && (admin.ok || (auctionEligible && publicAuction));
   const auctionHref = (showEnterButton && userId)
     ? auctionLink(tournament.id, auctionView, userId)

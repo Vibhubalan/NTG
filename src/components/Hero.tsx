@@ -29,7 +29,6 @@ async function resolveHeroAuctionHref(slug: string): Promise<string | null> {
   const auctionEligible =
     tournament.registrationFormat === "AUCTION" &&
     !!userId &&
-    tournament.userRegistered &&
     !!serverEnv.auctionUrl &&
     !!serverEnv.auctionJwtSecret;
   const showEnterButton = tournament.registrationFormat === "AUCTION" && (admin.ok || (auctionEligible && publicAuction));
