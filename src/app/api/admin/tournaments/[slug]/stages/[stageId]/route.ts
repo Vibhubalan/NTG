@@ -3,6 +3,7 @@ import { guardResponse, isAuthedAdmin, requireAdmin } from "@/lib/auth-guard";
 import { deleteStage, updateStage } from "@tournaments-leagues/index";
 
 export const dynamic = "force-dynamic";
+export const maxDuration = 60;
 
 type Params = { params: Promise<{ slug: string; stageId: string }> };
 

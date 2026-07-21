@@ -613,11 +613,11 @@ export function useStageBuilderState(
           body: JSON.stringify({ drafts: buildDrafts(graphRef.current) }),
         },
       );
-      const data = await requireApiJson(res);
-      setGraph((prev) =>
-        applyGraphPayload(prev, data.graph as unknown as AdminStageGraph),
-      );
-      matchesLoadedRef.current.add(stageId);
+      await requireApiJson(res);
+      // Generate no longer returns the full graph (that was timing out).
+      matchesLoadedRef.current.delete(stageId);
+      await load({ silent: true });
+      await loadMatchesForStage(stageId, { force: true });
       setDirty(false);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Generate failed");
@@ -754,11 +754,10 @@ export function useStageBuilderState(
         `/api/admin/tournaments/${slug}/stages/${stageId}/reshuffle`,
         { method: "POST" },
       );
-      const data = await requireApiJson(res);
-      setGraph((prev) =>
-        applyGraphPayload(prev, data.graph as unknown as AdminStageGraph),
-      );
-      matchesLoadedRef.current.add(stageId);
+      await requireApiJson(res);
+      matchesLoadedRef.current.delete(stageId);
+      await load({ silent: true });
+      await loadMatchesForStage(stageId, { force: true });
       setDirty(false);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Reshuffle failed");

@@ -84,15 +84,13 @@ export async function generateMatchesForStage(stageId: string): Promise<{ matchC
           where: { id: group.id },
           data: { targetSize },
         });
-        for (let si = 0; si < targetSize; si++) {
-          await prisma.stageGroupSlot.create({
-            data: {
-              groupId: group.id,
-              slotIndex: si,
-              teamId: teamIds[si] ?? null,
-            },
-          });
-        }
+        await prisma.stageGroupSlot.createMany({
+          data: Array.from({ length: targetSize }, (_, si) => ({
+            groupId: group.id,
+            slotIndex: si,
+            teamId: teamIds[si] ?? null,
+          })),
+        });
       }
 
       const refreshed = await prisma.tournamentStageGroup.findMany({
@@ -166,43 +164,57 @@ export async function generateMatchesForStage(stageId: string): Promise<{ matchC
 
   const keyToId = new Map<string, string>();
 
-  for (const m of generated) {
-    const created = await prisma.match.create({
-      data: {
-        bracketId: bracket.id,
-        stageGroupId: m.stageGroupId ?? null,
-        roundNumber: m.roundNumber,
-        positionInRound: m.positionInRound,
-        bracketSide: m.bracketSide ?? null,
-        status: m.status === "BYE" ? MatchStatus.BYE : MatchStatus.SCHEDULED,
-        participants: {
-          create: m.participants.map((p) => ({
-            slot: p.slot,
-            participantType: ParticipantType.TEAM,
-            tournamentTeamId: p.tournamentTeamId ?? null,
-            teamLabel: p.teamLabel ?? null,
-            seed: p.seed ?? null,
-          })),
-        },
-      },
-    });
-    keyToId.set(m.key, created.id);
+  // Create matches in parallel batches — sequential creates time out on Vercel/Neon.
+  const CREATE_BATCH = 20;
+  for (let i = 0; i < generated.length; i += CREATE_BATCH) {
+    const chunk = generated.slice(i, i + CREATE_BATCH);
+    const created = await Promise.all(
+      chunk.map((m) =>
+        prisma.match.create({
+          data: {
+            bracketId: bracket.id,
+            stageGroupId: m.stageGroupId ?? null,
+            roundNumber: m.roundNumber,
+            positionInRound: m.positionInRound,
+            bracketSide: m.bracketSide ?? null,
+            status: m.status === "BYE" ? MatchStatus.BYE : MatchStatus.SCHEDULED,
+            participants: {
+              create: m.participants.map((p) => ({
+                slot: p.slot,
+                participantType: ParticipantType.TEAM,
+                tournamentTeamId: p.tournamentTeamId ?? null,
+                teamLabel: p.teamLabel ?? null,
+                seed: p.seed ?? null,
+              })),
+            },
+          },
+        }),
+      ),
+    );
+    for (let j = 0; j < chunk.length; j++) {
+      keyToId.set(chunk[j]!.key, created[j]!.id);
+    }
   }
 
-  for (const m of generated) {
-    const id = keyToId.get(m.key);
-    if (!id) continue;
-    const nextWinnerId = m.nextWinnerKey ? keyToId.get(m.nextWinnerKey) : null;
-    const nextLoserId = m.nextLoserKey ? keyToId.get(m.nextLoserKey) : null;
-    if (nextWinnerId || nextLoserId) {
-      await prisma.match.update({
+  const linkUpdates = generated
+    .map((m) => {
+      const id = keyToId.get(m.key);
+      if (!id) return null;
+      const nextWinnerId = m.nextWinnerKey ? keyToId.get(m.nextWinnerKey) : null;
+      const nextLoserId = m.nextLoserKey ? keyToId.get(m.nextLoserKey) : null;
+      if (!nextWinnerId && !nextLoserId) return null;
+      return prisma.match.update({
         where: { id },
         data: {
           nextWinnerMatchId: nextWinnerId ?? null,
           nextLoserMatchId: nextLoserId ?? null,
         },
       });
-    }
+    })
+    .filter((p): p is NonNullable<typeof p> => p != null);
+
+  for (let i = 0; i < linkUpdates.length; i += CREATE_BATCH) {
+    await Promise.all(linkUpdates.slice(i, i + CREATE_BATCH));
   }
 
   // Auto-advance BYE winners

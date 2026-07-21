@@ -1,25 +1,7 @@
 {
   "functions": {
-    "src/app/api/admin/leaderboard/sync/route.ts": {
+    "src/app/api/**/*.ts": {
       "maxDuration": 60
-    },
-    "src/app/api/admin/tournaments/**/*.ts": {
-      "maxDuration": 60
-    },
-    "src/app/api/admin/matches/**/*.ts": {
-      "maxDuration": 60
-    },
-    "src/app/api/tournaments/**/*.ts": {
-      "maxDuration": 60
-    },
-    "src/app/api/cron/sync-ranks/route.ts": {
-      "maxDuration": 60
-    },
-    "src/app/api/cron/leaderboard-hourly/route.ts": {
-      "maxDuration": 60
-    },
-    "src/app/api/cron/trigger-daily-leaderboard/route.ts": {
-      "maxDuration": 30
     }
   },
   "crons": [

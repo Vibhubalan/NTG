@@ -432,15 +432,44 @@ export async function getStageMatchesAdmin(
       _count: { select: { matches: true } },
       matches: {
         orderBy: [{ roundNumber: "asc" }, { positionInRound: "asc" }],
-        include: {
-          participants: { orderBy: { slot: "asc" } },
-          result: true,
+        select: {
+          id: true,
+          roundNumber: true,
+          positionInRound: true,
+          bracketSide: true,
+          status: true,
+          stageGroupId: true,
+          scheduledAt: true,
+          scheduleStatus: true,
+          confirmedBySlot0: true,
+          confirmedBySlot1: true,
+          resultDeadlineAt: true,
+          participants: {
+            orderBy: { slot: "asc" },
+            select: {
+              slot: true,
+              tournamentTeamId: true,
+              teamLabel: true,
+            },
+          },
+          // Omit games JSON — large BO series payloads were timing out.
+          result: {
+            select: {
+              winnerSlot: true,
+              scoreSummary: true,
+              scoreA: true,
+              scoreB: true,
+              screenshotUrl: true,
+            },
+          },
           stageGroup: { select: { name: true } },
         },
       },
     },
   });
-  const matches = (bracket?.matches ?? []).map(mapAdminMatch);
+  const matches = (bracket?.matches ?? []).map((m) =>
+    mapAdminMatch({ ...m, result: m.result ? { ...m.result, games: null } : null }),
+  );
   return {
     matches,
     matchCount: bracket?._count.matches ?? matches.length,
@@ -850,7 +879,8 @@ export async function putStageGroups(
       sourcePosition?: number | null;
     }[];
   }[],
-): Promise<AdminStageGraph> {
+  opts?: { skipGraph?: boolean },
+): Promise<AdminStageGraph | null> {
   const tournamentId = await resolveTournamentId(slug);
   const stage = await prisma.tournamentStage.findFirst({
     where: { id: stageId, tournamentId },
@@ -932,6 +962,7 @@ export async function putStageGroups(
     { maxWait: 10_000, timeout: 30_000 },
   );
 
+  if (opts?.skipGraph) return null;
   return getStageGraphAdmin(slug);
 }
 
@@ -940,7 +971,8 @@ export async function putStagePoolAssignments(
   slug: string,
   stageId: string,
   pools: { order: number; teamIds: string[] }[],
-): Promise<AdminStageGraph> {
+  opts?: { skipGraph?: boolean },
+): Promise<AdminStageGraph | null> {
   const tournamentId = await resolveTournamentId(slug);
   const stage = await prisma.tournamentStage.findFirst({
     where: { id: stageId, tournamentId },
@@ -981,6 +1013,7 @@ export async function putStagePoolAssignments(
     { maxWait: 10_000, timeout: 30_000 },
   );
 
+  if (opts?.skipGraph) return null;
   return getStageGraphAdmin(slug);
 }
 
@@ -993,7 +1026,8 @@ export async function putStageRules(
     selector: unknown;
     destination: unknown;
   }[],
-): Promise<AdminStageGraph> {
+  opts?: { skipGraph?: boolean },
+): Promise<AdminStageGraph | null> {
   const tournamentId = await resolveTournamentId(slug);
   const stage = await prisma.tournamentStage.findFirst({
     where: { id: stageId, tournamentId },
@@ -1018,6 +1052,7 @@ export async function putStageRules(
     { maxWait: 10_000, timeout: 30_000 },
   );
 
+  if (opts?.skipGraph) return null;
   return getStageGraphAdmin(slug);
 }
 
@@ -1025,8 +1060,12 @@ export async function putStageSeeding(
   slug: string,
   stageId: string,
   seeding: { teamId: string; seed: number }[],
-  options?: { method?: "MANUAL" | "RANDOM"; redistribute?: boolean },
-): Promise<AdminStageGraph> {
+  options?: {
+    method?: "MANUAL" | "RANDOM";
+    redistribute?: boolean;
+    skipGraph?: boolean;
+  },
+): Promise<AdminStageGraph | null> {
   const tournamentId = await resolveTournamentId(slug);
   const stage = await prisma.tournamentStage.findFirst({
     where: { id: stageId, tournamentId },
@@ -1099,6 +1138,7 @@ export async function putStageSeeding(
     { maxWait: 10_000, timeout: 30_000 },
   );
 
+  if (options?.skipGraph) return null;
   return getStageGraphAdmin(slug);
 }
 
@@ -1117,9 +1157,7 @@ export async function generateStageMatches(slug: string, stageId: string) {
     where: { id: stageId, tournamentId },
   });
   if (!stage) throw new Error("Stage not found.");
-  const result = await generateMatchesForStage(stageId);
-  const graph = await getStageGraphAdmin(slug, { includeMatches: stageId });
-  return { ...result, graph };
+  return generateMatchesForStage(stageId);
 }
 
 /**
@@ -1169,12 +1207,10 @@ export async function reshuffleStageBracket(slug: string, stageId: string) {
     slug,
     stageId,
     teamIds.map((id, i) => ({ teamId: id, seed: i + 1 })),
-    { method: "MANUAL", redistribute: false },
+    { method: "MANUAL", redistribute: false, skipGraph: true },
   );
 
-  const result = await generateMatchesForStage(stageId);
-  const graph = await getStageGraphAdmin(slug, { includeMatches: stageId });
-  return { ...result, graph };
+  return generateMatchesForStage(stageId);
 }
 
 export async function advanceStageAdmin(slug: string, stageId: string) {
@@ -1184,8 +1220,7 @@ export async function advanceStageAdmin(slug: string, stageId: string) {
   });
   if (!stage) throw new Error("Stage not found.");
   const result = await applyStageMovement(stageId);
-  const graph = await getStageGraphAdmin(slug, { includeMatches: stageId });
-  return { ...result, graph };
+  return result;
 }
 
 export type StageSeedSource = "TEAMS" | "PREVIOUS_STAGE";
@@ -1331,70 +1366,74 @@ async function persistStageDrafts(
     select: { id: true, order: true },
   });
 
-  await Promise.all(
-    drafts.map(async (draft) => {
-      const stage = await prisma.tournamentStage.findFirst({
-        where: { id: draft.id, tournamentId },
-      });
-      if (!stage) return;
+  // Only touch the stage we're generating (or all drafts during full sync).
+  const targetId = options?.rebuildGroupsForStageId;
+  const draftsToWrite = targetId
+    ? drafts.filter((d) => d.id === targetId)
+    : drafts;
 
-      await prisma.tournamentStage.update({
-        where: { id: draft.id },
-        data: {
-          name: draft.name.trim(),
-          stageType: draft.stageType,
-          matchFormat: draft.matchFormat,
-          seedingMethod: draft.seedingMethod,
-          config: mergeStageConfig(stage.config, {
-            seedSource: draft.seedSource,
-            feederStageIds: draft.feederStageIds ?? null,
-            finalsMatchFormat:
-              draft.stageType === "SINGLE_ELIMINATION" ||
-              draft.stageType === "DOUBLE_ELIMINATION"
-                ? (draft.finalsMatchFormat ?? "BO5")
-                : null,
-            finishesAt: draft.finishesAt,
-            resultWindowHours: draft.resultWindowHours,
-          }) as object,
-        },
-      });
+  for (const draft of draftsToWrite) {
+    const stage = await prisma.tournamentStage.findFirst({
+      where: { id: draft.id, tournamentId },
+    });
+    if (!stage) continue;
 
-      const ruleGroupIdToOrder = new Map<string, number>();
-      for (const g of draft.groups) {
-        if (g.id) ruleGroupIdToOrder.set(g.id, g.order);
+    await prisma.tournamentStage.update({
+      where: { id: draft.id },
+      data: {
+        name: draft.name.trim(),
+        stageType: draft.stageType,
+        matchFormat: draft.matchFormat,
+        seedingMethod: draft.seedingMethod,
+        config: mergeStageConfig(stage.config, {
+          seedSource: draft.seedSource,
+          feederStageIds: draft.feederStageIds ?? null,
+          finalsMatchFormat:
+            draft.stageType === "SINGLE_ELIMINATION" ||
+            draft.stageType === "DOUBLE_ELIMINATION"
+              ? (draft.finalsMatchFormat ?? "BO5")
+              : null,
+          finishesAt: draft.finishesAt,
+          resultWindowHours: draft.resultWindowHours,
+        }) as object,
+      },
+    });
+
+    const ruleGroupIdToOrder = new Map<string, number>();
+    for (const g of draft.groups) {
+      if (g.id) ruleGroupIdToOrder.set(g.id, g.order);
+    }
+
+    if (options?.rebuildGroupsForStageId === draft.id) {
+      await putStageGroups(slug, draft.id, draft.groups, { skipGraph: true });
+    }
+
+    const liveGroups = await prisma.tournamentStageGroup.findMany({
+      where: { stageId: draft.id },
+      orderBy: { order: "asc" },
+      select: { id: true, order: true },
+    });
+    const orderToLiveId = new Map(liveGroups.map((g) => [g.order, g.id]));
+
+    const remappedRules = draft.rules.map((r) => {
+      let groupId = r.groupId;
+      if (groupId) {
+        const order = ruleGroupIdToOrder.get(groupId);
+        groupId = order != null ? (orderToLiveId.get(order) ?? null) : null;
       }
+      return {
+        ...r,
+        groupId,
+        destination: remapRuleDestination(
+          r.destination,
+          allStages,
+          stage.order,
+        ),
+      };
+    });
 
-      if (options?.rebuildGroupsForStageId === draft.id) {
-        await putStageGroups(slug, draft.id, draft.groups);
-      }
-
-      const liveGroups = await prisma.tournamentStageGroup.findMany({
-        where: { stageId: draft.id },
-        orderBy: { order: "asc" },
-        select: { id: true, order: true },
-      });
-      const orderToLiveId = new Map(liveGroups.map((g) => [g.order, g.id]));
-
-      const remappedRules = draft.rules.map((r) => {
-        let groupId = r.groupId;
-        if (groupId) {
-          const order = ruleGroupIdToOrder.get(groupId);
-          groupId = order != null ? (orderToLiveId.get(order) ?? null) : null;
-        }
-        return {
-          ...r,
-          groupId,
-          destination: remapRuleDestination(
-            r.destination,
-            allStages,
-            stage.order,
-          ),
-        };
-      });
-
-      await putStageRules(slug, draft.id, remappedRules);
-    }),
-  );
+    await putStageRules(slug, draft.id, remappedRules, { skipGraph: true });
+  }
 }
 
 async function seedStageFromFeeders(
@@ -1565,7 +1604,6 @@ export async function commitStageAndGenerate(
 ): Promise<{
   matchCount: number;
   moved: number;
-  graph: AdminStageGraph;
 }> {
   const tournamentId = await resolveTournamentId(slug);
   const target = await prisma.tournamentStage.findFirst({
@@ -1610,7 +1648,7 @@ export async function commitStageAndGenerate(
         slug,
         stageId,
         [...new Set(assigned)].map((id, i) => ({ teamId: id, seed: i + 1 })),
-        { method, redistribute: false },
+        { method, redistribute: false, skipGraph: true },
       );
       await putStagePoolAssignments(
         slug,
@@ -1621,20 +1659,21 @@ export async function commitStageAndGenerate(
             .map((s) => s.teamId)
             .filter((id): id is string => Boolean(id)),
         })),
+        { skipGraph: true },
       );
     } else {
       await putStageSeeding(
         slug,
         stageId,
         teamIds.map((id, i) => ({ teamId: id, seed: i + 1 })),
-        { method },
+        { method, skipGraph: true },
       );
     }
   }
 
   const generated = await generateMatchesForStage(stageId);
-  const graph = await getStageGraphAdmin(slug, { includeMatches: stageId });
-  return { matchCount: generated.matchCount, moved, graph };
+  // Do not reload full match payloads here — client fetches /matches after.
+  return { matchCount: generated.matchCount, moved };
 }
 
 /**

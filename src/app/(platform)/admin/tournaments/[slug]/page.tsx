@@ -5,7 +5,6 @@ import {
   listSeasonsAdmin,
   listUnassignedPlayerRegistrations,
   parsePrizeSplit,
-  getStageGraphAdmin,
 } from "@tournaments-leagues/index";
 import { serverEnv } from "@core/config/env.server";
 import { displayCs2Ranks, displayValorantRegistration } from "@auth-membership/domain/game-profile";
@@ -31,18 +30,17 @@ export default async function AdminTournamentEditPage({ params }: Props) {
   const session = await getSession();
   const userId = session?.user?.id;
 
-  const [t, poolPlayers, seasons, stageGraph, [row]] = await Promise.all([
+  const [t, poolPlayers, seasons, [row]] = await Promise.all([
     getTournamentAdmin(slug),
     listUnassignedPlayerRegistrations(slug),
     listSeasonsAdmin(),
-    getStageGraphAdmin(slug, { skipChainRepair: true, includeMatches: false }).catch(
-      () => null,
-    ),
+    // Stage graph loads client-side — SSR was timing out on Vercel.
     prisma.$queryRawUnsafe<{ publicAuction: boolean; yourGamesEnabled: boolean }[]>(
       'SELECT "publicAuction", "yourGamesEnabled" FROM "Tournament" WHERE slug = $1 LIMIT 1',
       slug
     ),
   ]);
+  const stageGraph = null;
   if (!t) notFound();
 
   const [auctionRow] = await prisma.$queryRawUnsafe<{ finalized: boolean }[]>(
