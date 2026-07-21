@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { requireApiJson } from "@/lib/parse-api-json";
 import {
   formatLabel,
   gamesFromScores,
@@ -180,8 +181,7 @@ export default function AdminMatchResultsBatch({
       fd.set("file", file);
       fd.set("prefix", "match-screenshots");
       const res = await fetch("/api/admin/upload", { method: "POST", body: fd });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error ?? "Upload failed");
+      const data = await requireApiJson(res);
       setDrafts((prev) => {
         const cur =
           prev[matchId] ??
@@ -212,8 +212,7 @@ export default function AdminMatchResultsBatch({
       fd.set("file", file);
       fd.set("prefix", "match-screenshots");
       const res = await fetch("/api/admin/upload", { method: "POST", body: fd });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error ?? "Upload failed");
+      const data = await requireApiJson(res);
       patchDraft(matchId, { screenshotUrl: data.url as string });
     } catch (e) {
       onError(e instanceof Error ? e.message : "Upload failed");
@@ -249,8 +248,7 @@ export default function AdminMatchResultsBatch({
                 body: JSON.stringify({ clear: true }),
               },
             );
-            const data = await res.json();
-            if (!res.ok) throw new Error(data.error ?? "Failed to clear result");
+            await requireApiJson(res);
           } else {
             const aNum = Number(d.scoreA);
             const bNum = Number(d.scoreB);
@@ -286,8 +284,7 @@ export default function AdminMatchResultsBatch({
                 }),
               },
             );
-            const data = await res.json();
-            if (!res.ok) throw new Error(data.error ?? "Failed to save result");
+            await requireApiJson(res);
           }
         } else {
           const format = formatForMatch(
@@ -306,8 +303,7 @@ export default function AdminMatchResultsBatch({
                 body: JSON.stringify({ clear: true }),
               },
             );
-            const data = await res.json();
-            if (!res.ok) throw new Error(data.error ?? "Failed to clear result");
+            await requireApiJson(res);
           } else {
             if (!seriesComplete(format, d.games)) {
               onError(
@@ -332,8 +328,7 @@ export default function AdminMatchResultsBatch({
                 }),
               },
             );
-            const data = await res.json();
-            if (!res.ok) throw new Error(data.error ?? "Failed to save result");
+            await requireApiJson(res);
           }
         }
         patchDraft(match.id, { open: false });
@@ -365,8 +360,7 @@ export default function AdminMatchResultsBatch({
           body: JSON.stringify({ clear: true }),
         },
       );
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error ?? "Failed to reset result");
+      await requireApiJson(res);
       patchDraft(match.id, { ...initDraft({ ...match, result: null }), open: false });
       onSaved();
     } catch (e) {

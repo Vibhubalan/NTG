@@ -12,13 +12,16 @@ export const dynamic = "force-dynamic";
 
 type Params = { params: Promise<{ slug: string }> };
 
-export async function GET(_req: Request, { params }: Params) {
+export async function GET(req: Request, { params }: Params) {
   const auth = await requireAdmin();
   if (!isAuthedAdmin(auth)) return guardResponse(auth)!;
 
   const { slug } = await params;
+  const skipRepair = new URL(req.url).searchParams.get("skipRepair") === "1";
   try {
-    const graph = await getStageGraphAdmin(slug);
+    const graph = await getStageGraphAdmin(slug, {
+      skipChainRepair: skipRepair,
+    });
     return NextResponse.json(graph);
   } catch (err) {
     const message = err instanceof Error ? err.message : "Failed to load stages.";

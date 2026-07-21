@@ -9,7 +9,11 @@ function createPrismaClient(): PrismaClient {
 }
 
 function isClientCurrent(client: PrismaClient): boolean {
-  return "pendingSignup" in client && "playerBadge" in client;
+  return (
+    "pendingSignup" in client &&
+    "playerBadge" in client &&
+    "tournamentStage" in client
+  );
 }
 
 function getPrisma(): PrismaClient {

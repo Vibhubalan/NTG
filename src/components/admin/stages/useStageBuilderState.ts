@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { StageType } from "@prisma/client";
+import { requireApiJson } from "@/lib/parse-api-json";
 import type { AdminStageGraph } from "@tournaments-leagues/index";
 import { buildDrafts } from "./build-drafts";
 import {
@@ -41,9 +42,9 @@ export function useStageBuilderState(
       if (!opts?.silent) setLoading(true);
       setError(null);
       try {
-        const res = await fetch(`/api/admin/tournaments/${slug}/stages`);
-        const data = (await res.json()) as AdminStageGraph & { error?: string };
-        if (!res.ok) throw new Error(data.error ?? "Failed to load");
+        const qs = opts?.silent ? "?skipRepair=1" : "";
+        const res = await fetch(`/api/admin/tournaments/${slug}/stages${qs}`);
+        const data = (await requireApiJson(res)) as unknown as AdminStageGraph;
         setGraph(graphFromPayload(data));
         setDirty(false);
         setSelectedId((prev) => prev ?? data.stages[0]?.id ?? null);
@@ -103,11 +104,11 @@ export function useStageBuilderState(
           stageType: opts?.stageType ?? "ROUND_ROBIN",
         }),
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error ?? "Failed");
-      setGraph(graphFromPayload(data));
+      const data = await requireApiJson(res);
+      setGraph(graphFromPayload(data as unknown as AdminStageGraph));
       setDirty(false);
-      const last = data.stages[data.stages.length - 1] as { id: string } | undefined;
+      const stages = data.stages as { id: string }[] | undefined;
+      const last = stages?.[stages.length - 1];
       if (last) setSelectedId(last.id);
       return last?.id ?? null;
     } catch (e) {
@@ -126,11 +127,11 @@ export function useStageBuilderState(
         `/api/admin/tournaments/${slug}/stages/${stageId}`,
         { method: "DELETE" },
       );
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error ?? "Failed");
-      setGraph(graphFromPayload(data));
+      const data = await requireApiJson(res);
+      setGraph(graphFromPayload(data as unknown as AdminStageGraph));
       setDirty(false);
-      setSelectedId(data.stages[0]?.id ?? null);
+      const stages = data.stages as { id?: string }[] | undefined;
+      setSelectedId(stages?.[0]?.id ?? null);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to delete");
     } finally {
@@ -274,9 +275,8 @@ export function useStageBuilderState(
           }),
         },
       );
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error ?? "Failed to save settings");
-      setGraph(graphFromPayload(data));
+      const data = await requireApiJson(res);
+      setGraph(graphFromPayload(data as unknown as AdminStageGraph));
       setDirty(false);
       setSyncNote("Stage settings saved.");
     } catch (e) {
@@ -314,9 +314,8 @@ export function useStageBuilderState(
           body: JSON.stringify({ groups }),
         },
       );
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error ?? "Failed to save pools");
-      setGraph(graphFromPayload(data));
+      const data = await requireApiJson(res);
+      setGraph(graphFromPayload(data as unknown as AdminStageGraph));
       setDirty(false);
       setSyncNote("Teams & pools saved.");
     } catch (e) {
@@ -350,9 +349,8 @@ export function useStageBuilderState(
           body: JSON.stringify({ rules }),
         },
       );
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error ?? "Failed to save rules");
-      setGraph(graphFromPayload(data));
+      const data = await requireApiJson(res);
+      setGraph(graphFromPayload(data as unknown as AdminStageGraph));
       setDirty(false);
       setSyncNote("Qualification rules saved.");
     } catch (e) {
@@ -534,9 +532,8 @@ export function useStageBuilderState(
           body: JSON.stringify({ drafts: buildDrafts(graphRef.current) }),
         },
       );
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error ?? "Failed");
-      setGraph(graphFromPayload(data.graph));
+      const data = await requireApiJson(res);
+      setGraph(graphFromPayload(data.graph as unknown as AdminStageGraph));
       setDirty(false);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Generate failed");
@@ -563,9 +560,8 @@ export function useStageBuilderState(
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ drafts: buildDrafts(graphRef.current) }),
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error ?? "Failed to sync");
-      setGraph(graphFromPayload(data.graph));
+      const data = await requireApiJson(res);
+      setGraph(graphFromPayload(data.graph as unknown as AdminStageGraph));
       setDirty(false);
       const lines = (
         data.synced as Array<{
@@ -616,8 +612,7 @@ export function useStageBuilderState(
           body: JSON.stringify(clearing ? { clear: true } : { winnerSlot }),
         },
       );
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error ?? "Failed to save result");
+      await requireApiJson(res);
       await load({ silent: true });
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to save result");
@@ -651,8 +646,7 @@ export function useStageBuilderState(
           ),
         },
       );
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error ?? "Failed to assign team");
+      await requireApiJson(res);
       await load({ silent: true });
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to assign team");
@@ -673,9 +667,8 @@ export function useStageBuilderState(
         `/api/admin/tournaments/${slug}/stages/${stageId}/reshuffle`,
         { method: "POST" },
       );
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error ?? "Failed to reshuffle");
-      setGraph(graphFromPayload(data.graph));
+      const data = await requireApiJson(res);
+      setGraph(graphFromPayload(data.graph as unknown as AdminStageGraph));
       setDirty(false);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Reshuffle failed");
@@ -709,18 +702,7 @@ export function useStageBuilderState(
           forceConfirm,
         }),
       });
-      const raw = await res.text();
-      let data: { error?: string; ok?: boolean } = {};
-      try {
-        data = raw ? (JSON.parse(raw) as { error?: string; ok?: boolean }) : {};
-      } catch {
-        throw new Error(
-          res.status === 404
-            ? "Schedule API not found — restart the dev server (clear .next if needed)."
-            : `Schedule request failed (${res.status}).`,
-        );
-      }
-      if (!res.ok) throw new Error(data.error ?? "Failed to set schedule");
+      await requireApiJson(res);
       // Ignore stale soft-saves that finished after a newer Force/save.
       if (scheduleSaveGen.current.get(matchId) !== gen) return;
       await load({ silent: true });

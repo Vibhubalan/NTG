@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { requireApiJson } from "@/lib/parse-api-json";
 import type { MyGameView } from "@/modules/tournaments-leagues/application/stages/my-games.types";
 import {
   allGamesHaveScreenshots,
@@ -124,9 +125,8 @@ export default function TournamentYourGames({
       setError(null);
       try {
         const res = await fetch(`/api/tournaments/${slug}/my-games`);
-        const data = await res.json();
-        if (!res.ok) throw new Error(data.error ?? "Failed to load");
-        setGames(data.games ?? []);
+        const data = await requireApiJson(res);
+        setGames((data.games as MyGameView[] | undefined) ?? []);
         setHasTeam(Boolean(data.hasTeam));
       } catch (e) {
         setError(e instanceof Error ? e.message : "Failed to load games");
@@ -162,8 +162,7 @@ export default function TournamentYourGames({
         `/api/tournaments/${slug}/matches/${matchId}/schedule/confirm`,
         { method: "POST" },
       );
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error ?? "Confirm failed");
+      await requireApiJson(res);
       await load({ silent: true });
     } catch (e) {
       setError(e instanceof Error ? e.message : "Confirm failed");
@@ -191,8 +190,7 @@ export default function TournamentYourGames({
           }),
         },
       );
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error ?? "Propose failed");
+      await requireApiJson(res);
       // Collapse the edit form on success
       setEditingScheduleId(null);
       await load({ silent: true });
@@ -216,8 +214,7 @@ export default function TournamentYourGames({
         method: "POST",
         body: fd,
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error ?? "Upload failed");
+      const data = await requireApiJson(res);
       patchForm(matchId, base, { screenshotUrl: data.url as string });
     } finally {
       setUploadingShot(null);
@@ -236,8 +233,7 @@ export default function TournamentYourGames({
       method: "POST",
       body: fd,
     });
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.error ?? "Upload failed");
+    const data = await requireApiJson(res);
     const next = base.games.map((g, i) =>
       i === gameIndex
         ? { ...g, screenshotUrl: data.url as string }
@@ -318,8 +314,7 @@ export default function TournamentYourGames({
           body: JSON.stringify(body),
         },
       );
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error ?? "Submit failed");
+      await requireApiJson(res);
       await load({ silent: true });
     } catch (e) {
       setError(e instanceof Error ? e.message : "Submit failed");

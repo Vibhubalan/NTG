@@ -3,6 +3,15 @@
     "src/app/api/admin/leaderboard/sync/route.ts": {
       "maxDuration": 60
     },
+    "src/app/api/admin/tournaments/**/*.ts": {
+      "maxDuration": 60
+    },
+    "src/app/api/admin/matches/**/*.ts": {
+      "maxDuration": 60
+    },
+    "src/app/api/tournaments/**/*.ts": {
+      "maxDuration": 60
+    },
     "src/app/api/cron/sync-ranks/route.ts": {
       "maxDuration": 60
     },

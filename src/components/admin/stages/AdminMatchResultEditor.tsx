@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { requireApiJson } from "@/lib/parse-api-json";
 import type { StageNode } from "./types";
 
 type Match = NonNullable<StageNode["matches"]>[number];
@@ -48,8 +49,7 @@ export default function AdminMatchResultEditor({
     fd.set("file", file);
     fd.set("prefix", "match-screenshots");
     const res = await fetch("/api/admin/upload", { method: "POST", body: fd });
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.error ?? "Upload failed");
+    const data = await requireApiJson(res);
     setScreenshotUrl(data.url as string);
   }
 
@@ -69,8 +69,7 @@ export default function AdminMatchResultEditor({
             body: JSON.stringify({ clear: true }),
           },
         );
-        const data = await res.json();
-        if (!res.ok) throw new Error(data.error ?? "Failed to clear result");
+        await requireApiJson(res);
         setOpen(false);
         onSaved();
         return;
@@ -105,8 +104,7 @@ export default function AdminMatchResultEditor({
           }),
         },
       );
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error ?? "Failed to save result");
+      await requireApiJson(res);
       setOpen(false);
       onSaved();
     } catch (e) {
@@ -135,8 +133,7 @@ export default function AdminMatchResultEditor({
           body: JSON.stringify({ clear: true }),
         },
       );
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error ?? "Failed to reset result");
+      await requireApiJson(res);
       setOpen(false);
       setWinnerSlot(null);
       setScoreA("");

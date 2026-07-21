@@ -57,6 +57,41 @@ export async function PATCH(req: Request, { params }: Props) {
     return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
   }
 
+  // Flag-only patches (Your Games / Public Auction) — skip full cup validation.
+  const keys = Object.keys(body);
+  const flagOnly =
+    keys.length > 0 &&
+    keys.every((k) => k === "yourGamesEnabled" || k === "publicAuction");
+  if (flagOnly) {
+    const tournament = await getTournamentAdmin(slug);
+    if (!tournament) {
+      return NextResponse.json({ error: "Tournament not found." }, { status: 404 });
+    }
+    if (body.publicAuction !== undefined) {
+      const isPublic = !!body.publicAuction;
+      await prisma.$executeRawUnsafe(
+        'UPDATE "Tournament" SET "publicAuction" = $1 WHERE slug = $2',
+        isPublic,
+        slug,
+      );
+      (tournament as { publicAuction?: boolean }).publicAuction = isPublic;
+    }
+    if (body.yourGamesEnabled !== undefined) {
+      const enabled = !!body.yourGamesEnabled;
+      await prisma.$executeRawUnsafe(
+        'UPDATE "Tournament" SET "yourGamesEnabled" = $1 WHERE slug = $2',
+        enabled,
+        slug,
+      );
+      (tournament as { yourGamesEnabled?: boolean }).yourGamesEnabled = enabled;
+    }
+    await logAdminAction(auth.userId, "tournament.update", slug, {
+      fields: keys,
+      tournamentName: tournament.name,
+    });
+    return NextResponse.json({ ok: true, tournament });
+  }
+
   let result;
   try {
     result = await updateTournamentFull(slug, {

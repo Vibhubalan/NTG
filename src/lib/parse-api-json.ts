@@ -16,9 +16,33 @@ export async function parseApiJson(res: Response): Promise<
     return { ok: true, data };
   } catch {
     const snippet = text.replace(/\s+/g, " ").trim().slice(0, 160);
+    // Vercel FUNCTION_INVOCATION_TIMEOUT / crash pages often start with "An error occurred..."
+    if (/^An error o/i.test(snippet) || /FUNCTION_INVOCATION_TIMEOUT/i.test(snippet)) {
+      return {
+        ok: false,
+        message:
+          "Server timed out while processing this request. Try again, or do fewer matches at once.",
+      };
+    }
+    if (/^<!DOCTYPE/i.test(snippet) || /^<html/i.test(snippet)) {
+      return {
+        ok: false,
+        message: `Request failed (${res.status}) — server returned a web page instead of JSON.`,
+      };
+    }
     return {
       ok: false,
       message: snippet || `Request failed (${res.status}).`,
     };
   }
+}
+
+/** Parse JSON and throw a readable Error on proxy/HTML failures or HTTP errors. */
+export async function requireApiJson(res: Response): Promise<Record<string, unknown>> {
+  const parsed = await parseApiJson(res);
+  if (!parsed.ok) throw new Error(parsed.message);
+  if (!res.ok) {
+    throw new Error(String(parsed.data.error ?? `Request failed (${res.status}).`));
+  }
+  return parsed.data;
 }
