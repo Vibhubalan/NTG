@@ -12,7 +12,6 @@ import Footer from "@/components/Footer";
 import LocalBusinessJsonLd from "@/components/seo/LocalBusinessJsonLd";
 import { SITE_DESCRIPTION, SITE_TITLE } from "@/lib/site";
 
-export const dynamic = "force-dynamic";
 
 export const metadata = {
   title: SITE_TITLE,

@@ -67,6 +67,8 @@ export default function AdminMembersPanel({
   const [createForm, setCreateForm] = useState({ email: "", password: "", displayName: "" });
   const [message, setMessage] = useState<string | null>(null);
   const [syncingRank, setSyncingRank] = useState(false);
+  const [remoteResults, setRemoteResults] = useState<Member[] | null>(null);
+  const [searching, setSearching] = useState(false);
 
   useEffect(() => {
     if (!selected) return;
@@ -103,17 +105,30 @@ export default function AdminMembersPanel({
     if (ok) setMessage("Valorant roles updated.");
   }
 
-  const filtered = initialMembers.filter((m) => {
-    const q = search.toLowerCase();
-    if (!q) return true;
-    return (
-      m.email?.toLowerCase().includes(q) ||
-      m.name?.toLowerCase().includes(q) ||
-      m.displayName?.toLowerCase().includes(q) ||
-      m.olympusId?.toLowerCase().includes(q) ||
-      m.riotId?.toLowerCase().includes(q)
-    );
-  });
+  // initialMembers is only the 200 most-recently-created accounts. A search term must hit
+  // the server so it can find members outside that window, not just filter what's loaded.
+  useEffect(() => {
+    const q = search.trim();
+    if (q.length < 2) {
+      setRemoteResults(null);
+      setSearching(false);
+      return;
+    }
+
+    setSearching(true);
+    const timer = setTimeout(async () => {
+      const res = await fetch(`/api/admin/members?search=${encodeURIComponent(q)}&limit=100`);
+      const data = await res.json();
+      if (res.ok && Array.isArray(data.users)) {
+        setRemoteResults(data.users);
+      }
+      setSearching(false);
+    }, 300);
+
+    return () => clearTimeout(timer);
+  }, [search]);
+
+  const filtered = remoteResults ?? initialMembers;
 
   async function patchMember(id: string, body: Record<string, unknown>) {
     setMessage(null);
@@ -259,7 +274,11 @@ export default function AdminMembersPanel({
           </div>
 
           <ul className="space-y-2 max-h-[30rem] overflow-y-auto pr-1">
-            {filtered.length === 0 ? (
+            {searching ? (
+              <div className="rounded-xl border border-dashed border-white/10 p-8 text-center text-sm text-white/30">
+                Searching...
+              </div>
+            ) : filtered.length === 0 ? (
               <div className="rounded-xl border border-dashed border-white/10 p-8 text-center text-sm text-white/30">
                 No members found.
               </div>

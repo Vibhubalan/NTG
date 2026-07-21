@@ -166,19 +166,8 @@ export class LeaderboardRepository {
   private async resolveGameForMatch(matchId: string): Promise<GameSlug | null> {
     const match = await prisma.match.findUnique({
       where: { id: matchId },
-      include: {
-        bracket: {
-          include: {
-            tournament: true,
-            stage: { include: { tournament: true } },
-          },
-        },
-      },
+      include: { bracket: { include: { tournament: true } } },
     });
-    return (
-      match?.bracket.tournament?.game ??
-      match?.bracket.stage?.tournament.game ??
-      null
-    );
+    return match?.bracket.tournament.game ?? null;
   }
 }

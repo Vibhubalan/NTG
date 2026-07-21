@@ -43,6 +43,12 @@ export default async function AdminTournamentEditPage({ params }: Props) {
   ]);
   if (!t) notFound();
 
+  const [auctionRow] = await prisma.$queryRawUnsafe<{ finalized: boolean }[]>(
+    'SELECT finalized FROM auction_sessions WHERE tournament_id = $1 LIMIT 1',
+    t.id
+  );
+  const auctionFinalized = auctionRow?.finalized ?? false;
+
   const initial = {
     slug: t.slug,
     name: t.name,
@@ -158,6 +164,7 @@ export default async function AdminTournamentEditPage({ params }: Props) {
       initial={initial}
       seasons={seasons}
       auctionHref={auctionHref}
+      auctionFinalized={auctionFinalized}
       initialStageGraph={stageGraph}
     />
   );

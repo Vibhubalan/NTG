@@ -183,7 +183,10 @@ export default function TournamentTeamsList({
                     </span>
                   )}
                   <div className="min-w-0 flex-1">
-                    <span className="font-display text-lg font-semibold tracking-[-0.01em] text-white/90">
+                    <span
+                      title={team.name}
+                      className="block truncate font-display text-lg font-semibold tracking-[-0.01em] text-white/90"
+                    >
                       {team.name}
                     </span>
                     {hasPlayers ? (

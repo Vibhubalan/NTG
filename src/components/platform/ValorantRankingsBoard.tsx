@@ -405,9 +405,16 @@ export default function ValorantRankingsBoard({ data }: Props) {
       >
         
         {/* Premium Header */}
-        <div className="relative mb-10 overflow-hidden rounded-2xl border border-white/10 bg-gradient-to-br from-white/[0.04] to-black/40 p-8 sm:p-10 shadow-2xl backdrop-blur-md">
+        <div className="relative mb-10 overflow-hidden rounded-2xl border border-white/10 bg-gradient-to-br from-white/[0.04] to-black/40 p-8 sm:p-10 shadow-2xl backdrop-blur-md isolate [transform:translateZ(0)]">
           {/* Subtle glow orb inside the card */}
-          <div className="absolute -top-24 -right-24 h-48 w-48 rounded-full bg-cyan-500/20 blur-[80px]" />
+          <div className="pointer-events-none absolute inset-0 overflow-hidden rounded-2xl">
+            <div 
+              className="absolute -top-24 -right-24 h-48 w-48 rounded-full opacity-20" 
+              style={{
+                background: "radial-gradient(circle, rgba(6,182,212,1) 0%, transparent 70%)"
+              }}
+            />
+          </div>
           
           {/* Valorant Logo (Top Right) — filled paths, not stroke (stroke breaks the V shape) */}
           <div className="absolute top-6 right-6 sm:top-8 sm:right-8 pointer-events-none text-[#FF4655] opacity-90 drop-shadow-[0_0_15px_rgba(255,70,85,0.8)]">

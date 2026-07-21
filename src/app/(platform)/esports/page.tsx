@@ -169,8 +169,15 @@ export default async function EsportsHubPage() {
           </div>
         </div>
       ) : (
-        <div className="rounded-[2rem] border border-white/[0.06] bg-gradient-to-br from-[#121212]/90 to-[#080808]/90 p-6 backdrop-blur-md sm:p-8 shadow-2xl relative overflow-hidden group">
-          <div className="absolute -right-16 -top-16 h-40 w-40 rounded-full bg-[var(--color-iris)]/5 blur-[50px] group-hover:bg-[var(--color-iris)]/10 transition-colors" />
+        <div className="rounded-[2rem] border border-white/[0.06] bg-gradient-to-br from-[#121212]/90 to-[#080808]/90 p-6 backdrop-blur-md sm:p-8 shadow-2xl relative overflow-hidden group isolate [transform:translateZ(0)]">
+          <div className="pointer-events-none absolute inset-0 overflow-hidden rounded-[2rem]">
+            <div 
+              className="absolute -right-16 -top-16 h-40 w-40 rounded-full opacity-5 group-hover:opacity-10 transition-opacity duration-300" 
+              style={{
+                background: "radial-gradient(circle, var(--color-iris) 0%, transparent 70%)"
+              }}
+            />
+          </div>
           <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
             <div>
               <h2 className="font-display text-2xl font-black tracking-tight text-white">Join the NTG Arena</h2>
@@ -189,9 +196,21 @@ export default async function EsportsHubPage() {
           </div>
         </div>
       )}      {/* Valorant Top 3 Podium Widget */}
-      <div className="rounded-[2rem] border border-[var(--color-iris)]/15 bg-gradient-to-br from-[#120F1F]/40 via-[#0A0A0A]/60 to-[#0A161A]/40 p-6 backdrop-blur-xl sm:p-8 shadow-[0_0_50px_rgba(124,58,237,0.06)] relative overflow-hidden group/board">
-        <div className="pointer-events-none absolute -right-24 -top-24 h-72 w-72 rounded-full bg-[var(--color-brand)]/10 blur-[80px] transition-all duration-1000 group-hover/board:bg-[var(--color-brand)]/15" />
-        <div className="pointer-events-none absolute -left-24 -bottom-24 h-72 w-72 rounded-full bg-[var(--color-iris)]/10 blur-[80px] transition-all duration-1000 group-hover/board:bg-[var(--color-iris)]/15" />
+      <div className="rounded-[2rem] border border-[var(--color-iris)]/15 bg-gradient-to-br from-[#120F1F]/40 via-[#0A0A0A]/60 to-[#0A161A]/40 p-6 backdrop-blur-xl sm:p-8 shadow-[0_0_50px_rgba(124,58,237,0.06)] relative overflow-hidden group/board isolate [transform:translateZ(0)]">
+        <div className="pointer-events-none absolute inset-0 overflow-hidden rounded-[2rem]">
+          <div 
+            className="absolute -right-24 -top-24 h-72 w-72 rounded-full opacity-10 group-hover/board:opacity-15 transition-opacity duration-1000" 
+            style={{
+              background: "radial-gradient(circle, var(--color-brand) 0%, transparent 70%)"
+            }}
+          />
+          <div 
+            className="absolute -left-24 -bottom-24 h-72 w-72 rounded-full opacity-10 group-hover/board:opacity-15 transition-opacity duration-1000" 
+            style={{
+              background: "radial-gradient(circle, var(--color-iris) 0%, transparent 70%)"
+            }}
+          />
+        </div>
 
         <div className="relative z-10 mb-6 flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
           <div>
@@ -337,7 +356,7 @@ export default async function EsportsHubPage() {
 
 
       {/* Glassmorphic Navigation Cards — moved to bottom */}
-      <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
         <Link href="/esports/roster" prefetch={true} className="group relative flex min-h-[14rem] flex-col overflow-hidden rounded-[1.5rem] border border-white/[0.08] bg-[#0D0D0D]/60 p-8 shadow-lg backdrop-blur-md transition-all duration-500 hover:-translate-y-1 hover:border-violet-500/50 hover:bg-[#100c18]/80 hover:shadow-[0_0_40px_rgba(124,58,237,0.15)] active:scale-[0.98]">
           <div className="absolute inset-0 bg-gradient-to-tr from-transparent via-white/[0.02] to-white/[0.05] opacity-0 transition-opacity duration-500 group-hover:opacity-100" />
           <div className="absolute right-0 top-0 h-32 w-32 -translate-y-8 translate-x-8 rounded-full bg-violet-500/10 blur-[50px] transition-all group-hover:bg-violet-500/20" />

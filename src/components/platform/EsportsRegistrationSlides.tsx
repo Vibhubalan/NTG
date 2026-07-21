@@ -45,7 +45,7 @@ export default function EsportsRegistrationSlides({ banners, intervalMs = 7000 }
               i === safeIndex
                 ? "pointer-events-auto z-10 opacity-100"
                 : "pointer-events-none z-0 opacity-0"
-            } hover:scale-[1.01] hover:ring-white/20 hover:shadow-[0_0_40px_rgba(34,211,238,0.15)] active:scale-[0.98]`}
+            } hover:scale-[1.01] hover:ring-white/20 hover:shadow-[0_0_40px_rgba(34,211,238,0.15)] active:scale-[0.98] isolate [transform:translateZ(0)]`}
           >
             {banner.hubBannerUrl || (banner.hubCarouselImages && banner.hubCarouselImages.length > 0) ? (
               <div
@@ -57,8 +57,20 @@ export default function EsportsRegistrationSlides({ banners, intervalMs = 7000 }
               className="pointer-events-none absolute inset-0 z-0 bg-gradient-to-t from-black via-[#0A0A0A]/80 to-[#0A0A0A]/20"
               aria-hidden
             />
-            <div className="pointer-events-none absolute z-0 -right-20 -top-20 h-64 w-64 rounded-full bg-[var(--color-brand)]/20 blur-[100px] transition-all duration-500 group-hover/card:bg-[var(--color-brand)]/30" />
-            <div className="pointer-events-none absolute -bottom-32 -left-32 h-96 w-96 rounded-full bg-[var(--color-iris)]/10 blur-[100px]" />
+            <div className="pointer-events-none absolute inset-0 z-0 overflow-hidden rounded-[2rem]">
+              <div 
+                className="absolute -right-20 -top-20 h-64 w-64 rounded-full opacity-20 transition-opacity duration-500 group-hover/card:opacity-30" 
+                style={{
+                  background: "radial-gradient(circle, var(--color-brand) 0%, transparent 70%)"
+                }}
+              />
+              <div 
+                className="absolute -bottom-32 -left-32 h-96 w-96 rounded-full opacity-10" 
+                style={{
+                  background: "radial-gradient(circle, var(--color-iris) 0%, transparent 70%)"
+                }}
+              />
+            </div>
 
             <div className="relative z-10 flex h-full w-full flex-col justify-between gap-8 sm:flex-row sm:items-end">
               <div className="max-w-xl">

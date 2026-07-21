@@ -33,6 +33,15 @@ const links = [
     ),
   },
   {
+    href: "/admin/badges",
+    label: "Badges",
+    icon: (
+      <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" d="M12 15a4 4 0 100-8 4 4 0 000 8zm-3.5 1.5L7 22l5-2 5 2-1.5-5.5" />
+      </svg>
+    ),
+  },
+  {
     href: "/admin/roster",
     label: "Roster",
     icon: (

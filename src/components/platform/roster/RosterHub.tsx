@@ -192,11 +192,15 @@ export default function RosterHub({ teams, jobListings }: Props) {
         </div>
       )}
 
-      <div className="relative overflow-hidden rounded-[1.75rem] border border-white/[0.07] bg-[#080808] p-6 sm:p-8">
-        <div
-          className="pointer-events-none absolute -right-20 -top-20 h-64 w-64 rounded-full blur-[80px] opacity-30"
-          style={{ background: meta.hex }}
-        />
+      <div className="relative overflow-hidden rounded-[1.75rem] border border-white/[0.07] bg-[#080808] p-6 sm:p-8 isolate [transform:translateZ(0)]">
+        <div className="pointer-events-none absolute inset-0 overflow-hidden rounded-[1.75rem]">
+          <div
+            className="absolute -right-20 -top-20 h-64 w-64 rounded-full opacity-30"
+            style={{
+              background: `radial-gradient(circle, ${meta.hex} 0%, transparent 70%)`
+            }}
+          />
+        </div>
         <div className="pointer-events-none absolute inset-0 bg-gradient-to-r from-[#080808] via-[#080808]/90 to-transparent" />
 
         <div className="relative z-10 flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">

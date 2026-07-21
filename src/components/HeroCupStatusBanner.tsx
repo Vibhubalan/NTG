@@ -46,7 +46,7 @@ function Countdown({ endsAt, prefix }: { endsAt: string; prefix?: string }) {
   if (!timeLeft) return null;
 
   return (
-    <span className="font-mono text-xs opacity-90">
+    <span className="font-mono text-[inherit] opacity-90 whitespace-nowrap">
       {prefix ? `${prefix} ` : ""}({timeLeft})
     </span>
   );
@@ -60,6 +60,7 @@ const phaseStyles: Record<
     border: "border-[var(--color-brand)]/30",
     bg: "bg-[var(--color-brand)]/[0.08]",
     text: "text-[var(--color-brand)]",
+    pulse: true,
   },
   auction_soon: {
     border: "border-[var(--color-magenta)]/30",
@@ -116,20 +117,28 @@ function countdownPrefix(cup: HeroCupStatusClient): string | undefined {
   }
 }
 
-export default function HeroCupStatusBanner({ cup }: { cup: HeroCupStatusClient }) {
+export default function HeroCupStatusBanner({
+  cup,
+  auctionHref,
+}: {
+  cup: HeroCupStatusClient;
+  auctionHref?: string | null;
+}) {
   const style = phaseStyles[cup.phase];
-  const href = `/esports/tournaments/${cup.slug}`;
+  const href = auctionHref ?? `/esports/tournaments/${cup.slug}`;
 
   return (
     <Link
       href={href}
-      className={`group relative inline-flex max-w-full flex-col items-center gap-1 rounded-full border px-6 py-2.5 text-xs font-semibold uppercase tracking-[0.14em] transition-all hover:scale-[1.02] sm:flex-row sm:gap-2.5 sm:tracking-[0.18em] ${style.border} ${style.bg} ${style.text} hover:brightness-110 shadow-[0_0_20px_-5px_rgba(124,58,237,0.15)]`}
+      target={auctionHref ? "_blank" : undefined}
+      rel={auctionHref ? "noopener noreferrer" : undefined}
+      className={`group relative inline-flex max-w-full flex-row items-center gap-1.5 rounded-full border px-3 py-1 text-[8px] font-semibold uppercase tracking-[0.08em] transition-all hover:scale-[1.02] sm:px-6 sm:py-2.5 sm:text-xs sm:gap-2.5 sm:tracking-[0.18em] ${style.border} ${style.bg} ${style.text} hover:brightness-110 shadow-[0_0_20px_-5px_rgba(124,58,237,0.15)]`}
     >
       <span className="inline-flex items-center gap-2">
         {style.pulse ? (
-          <span className="relative flex h-2 w-2 shrink-0">
-            <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-current opacity-75" />
-            <span className="relative inline-flex h-2 w-2 rounded-full bg-current" />
+          <span className="relative flex h-1.5 w-1.5 sm:h-2.5 sm:w-2.5 shrink-0">
+            <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-red-500 opacity-75" />
+            <span className="relative inline-flex h-1.5 w-1.5 sm:h-2.5 sm:w-2.5 rounded-full bg-red-500 shadow-[0_0_8px_#ef4444]" />
           </span>
         ) : null}
         <span className="text-center sm:text-left">{phaseLabel(cup)}</span>

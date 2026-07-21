@@ -7,7 +7,7 @@ import { instagramUrl, showPlansSection, whatsappInquiryUrl } from "@/lib/env";
 
 export default function CtaBanner() {
   return (
-    <section className="mx-auto w-full max-w-6xl px-5 pb-24 [content-visibility:auto] sm:pb-32">
+    <section className="mx-auto w-full max-w-7xl px-5 pb-24 [content-visibility:auto] sm:pb-32">
       <motion.div
         initial={{ opacity: 0, y: 28 }}
         whileInView={{ opacity: 1, y: 0 }}

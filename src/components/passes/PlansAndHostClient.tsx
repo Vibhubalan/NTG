@@ -174,14 +174,14 @@ export default function PlansAndHostClient({ data }: { data: LoungeCommerceHomeD
           whileInView={{ opacity: 1, scale: 1 }}
           viewport={{ once: true }}
           transition={{ duration: 0.5, delay: 0.3 }}
-          className="group relative flex flex-col justify-between overflow-hidden rounded-[24px] border border-[var(--color-iris)]/50 bg-gradient-to-b from-[var(--color-iris)]/10 via-white/[0.02] to-transparent p-6 shadow-[0_0_30px_rgba(124,58,237,0.12)] transition-all duration-500 hover:-translate-y-1 hover:border-[var(--color-iris)] hover:shadow-[0_0_40px_rgba(124,58,237,0.22)] ring-1 ring-[var(--color-iris)]/25 xl:scale-[1.03]"
+          className="group relative flex flex-col justify-between overflow-hidden rounded-[24px] border border-[var(--color-iris)]/50 bg-gradient-to-b from-[var(--color-iris)]/10 via-white/[0.02] to-transparent p-6 shadow-[0_0_30px_rgba(124,58,237,0.12)] transition-all duration-500 hover:-translate-y-1 hover:border-[var(--color-iris)] hover:shadow-[0_0_40px_rgba(124,58,237,0.22)] ring-1 ring-[var(--color-iris)]/25"
         >
           {/* Subtle top edge highlight */}
           <div className="absolute inset-x-0 top-0 h-px w-full bg-gradient-to-r from-transparent via-[var(--color-iris)]/50 to-transparent" />
           
           <div>
-            <div className="flex items-start justify-between mb-6">
-              <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-[var(--color-iris)]/10 ring-1 ring-[var(--color-iris)]/30">
+            <div className="mb-6">
+              <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-[var(--color-iris)]/10 ring-1 ring-[var(--color-iris)]/30 mb-3">
                 <FeaturedIcon />
               </div>
               <span className="rounded-full border border-[var(--color-iris)]/30 bg-[var(--color-iris)]/20 px-2.5 py-1 text-[9px] font-bold uppercase tracking-[0.2em] text-purple-300">
@@ -227,14 +227,14 @@ export default function PlansAndHostClient({ data }: { data: LoungeCommerceHomeD
           whileInView={{ opacity: 1, scale: 1 }}
           viewport={{ once: true }}
           transition={{ duration: 0.5, delay: 0.4 }}
-          className="group relative flex flex-col justify-between overflow-hidden rounded-[24px] border border-amber-500/50 bg-gradient-to-b from-amber-500/12 via-white/[0.02] to-transparent p-6 shadow-[0_0_30px_rgba(245,158,11,0.15)] transition-all duration-500 hover:-translate-y-1 hover:border-amber-400 hover:shadow-[0_0_40px_rgba(245,158,11,0.25)] ring-1 ring-amber-500/25 xl:scale-[1.03]"
+          className="group relative flex flex-col justify-between overflow-hidden rounded-[24px] border border-amber-500/50 bg-gradient-to-b from-amber-500/12 via-white/[0.02] to-transparent p-6 shadow-[0_0_30px_rgba(245,158,11,0.15)] transition-all duration-500 hover:-translate-y-1 hover:border-amber-400 hover:shadow-[0_0_40px_rgba(245,158,11,0.25)] ring-1 ring-amber-500/25"
         >
           {/* Subtle top edge highlight */}
           <div className="absolute inset-x-0 top-0 h-px w-full bg-gradient-to-r from-transparent via-amber-400/50 to-transparent" />
 
           <div>
-            <div className="flex items-start justify-between mb-6">
-              <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-amber-500/10 ring-1 ring-amber-500/30">
+            <div className="mb-6">
+              <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-amber-500/10 ring-1 ring-amber-500/30 mb-3">
                 <CrownIcon />
               </div>
               <span className="rounded-full border border-amber-500/30 bg-amber-500/20 px-2.5 py-1 text-[9px] font-bold uppercase tracking-[0.2em] text-amber-300">
@@ -295,7 +295,7 @@ export default function PlansAndHostClient({ data }: { data: LoungeCommerceHomeD
                 href={whatsappInquiryUrl("Hi NTG Lounge, I'd like to ask about other packs available (5hr, 6hr, group discounts, etc.).")}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="group/btn relative flex w-full items-center justify-center gap-1.5 overflow-hidden rounded-full bg-cyan-500/10 border border-cyan-500/35 px-4 py-3.5 text-[11px] font-bold uppercase tracking-[0.15em] text-cyan-400 transition-all hover:bg-cyan-500 hover:text-black hover:shadow-[0_0_20px_rgba(34,211,238,0.3)]"
+                className="group/btn relative flex w-full max-w-[220px] mx-auto items-center justify-center gap-1.5 overflow-hidden rounded-full bg-cyan-500/10 border border-cyan-500/35 px-4 py-3.5 text-[11px] font-bold uppercase tracking-[0.15em] text-cyan-400 transition-all hover:bg-cyan-500 hover:text-black hover:shadow-[0_0_20px_rgba(34,211,238,0.3)]"
               >
                 <span>Contact Us</span>
                 <svg viewBox="0 0 24 24" className="h-3.5 w-3.5 transition-transform group-hover/btn:translate-x-0.5" fill="currentColor">

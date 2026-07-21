@@ -1,12 +1,50 @@
 import Link from "next/link";
-import { getHeroCupStatus } from "@tournaments-leagues/index";
+import { getHeroCupStatus, getTournamentDetail } from "@tournaments-leagues/index";
+import { resolveEffectivePublicAuction } from "@tournaments-leagues/domain/auction-hero-phase";
 import HeroCupStatusBanner from "@/components/HeroCupStatusBanner";
+import SplitText from "./SplitText";
+import { getSession } from "@core/auth/session";
+import { requireAdmin } from "@core/auth/require-admin";
+import { serverEnv } from "@core/config/env.server";
+import { auctionLink } from "@/lib/auction-link";
+import { prisma } from "@core/database/client";
 
 const heroCtaBase =
-  "inline-flex h-10 w-full cursor-pointer select-none items-center justify-center gap-1.5 whitespace-nowrap rounded-full px-3 text-[10px] font-semibold uppercase tracking-[0.12em] transition-all hover:scale-[1.03] active:scale-[0.98] sm:h-12 sm:gap-2 sm:px-5 sm:text-sm sm:tracking-[0.18em]";
+  "inline-flex h-10 w-auto cursor-pointer select-none items-center justify-center gap-1.5 whitespace-nowrap rounded-full px-3 text-[10px] font-semibold uppercase tracking-[0.12em] transition-all hover:scale-[1.03] active:scale-[0.98] sm:h-12 sm:gap-2 sm:px-5 sm:text-sm sm:tracking-[0.18em]";
+
+// Same gating rules as the tournament detail page's "Enter Live Auction" button
+// (admin.ok, or a registered+eligible user when the admin has made the auction public).
+async function resolveHeroAuctionHref(slug: string): Promise<string | null> {
+  const session = await getSession();
+  const userId = session?.user?.id;
+  const [tournament, admin] = await Promise.all([getTournamentDetail(slug, userId), requireAdmin()]);
+  if (!tournament) return null;
+
+  const [dbRow] = await prisma.$queryRawUnsafe<{ publicAuction: boolean }[]>(
+    'SELECT "publicAuction" FROM "Tournament" WHERE id = $1 LIMIT 1',
+    tournament.id
+  );
+  const publicAuction = resolveEffectivePublicAuction(dbRow?.publicAuction ?? false, tournament);
+
+  const auctionEligible =
+    tournament.registrationFormat === "AUCTION" &&
+    !!userId &&
+    !!serverEnv.auctionUrl &&
+    !!serverEnv.auctionJwtSecret;
+  const showEnterButton = tournament.registrationFormat === "AUCTION" && (admin.ok || (auctionEligible && publicAuction));
+  if (!showEnterButton || !userId) return null;
+
+  const auctionView = admin.ok
+    ? "auctioneer"
+    : tournament.userParticipantRole === "CAPTAIN" || tournament.userParticipantRole === "CO_CAPTAIN"
+      ? "captain"
+      : "observe";
+  return auctionLink(tournament.id, auctionView, userId);
+}
 
 export default async function Hero() {
   const heroCup = await getHeroCupStatus();
+  const auctionHref = heroCup?.phase === "auction_live" ? await resolveHeroAuctionHref(heroCup.slug) : null;
   return (
     <section
       id="top"
@@ -31,71 +69,93 @@ export default async function Hero() {
       {/* Watermark */}
       <span
         aria-hidden
-        className="text-outline pointer-events-none absolute left-1/2 top-[42.7%] sm:top-[48.5%] z-0 -translate-x-1/2 -translate-y-1/2 select-none whitespace-nowrap font-display text-[32vw] font-black leading-none tracking-[-0.06em] sm:text-[26vw] md:text-[24vw]"
+        className="text-outline pointer-events-none absolute left-1/2 top-[42.7%] sm:top-[48.5%] z-0 -translate-x-1/2 -translate-y-1/2 select-none whitespace-nowrap font-display text-[25.6vw] font-black leading-none tracking-[-0.06em] sm:text-[20.8vw] md:text-[19.2vw]"
       >
         NTG
       </span>
 
-      <div className="relative z-10 flex flex-col items-center px-6 text-center">
-        <h1 className="font-display font-semibold uppercase text-white mt-30">
-          <span className="block text-4xl leading-[0.96] tracking-[-0.025em] sm:text-6xl md:text-7xl lg:text-[6rem]">
-            Namma Tulunad
+      {/* Registration Status Banner — shown above watermark on all viewports */}
+      {heroCup ? (
+        <div
+          className="absolute inset-x-0 z-10 -translate-y-full flex flex-col items-center px-6 text-center"
+          style={{ top: "var(--hero-content-bottom-above)" }}
+        >
+          <div className="animate-in fade-in slide-in-from-bottom-1 duration-300">
+            <HeroCupStatusBanner cup={heroCup} auctionHref={auctionHref} />
+          </div>
+        </div>
+      ) : null}
+
+      {/* Heading Container (Centered at Watermark) */}
+      <div className="absolute inset-x-0 top-[42.7%] sm:top-[48.5%] z-10 -translate-y-1/2 flex flex-col items-center px-6 text-center">
+        <h1 className="font-display font-semibold uppercase text-white">
+          <span className="block leading-[0.96] tracking-[-0.025em]" style={{ fontSize: "var(--text-hero)" }}>
+            <SplitText text="Namma Tulunad" delay={0} stagger={25} duration={680} />
           </span>
-          <span className="mt-2 block text-4xl leading-[0.96] tracking-[-0.025em] sm:text-6xl md:text-7xl lg:text-[6rem]">
-            <span className="text-gradient-brand">Gaming</span>
+
+          {/* Line 2 — SplitText with brand gradient, delayed to sequence after line 1 */}
+          <span className="mt-2 block leading-[0.96] tracking-[-0.025em]" style={{ fontSize: "var(--text-hero)" }}>
+            <SplitText text="Gaming" delay={380} stagger={35} duration={680} charClassName="text-gradient-brand" />
           </span>
         </h1>
+      </div>
 
-        <div className="relative top-10 flex flex-col items-center">
-          <p className="max-w-xl text-balance text-base leading-relaxed text-white/55 sm:text-lg">
-            Mangaluru&apos;s premier esports lounge. Premium hardware, electric
-            atmosphere, engineered for the players who set the standard.
-          </p>
+      <div
+        className="absolute inset-x-0 z-10 flex flex-col items-center gap-3 sm:gap-8 px-6 text-center"
+        style={{ top: "var(--hero-content-top)" }}
+      >
+        <p
+          className="leading-relaxed text-white/55"
+          style={{
+            fontSize: "clamp(0.68rem, 2.6vw, 1.3rem)",
+            maxWidth: "clamp(14.4rem, 64vw, 54.4rem)",
+          }}
+        >
+          Mangaluru&apos;s premier esports lounge — premium hardware, electric
+          <span className="hidden sm:inline"><br /></span>
+          <span className="sm:hidden"> </span>
+          atmosphere, engineered for the players who set the standard.
+        </p>
 
-          <div className="mt-10 grid w-full max-w-[19rem] grid-cols-2 gap-2 sm:max-w-md sm:gap-3">
-            <Link
-              href="/listings"
-              className={`cta group relative ${heroCtaBase} hover:brightness-110`}
+        <div className="flex flex-wrap items-center justify-center gap-2 sm:gap-3">
+          <Link
+            href="/listings"
+            className={`cta group relative ${heroCtaBase} hover:brightness-110`}
+            style={{ fontSize: "13px", height: "40px", padding: "0 20px" }}
+          >
+            <span>Opportunities</span>
+            <svg
+              viewBox="0 0 24 24"
+              className="h-3 w-3 shrink-0 transition-transform group-hover:translate-x-0.5 sm:h-4 sm:w-4"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              aria-hidden
             >
-              <span>Opportunities</span>
-              <svg
-                viewBox="0 0 24 24"
-                className="h-3 w-3 shrink-0 transition-transform group-hover:translate-x-0.5 sm:h-4 sm:w-4"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                aria-hidden
-              >
-                <path d="M5 12h14M13 5l7 7-7 7" />
-              </svg>
-            </Link>
-            <Link
-              href="/esports/tournaments"
-              className={`glass group ${heroCtaBase} border border-white/15 text-white/90 hover:border-cyan-400/35 hover:bg-white/[0.08] hover:text-white hover:shadow-[0_0_32px_-10px_rgba(34,211,238,0.4)]`}
+              <path d="M5 12h14M13 5l7 7-7 7" />
+            </svg>
+          </Link>
+          <Link
+            href="/esports/tournaments"
+            className={`glass group ${heroCtaBase} border border-white/15 text-white/90 hover:border-cyan-400/35 hover:bg-white/[0.08] hover:text-white hover:shadow-[0_0_32px_-10px_rgba(34,211,238,0.4)]`}
+            style={{ fontSize: "13px", height: "40px", padding: "0 20px" }}
+          >
+            <span>Tournaments</span>
+            <svg
+              viewBox="0 0 24 24"
+              className="h-3 w-3 shrink-0 text-white/70 transition-transform group-hover:translate-x-0.5 group-hover:text-white sm:h-4 sm:w-4"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              aria-hidden
             >
-              <span>Tournaments</span>
-              <svg
-                viewBox="0 0 24 24"
-                className="h-3 w-3 shrink-0 text-white/70 transition-transform group-hover:translate-x-0.5 group-hover:text-white sm:h-4 sm:w-4"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                aria-hidden
-              >
-                <path d="M5 12h14M13 5l7 7-7 7" />
-              </svg>
-            </Link>
-          </div>
-
-          {heroCup ? (
-            <div className="mt-6 animate-in fade-in slide-in-from-top-1 duration-300">
-              <HeroCupStatusBanner cup={heroCup} />
-            </div>
-          ) : null}
+              <path d="M5 12h14M13 5l7 7-7 7" />
+            </svg>
+          </Link>
         </div>
       </div>
     </section>

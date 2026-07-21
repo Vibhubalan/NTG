@@ -55,7 +55,7 @@ function NavLink({
   const pathname = usePathname();
   const isEsports = label.toLowerCase() === "esports";
   const isLounge = label.toLowerCase() === "lounge";
-  
+
   const handleClick = (e: React.MouseEvent<HTMLAnchorElement>) => {
     if (href.startsWith("/#") || href.startsWith("#")) {
       const hash = href.split("#")[1];
@@ -76,16 +76,15 @@ function NavLink({
 
   if (isEsports || isLounge) {
     textColorClass = active ? "" : "opacity-75 hover:opacity-100 transition-opacity";
-    const gradient = isEsports 
+    const gradient = isEsports
       ? "from-[var(--color-iris)] to-[var(--color-brand)]"
       : "from-emerald-400 to-cyan-400";
     const shadow = isEsports
       ? "drop-shadow-[0_0_8px_rgba(124,58,237,0.3)]"
       : "drop-shadow-[0_0_8px_rgba(52,211,153,0.3)]";
 
-    textSpanClass = `bg-gradient-to-r ${gradient} bg-clip-text text-transparent font-bold ${
-      active ? shadow : ""
-    }`;
+    textSpanClass = `bg-gradient-to-r ${gradient} bg-clip-text text-transparent font-bold ${active ? shadow : ""
+      }`;
   }
 
   const className = `group relative rounded-full px-4 py-2 text-[12px] font-medium uppercase tracking-[0.16em] transition-colors sm:px-5 sm:py-2.5 sm:text-[13px] sm:tracking-[0.18em] flex items-center ${textColorClass}`;
@@ -414,9 +413,8 @@ function MobileMenu({
                   ? pathname === "/qa"
                   : false;
 
-            const rowClass = `flex w-full items-center justify-between px-4 py-4 text-left text-[13px] font-semibold uppercase tracking-[0.2em] transition-colors ${
-              active ? "text-white" : "text-white/70 hover:text-white"
-            }`;
+            const rowClass = `flex w-full items-center justify-between px-4 py-4 text-left text-[13px] font-semibold uppercase tracking-[0.2em] transition-colors ${active ? "text-white" : "text-white/70 hover:text-white"
+              }`;
 
             const isLounge = link.label.toLowerCase() === "lounge";
             const loungeIcon = isLounge && (
@@ -580,9 +578,8 @@ function NavbarContent() {
       }}
     >
       <nav
-        className={`site-nav-shell glass w-full max-w-7xl rounded-2xl px-3 py-2 sm:px-5 sm:py-3 ${
-          hideForIntro ? "pointer-events-none" : "pointer-events-auto"
-        }`}
+        className={`site-nav-shell glass w-full max-w-[var(--container)] rounded-2xl px-3 py-[10px] sm:px-5 sm:py-[16px] ${hideForIntro ? "pointer-events-none" : "pointer-events-auto"
+          }`}
         style={{ transform: "translateZ(0)" }}
       >
         <div className="flex items-center justify-between gap-2 sm:gap-4">
