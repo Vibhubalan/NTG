@@ -168,6 +168,6 @@ export class LeaderboardRepository {
       where: { id: matchId },
       include: { bracket: { include: { tournament: true } } },
     });
-    return match?.bracket.tournament.game ?? null;
+    return match?.bracket?.tournament?.game ?? null;
   }
 }
