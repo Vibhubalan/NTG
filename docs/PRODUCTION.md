@@ -28,22 +28,22 @@ What matters for **NTG Lounge** (single org, Mangaluru) vs enterprise SaaS.
 
 | | Target |
 |--|--------|
-| **RPO** (max data loss) | ~24h — Neon daily backups (verify in Neon dashboard) |
-| **RTO** (time to restore) | ~1–2h — redeploy from main + `db:migrate:deploy` |
-| **Secrets** | Vercel env + local `.env.local`; rotate `AUTH_SECRET` and `CRON_SECRET` if leaked |
+| **RPO** (max data loss) | ~24h — Supabase daily backups (verify in Supabase dashboard → Database → Backups) |
+| **RTO** (time to restore) | ~1–2h — redeploy from main on Render + `db:migrate:deploy` |
+| **Secrets** | Render env + local `.env.local`; rotate `AUTH_SECRET` and `CRON_SECRET` if leaked |
 
-**Recovery steps:** restore Neon backup if needed → deploy last good Vercel build → run migrations → smoke test signup/login/admin/cups.
+**Recovery steps:** restore Supabase backup if needed → deploy last good Render build → run migrations → smoke test signup/login/admin/cups. Neon backup kept during migration window — see `docs/MIGRATION-RENDER-SUPABASE.md`.
 
 ## Before each production deploy
 
 1. `npm test` and `npm run build` locally
 2. `db:migrate:deploy` against prod DATABASE_URL
-3. Mirror env vars on Vercel (see `.env.example`)
-4. Smoke: login, admin, FC26 reg, leaderboard, cron secrets set
+3. Mirror env vars on Render (see `.env.example`)
+4. Smoke: login, admin, FC26 reg, leaderboard, cron secrets set on web service + cron jobs
 
 ## Code review process
 
 1. Feature branch → PR to `main`
 2. CI must pass (lint + unit tests; audit reported)
 3. One human review for auth, payments, or schema changes
-4. Merge → Vercel preview/prod deploy
+4. Merge → Render auto-deploy from `main`

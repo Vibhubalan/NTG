@@ -30,6 +30,7 @@
 .DS_Store
 *.pem
 .commit-msg.txt
+ntg-neon-backup.dump
 
 # debug
 npm-debug.log*

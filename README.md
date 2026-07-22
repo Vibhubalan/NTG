@@ -6,8 +6,8 @@
 
 ```
 Browser
-  → Next.js 16 (App Router) on Vercel
-  → Neon Postgres (Prisma)
+  → Next.js 16 (App Router) on Render
+  → Supabase Postgres (Prisma)
   → S3/R2 uploads · Resend email · Henrik.dev (Valorant ranks)
 ```
 
@@ -47,13 +47,16 @@ Open [http://localhost:3000](http://localhost:3000).
 | `npm run build` | Production build |
 | `npm run db:seed` | Seed cups from static data |
 
-## Deploy (Vercel)
+## Deploy (Render + Supabase)
 
 1. Push to GitHub
-2. Import on Vercel — framework: Next.js
-3. Set env vars from `.env.example` (especially `DATABASE_URL`, `AUTH_SECRET`, `CRON_SECRET`, `ADMIN_EMAILS`)
-4. Run `npm run db:migrate:deploy` against production DB
-5. Smoke: signup, login, admin, cup registration
+2. Render Dashboard → **New → Blueprint** → connect repo (uses `render.yaml`)
+3. Set env vars from `.env.example` on the Render web service (especially `DATABASE_URL`, `DIRECT_URL`, `AUTH_SECRET`, `CRON_SECRET`, `ADMIN_EMAILS`)
+4. Set `SITE_URL` + `CRON_SECRET` on both Render cron jobs
+5. Run `npm run db:migrate:deploy` against Supabase production DB
+6. Smoke: signup, login, admin, cup registration
+
+See `docs/RENDER-DEPLOY.md` for the full Vercel → Render step-by-step. Migrating from Vercel + Neon: `docs/MIGRATION-RENDER-SUPABASE.md`.
 
 See `docs/PRODUCTION.md` for DR checklist and `docs/ADR-001-architecture.md` for decisions.
 
