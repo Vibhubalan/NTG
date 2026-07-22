@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import TournamentDetailView from "@/components/platform/TournamentDetailView";
 import { fetchChallongeBrackets } from "@/lib/challonge-api";
 import { normalizeBracketUrls } from "@/lib/challonge";
+import { syncBracketChampionsToPlacements } from "@/lib/sync-bracket-champions";
 import { getSession } from "@core/auth/session";
 import { requireAdmin } from "@core/auth/require-admin";
 import {
@@ -36,6 +37,11 @@ export default async function TournamentDetailPage({ params }: Props) {
   const brackets = bracketUrls.length
     ? await fetchChallongeBrackets(bracketUrls)
     : [];
+
+  // Persist Challonge winners to DB so cups list shows them without API spam.
+  if (brackets.some((b) => b.bracket?.finalStandings?.length)) {
+    await syncBracketChampionsToPlacements(tournament.id, brackets).catch(() => {});
+  }
 
   const admin = await requireAdmin();
   const registrationPreview = userId

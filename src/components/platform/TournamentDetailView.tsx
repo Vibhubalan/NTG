@@ -1,7 +1,7 @@
 import BrandIcon from "@/components/ui/BrandIcon";
 import StatusBadge from "@/components/platform/ui/StatusBadge";
+import ChallongeEmbed from "@/components/platform/tournament/ChallongeEmbed";
 import TournamentBracket from "@/components/platform/tournament/TournamentBracket";
-import TournamentBracketEmpty from "@/components/platform/tournament/TournamentBracketEmpty";
 import TournamentChampionSection from "@/components/platform/tournament/TournamentChampionSection";
 import TournamentFinalResults from "@/components/platform/tournament/TournamentFinalResults";
 import TournamentScheduleCard from "@/components/platform/tournament/TournamentScheduleCard";
@@ -54,8 +54,15 @@ export default function TournamentDetailView({
     : mvpPlacement?.teamLabel?.trim()
       ? mvpPlacement.displayName
       : null;
+  const loadedBrackets = brackets
+    .map((b) => b.bracket)
+    .filter((b): b is TournamentBracketView => b != null);
   const primaryBracket =
-    brackets.find((b) => b.bracket != null)?.bracket ?? null;
+    [...loadedBrackets].reverse().find((b) =>
+      b.finalStandings.some((s) => s.rank === 1 && s.name?.trim()),
+    ) ??
+    loadedBrackets[0] ??
+    null;
   const mvp = primaryBracket?.mvp ?? adminMvp ?? null;
 
   const fallbackStandings: FinalStandingView[] = [];
@@ -69,6 +76,7 @@ export default function TournamentDetailView({
     primaryBracket,
     tournament.teamDetails,
     tournament.teams,
+    tournament.placements,
   );
 
   const prizeSplit =
@@ -282,7 +290,14 @@ export default function TournamentDetailView({
               {bracket ? (
                 <TournamentBracket bracket={bracket} accentHex={meta.hex} />
               ) : (
-                <TournamentBracketEmpty url={url} />
+                <ChallongeEmbed
+                  url={url}
+                  title={
+                    brackets.length > 1
+                      ? `${tournament.name} — Bracket ${index + 1}`
+                      : `${tournament.name} bracket`
+                  }
+                />
               )}
             </div>
           ))}
