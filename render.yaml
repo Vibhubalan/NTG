@@ -1,0 +1,72 @@
+# Render Blueprint — NTG Lounge (Next.js + Supabase Postgres)
+# Docs: docs/MIGRATION-RENDER-SUPABASE.md
+#
+# Deploy: Render Dashboard → New → Blueprint → connect this repo.
+# Set secret env vars in the dashboard before first deploy (see migration doc).
+
+services:
+  - type: web
+    name: ntg-lounge
+    runtime: node
+    region: singapore
+    plan: starter
+    branch: main
+    buildCommand: npm ci && npm run build
+    startCommand: npm start
+    healthCheckPath: /
+    envVars:
+      - key: NODE_VERSION
+        value: "20"
+      - key: NODE_ENV
+        value: production
+      # --- Required (set in Render dashboard) ---
+      - key: DATABASE_URL
+        sync: false
+      - key: DIRECT_URL
+        sync: false
+      - key: AUTH_SECRET
+        sync: false
+      - key: AUTH_URL
+        sync: false
+      - key: NEXTAUTH_URL
+        sync: false
+      - key: CRON_SECRET
+        sync: false
+      - key: ADMIN_EMAILS
+        sync: false
+      # --- Public site ---
+      - key: NEXT_PUBLIC_SITE_URL
+        sync: false
+      # --- Copy remaining vars from .env.example as needed ---
+
+  # 12:30 AM IST — tournament + tryout status sync (was Vercel cron 0 19 * * * UTC)
+  - type: cron
+    name: ntg-sync-tournament-status
+    runtime: node
+    region: singapore
+    schedule: "0 19 * * *"
+    envVars:
+      - key: CRON_SECRET
+        sync: false
+      - key: SITE_URL
+        sync: false
+    buildCommand: "true"
+    startCommand: >-
+      curl -sfS -H "Authorization: Bearer ${CRON_SECRET}"
+      "${SITE_URL%/}/api/cron/sync-tournament-status"
+
+  # 2:30 AM IST — dispatches GitHub Actions daily leaderboard workflow (was Vercel cron 0 21 * * * UTC)
+  - type: cron
+    name: ntg-trigger-daily-leaderboard
+    runtime: node
+    region: singapore
+    schedule: "0 21 * * *"
+    envVars:
+      - key: CRON_SECRET
+        sync: false
+      - key: SITE_URL
+        sync: false
+    buildCommand: "true"
+    startCommand: >-
+      curl -sfS -H "Authorization: Bearer ${CRON_SECRET}"
+      "${SITE_URL%/}/api/cron/trigger-daily-leaderboard"
