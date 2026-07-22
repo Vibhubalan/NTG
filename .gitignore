@@ -31,6 +31,10 @@
 *.pem
 .commit-msg.txt
 
+# local DB dumps (never commit)
+*.dump
+ntg-neon-backup.dump
+
 # debug
 npm-debug.log*
 yarn-debug.log*
