@@ -2,12 +2,11 @@ import BrandIcon from "@/components/ui/BrandIcon";
 import StatusBadge from "@/components/platform/ui/StatusBadge";
 import TournamentBracket from "@/components/platform/tournament/TournamentBracket";
 import TournamentBracketEmpty from "@/components/platform/tournament/TournamentBracketEmpty";
-import TournamentChampionSection, {
-  resolveChampion,
-} from "@/components/platform/tournament/TournamentChampionSection";
+import TournamentChampionSection from "@/components/platform/tournament/TournamentChampionSection";
 import TournamentFinalResults from "@/components/platform/tournament/TournamentFinalResults";
 import TournamentScheduleCard from "@/components/platform/tournament/TournamentScheduleCard";
 import TournamentTeamsList from "@/components/platform/tournament/TournamentTeamsList";
+import { resolveChampion } from "@/lib/tournament-champion";
 import { gameMetaFor, formatRegistrationLabel, buildTournamentScheduleCardView } from "@/lib/tournament-display";
 import TournamentRegisterForm from "./TournamentRegisterForm";
 import type { RegistrationPreview } from "./TournamentRegisterForm";
