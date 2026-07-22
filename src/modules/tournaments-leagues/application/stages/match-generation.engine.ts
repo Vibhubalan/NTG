@@ -13,8 +13,67 @@ import type {
   StageGenerateContext,
 } from "@tournaments-leagues/domain/stages/types";
 
-/** Matches created per insert request — keep each Vercel invocation short. */
-export const MATCH_INSERT_BATCH = 40;
+/** Matches created per insert request — one at a time to stay under Vercel 60s. */
+export const MATCH_INSERT_BATCH = 1;
+
+const MATCH_GEN_JOB_KEY = "_matchGenJob";
+
+type StoredMatchGenJob = {
+  bracketId: string;
+  generated: GeneratedMatch[];
+  createdAt: number;
+};
+
+function parseConfigRecord(config: unknown): Record<string, unknown> {
+  if (config && typeof config === "object" && !Array.isArray(config)) {
+    return { ...(config as Record<string, unknown>) };
+  }
+  return {};
+}
+
+async function loadMatchGenJob(stageId: string): Promise<StoredMatchGenJob | null> {
+  const stage = await prisma.tournamentStage.findUnique({
+    where: { id: stageId },
+    select: { config: true },
+  });
+  const raw = parseConfigRecord(stage?.config)[MATCH_GEN_JOB_KEY];
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return null;
+  const job = raw as StoredMatchGenJob;
+  if (!job.bracketId || !Array.isArray(job.generated)) return null;
+  return job;
+}
+
+async function saveMatchGenJob(
+  stageId: string,
+  job: StoredMatchGenJob | null,
+): Promise<void> {
+  const stage = await prisma.tournamentStage.findUnique({
+    where: { id: stageId },
+    select: { config: true },
+  });
+  const next = parseConfigRecord(stage?.config);
+  if (job) {
+    next[MATCH_GEN_JOB_KEY] = job;
+  } else {
+    delete next[MATCH_GEN_JOB_KEY];
+  }
+  await prisma.tournamentStage.update({
+    where: { id: stageId },
+    data: { config: next as object },
+  });
+}
+
+async function resolveGeneratedForJob(
+  stageId: string,
+  bracketId: string,
+): Promise<GeneratedMatch[]> {
+  const job = await loadMatchGenJob(stageId);
+  if (job?.bracketId === bracketId && job.generated.length > 0) {
+    return job.generated;
+  }
+  const { generated } = await buildGeneratedMatchesForStage(stageId);
+  return generated;
+}
 
 function newId(): string {
   return `c${randomBytes(12).toString("hex")}`;
@@ -244,6 +303,12 @@ export async function prepareMatchGeneration(stageId: string): Promise<{
     data: { status: "READY" },
   });
 
+  await saveMatchGenJob(stageId, {
+    bracketId: bracket.id,
+    generated,
+    createdAt: Date.now(),
+  });
+
   return {
     jobId: stageId,
     bracketId: bracket.id,
@@ -277,7 +342,7 @@ export async function insertMatchGenerationBatch(
   }
   const bracketId = stage.bracket.id;
 
-  const { generated } = await buildGeneratedMatchesForStage(stageId);
+  const generated = await resolveGeneratedForJob(stageId, bracketId);
   const total = generated.length;
   const safeCursor = Math.max(0, Math.min(cursor, total));
 
@@ -368,7 +433,7 @@ export async function finalizeMatchGeneration(stageId: string): Promise<{
   }
   const bracketId = stage.bracket.id;
 
-  const { generated } = await buildGeneratedMatchesForStage(stageId);
+  const generated = await resolveGeneratedForJob(stageId, bracketId);
   const dbMatches = await prisma.match.findMany({
     where: { bracketId },
     select: {
@@ -408,7 +473,7 @@ export async function finalizeMatchGeneration(stageId: string): Promise<{
     })
     .filter((p): p is NonNullable<typeof p> => p != null);
 
-  const LINK_BATCH = 40;
+  const LINK_BATCH = 8;
   for (let i = 0; i < linkUpdates.length; i += LINK_BATCH) {
     await Promise.all(linkUpdates.slice(i, i + LINK_BATCH));
   }
@@ -432,6 +497,8 @@ export async function finalizeMatchGeneration(stageId: string): Promise<{
     where: { id: stageId },
     data: { status: "LIVE" },
   });
+
+  await saveMatchGenJob(stageId, null);
 
   return { complete: true, matchCount: generated.length };
 }

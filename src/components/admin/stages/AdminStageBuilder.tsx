@@ -154,7 +154,9 @@ export default function AdminStageBuilder({
           ) : null}
           {activeTab === "matches" ? (
             state.matchesLoading && !(selected.matches?.length) ? (
-              <p className="px-1 py-8 text-sm text-white/45">Loading matches…</p>
+              <p className="px-1 py-8 text-sm text-white/45">
+                {state.matchesLoadProgress ?? "Loading matches…"}
+              </p>
             ) : (
             <StageMatchesTab
               slug={slug}

@@ -95,6 +95,7 @@ export {
   finalizeStageMatchGeneration,
   advanceStageAdmin,
   commitStageAndGenerate,
+  commitStageDraftsForGenerate,
   syncAllStages,
   reshuffleStageBracket,
 } from "./application/stages/admin-stage.service";

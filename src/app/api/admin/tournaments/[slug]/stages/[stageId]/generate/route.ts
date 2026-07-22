@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { guardResponse, isAuthedAdmin, requireAdmin } from "@/lib/auth-guard";
 import {
   commitStageAndGenerate,
+  commitStageDraftsForGenerate,
   finalizeStageMatchGeneration,
   insertStageMatchGenerationBatch,
   prepareStageMatchGeneration,
@@ -14,7 +15,7 @@ export const maxDuration = 60;
 type Params = { params: Promise<{ slug: string; stageId: string }> };
 
 type GenerateBody = {
-  phase?: "prepare" | "insert" | "finalize";
+  phase?: "commit" | "prepare" | "insert" | "finalize";
   drafts?: StageCommitDraft[];
   cursor?: number;
 };
@@ -27,6 +28,18 @@ export async function POST(req: Request, { params }: Params) {
   try {
     const body = (await req.json().catch(() => ({}))) as GenerateBody;
     const phase = body.phase ?? "prepare";
+
+    if (phase === "commit") {
+      if (!body.drafts?.length) {
+        return NextResponse.json({ error: "Missing drafts." }, { status: 400 });
+      }
+      const result = await commitStageDraftsForGenerate(
+        slug,
+        stageId,
+        body.drafts,
+      );
+      return NextResponse.json({ ok: true, ...result });
+    }
 
     if (phase === "prepare") {
       if (body.drafts?.length) {

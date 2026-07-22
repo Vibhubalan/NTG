@@ -51,6 +51,9 @@ export function useStageBuilderState(
   );
   const [loading, setLoading] = useState(!initialGraph);
   const [matchesLoading, setMatchesLoading] = useState(false);
+  const [matchesLoadProgress, setMatchesLoadProgress] = useState<string | null>(
+    null,
+  );
   const [busy, setBusy] = useState(false);
   const [dirty, setDirty] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -102,31 +105,54 @@ export function useStageBuilderState(
         }
       }
       setMatchesLoading(true);
+      setMatchesLoadProgress(null);
       setError(null);
       try {
-        const res = await fetch(
-          `/api/admin/tournaments/${slug}/stages/${stageId}/matches`,
-        );
-        const data = await requireApiJson(res);
-        const matches = (data.matches ?? []) as NonNullable<
-          StageNode["matches"]
-        >;
-        const matchCount =
-          typeof data.matchCount === "number" ? data.matchCount : matches.length;
-        setGraph((g) => {
-          if (!g) return g;
-          return {
-            ...g,
-            stages: g.stages.map((s) =>
-              s.id === stageId ? { ...s, matches, matchCount } : s,
-            ),
-          };
-        });
+        const batchLimit = 30;
+        let offset = 0;
+        let matchCount = 0;
+        let allMatches: NonNullable<StageNode["matches"]> = [];
+
+        for (;;) {
+          setMatchesLoadProgress(
+            matchCount > 0
+              ? `Loading matches… ${Math.min(offset, matchCount)}/${matchCount}`
+              : "Loading matches…",
+          );
+          const res = await fetch(
+            `/api/admin/tournaments/${slug}/stages/${stageId}/matches?offset=${offset}&limit=${batchLimit}`,
+          );
+          const data = await requireApiJson(res);
+          const batch = (data.matches ?? []) as NonNullable<
+            StageNode["matches"]
+          >;
+          matchCount =
+            typeof data.matchCount === "number" ? data.matchCount : batch.length;
+          allMatches = [...allMatches, ...batch];
+          offset += batch.length;
+
+          setGraph((g) => {
+            if (!g) return g;
+            return {
+              ...g,
+              stages: g.stages.map((s) =>
+                s.id === stageId
+                  ? { ...s, matches: allMatches, matchCount }
+                  : s,
+              ),
+            };
+          });
+
+          if (!data.hasMore || batch.length === 0) break;
+          await new Promise((r) => setTimeout(r, 150));
+        }
+
         matchesLoadedRef.current.add(stageId);
       } catch (e) {
         setError(e instanceof Error ? e.message : "Failed to load matches");
       } finally {
         setMatchesLoading(false);
+        setMatchesLoadProgress(null);
       }
     },
     [slug],
@@ -619,7 +645,7 @@ export function useStageBuilderState(
     while (true) {
       setGenerateProgress(
         total > 0
-          ? `Creating matches… ${Math.min(cursor, total)}/${total}`
+          ? `Creating match ${Math.min(cursor + 1, total)}/${total}…`
           : "Creating matches…",
       );
       const insertRes = await fetch(
@@ -639,9 +665,10 @@ export function useStageBuilderState(
       total = insertData.total;
       setPendingGenerate({ stageId, cursor, total });
       setGenerateProgress(
-        `Creating matches… ${Math.min(cursor, total)}/${total}`,
+        `Creating match ${Math.min(cursor, total)}/${total}…`,
       );
       if (insertData.complete || cursor >= total) break;
+      await new Promise((r) => setTimeout(r, 200));
     }
 
     setGenerateProgress("Finalizing…");
@@ -662,18 +689,28 @@ export function useStageBuilderState(
   async function generate(stageId: string) {
     setBusy(true);
     setError(null);
-    setGenerateProgress("Preparing…");
+    setGenerateProgress("Saving drafts…");
     setPendingGenerate(null);
     try {
+      const drafts = buildDrafts(graphRef.current);
+      await requireApiJson(
+        await fetch(
+          `/api/admin/tournaments/${slug}/stages/${stageId}/generate`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ phase: "commit", drafts }),
+          },
+        ),
+      );
+
+      setGenerateProgress("Preparing…");
       const prepareRes = await fetch(
         `/api/admin/tournaments/${slug}/stages/${stageId}/generate`,
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            phase: "prepare",
-            drafts: buildDrafts(graphRef.current),
-          }),
+          body: JSON.stringify({ phase: "prepare" }),
         },
       );
       const prepared = (await requireApiJson(prepareRes)) as {
@@ -974,6 +1011,7 @@ export function useStageBuilderState(
     setMatchSchedule,
     loadMatchesForStage,
     matchesLoading,
+    matchesLoadProgress,
     reload: () =>
       selectedId
         ? loadMatchesForStage(selectedId, { force: true })

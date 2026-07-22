@@ -7,14 +7,17 @@ export const maxDuration = 60;
 
 type Params = { params: Promise<{ slug: string; stageId: string }> };
 
-/** Fast path: match payloads for one stage only (Matches tab). */
-export async function GET(_req: Request, { params }: Params) {
+/** Fast path: match payloads for one stage only (Matches tab). Paginated. */
+export async function GET(req: Request, { params }: Params) {
   const auth = await requireAdmin();
   if (!isAuthedAdmin(auth)) return guardResponse(auth)!;
 
   const { slug, stageId } = await params;
+  const { searchParams } = new URL(req.url);
+  const offset = Number(searchParams.get("offset") ?? "0");
+  const limit = Number(searchParams.get("limit") ?? "30");
   try {
-    const result = await getStageMatchesAdmin(slug, stageId);
+    const result = await getStageMatchesAdmin(slug, stageId, { offset, limit });
     return NextResponse.json(result);
   } catch (err) {
     const message = err instanceof Error ? err.message : "Failed to load matches.";

@@ -419,11 +419,17 @@ export async function getStageGraphAdmin(
   return { stages: nodes, validation };
 }
 
-/** Load match payloads for a single stage (Matches tab). */
 export async function getStageMatchesAdmin(
   slug: string,
   stageId: string,
-): Promise<{ matches: MatchRow[]; matchCount: number }> {
+  opts?: { offset?: number; limit?: number },
+): Promise<{
+  matches: MatchRow[];
+  matchCount: number;
+  offset: number;
+  limit: number;
+  hasMore: boolean;
+}> {
   const tournamentId = await resolveTournamentId(slug);
   const stage = await prisma.tournamentStage.findFirst({
     where: { id: stageId, tournamentId },
@@ -431,11 +437,16 @@ export async function getStageMatchesAdmin(
   });
   if (!stage) throw new Error("Stage not found.");
 
+  const offset = Math.max(0, Math.floor(opts?.offset ?? 0));
+  const limit = Math.min(30, Math.max(1, Math.floor(opts?.limit ?? 30)));
+
   const bracket = await prisma.bracket.findUnique({
     where: { stageId },
     select: {
       _count: { select: { matches: true } },
       matches: {
+        skip: offset,
+        take: limit,
         orderBy: [{ roundNumber: "asc" }, { positionInRound: "asc" }],
         select: {
           id: true,
@@ -475,9 +486,13 @@ export async function getStageMatchesAdmin(
   const matches = (bracket?.matches ?? []).map((m) =>
     mapAdminMatch({ ...m, result: m.result ? { ...m.result, games: null } : null }),
   );
+  const matchCount = bracket?._count.matches ?? 0;
   return {
     matches,
-    matchCount: bracket?._count.matches ?? matches.length,
+    matchCount,
+    offset,
+    limit,
+    hasMore: offset + matches.length < matchCount,
   };
 }
 
@@ -1629,23 +1644,14 @@ async function seedStageFromFeeders(
 }
 
 /**
- * Persist buffered stage drafts, seed the target stage, then prepare an empty
- * bracket. Client continues with insert/finalize batches.
- * Seed from PREVIOUS_STAGE runs qualification from ALL earlier stages that
- * point here (not only the immediate previous stage).
+ * Persist buffered stage drafts and seed the target stage (no match insert).
+ * Client should call prepare → insert → finalize separately to avoid timeouts.
  */
-export async function commitStageAndGenerate(
+export async function commitStageDraftsForGenerate(
   slug: string,
   stageId: string,
   drafts: StageCommitDraft[],
-): Promise<{
-  jobId: string;
-  bracketId: string;
-  total: number;
-  cursor: number;
-  complete: false;
-  moved: number;
-}> {
+): Promise<{ moved: number }> {
   const tournamentId = await resolveTournamentId(slug);
   const target = await prisma.tournamentStage.findFirst({
     where: { id: stageId, tournamentId },
@@ -1712,6 +1718,28 @@ export async function commitStageAndGenerate(
     }
   }
 
+  return { moved };
+}
+
+/**
+ * Persist buffered stage drafts, seed the target stage, then prepare an empty
+ * bracket. Client continues with insert/finalize batches.
+ * Seed from PREVIOUS_STAGE runs qualification from ALL earlier stages that
+ * point here (not only the immediate previous stage).
+ */
+export async function commitStageAndGenerate(
+  slug: string,
+  stageId: string,
+  drafts: StageCommitDraft[],
+): Promise<{
+  jobId: string;
+  bracketId: string;
+  total: number;
+  cursor: number;
+  complete: false;
+  moved: number;
+}> {
+  const { moved } = await commitStageDraftsForGenerate(slug, stageId, drafts);
   const prepared = await prepareMatchGeneration(stageId);
   return { ...prepared, moved };
 }
