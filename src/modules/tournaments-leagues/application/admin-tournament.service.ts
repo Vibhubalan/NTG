@@ -16,6 +16,7 @@ import {
   isAuctionCup,
   validateAutoSchedule,
 } from "../domain/tournament-schedule";
+import { bracketUrlsForSave, normalizeBracketUrls } from "@/lib/challonge";
 
 export type CreateTournamentInput = {
   slug: string;
@@ -36,6 +37,7 @@ export type CreateTournamentInput = {
   prizeNotes?: string;
   prizeSplit?: PrizeSplitRow[] | null;
   bracketUrl?: string;
+  bracketUrls?: string[] | null;
   posterUrl?: string;
   rulebookUrl?: string;
   hubBannerUrl?: string;
@@ -67,6 +69,7 @@ export type UpdateTournamentInput = Partial<
   description?: string | null;
   prizeNotes?: string | null;
   bracketUrl?: string | null;
+  bracketUrls?: string[] | null;
   posterUrl?: string | null;
   rulebookUrl?: string | null;
   hubBannerUrl?: string | null;
@@ -201,7 +204,18 @@ export async function createTournament(
       prizePool: input.prizePool ?? null,
       prizeNotes: input.prizeNotes?.trim() || null,
       prizeSplit: prizeSplit ? (prizeSplit as unknown as Prisma.InputJsonValue) : undefined,
-      bracketUrl: input.bracketUrl?.trim() || null,
+      ...(() => {
+        const saved = bracketUrlsForSave(
+          input.bracketUrls ??
+            (input.bracketUrl?.trim() ? [input.bracketUrl.trim()] : []),
+        );
+        return {
+          bracketUrl: saved.bracketUrl,
+          bracketUrls: saved.bracketUrls
+            ? (saved.bracketUrls as unknown as Prisma.InputJsonValue)
+            : Prisma.JsonNull,
+        };
+      })(),
       posterUrl: input.posterUrl?.trim() || null,
       rulebookUrl: input.rulebookUrl?.trim() || null,
       hubBannerUrl: input.hubBannerUrl?.trim() || null,
@@ -244,6 +258,7 @@ export type AdminCupFieldsSnapshot = {
   registrationClosesAt: string | null;
   autoManageStatus: boolean;
   bracketUrl: string | null;
+  bracketUrls: string[];
   rulebookUrl: string | null;
   format: BracketType | null;
   coCaptainSlots: number;
@@ -302,6 +317,10 @@ export function toAdminCupFieldsSnapshot(
     registrationClosesAt: t.registrationClosesAt?.toISOString() ?? null,
     autoManageStatus: t.autoManageStatus,
     bracketUrl: t.bracketUrl,
+    bracketUrls: normalizeBracketUrls({
+      bracketUrl: t.bracketUrl,
+      bracketUrls: (t as { bracketUrls?: unknown }).bracketUrls,
+    }),
     rulebookUrl: t.rulebookUrl,
     format: t.format,
     coCaptainSlots: t.coCaptainSlots,
@@ -372,7 +391,16 @@ export async function updateTournamentFull(
         ? (input.prizeSplit as unknown as Prisma.InputJsonValue)
         : Prisma.JsonNull;
   }
-  if (input.bracketUrl !== undefined) data.bracketUrl = input.bracketUrl?.trim() || null;
+  if (input.bracketUrl !== undefined || input.bracketUrls !== undefined) {
+    const saved = bracketUrlsForSave(
+      input.bracketUrls ??
+        (input.bracketUrl?.trim() ? [input.bracketUrl.trim()] : []),
+    );
+    data.bracketUrl = saved.bracketUrl;
+    data.bracketUrls = saved.bracketUrls
+      ? (saved.bracketUrls as unknown as Prisma.InputJsonValue)
+      : Prisma.JsonNull;
+  }
   if (input.posterUrl !== undefined) data.posterUrl = input.posterUrl?.trim() || null;
   if (input.rulebookUrl !== undefined) data.rulebookUrl = input.rulebookUrl?.trim() || null;
   if (input.hubBannerUrl !== undefined) data.hubBannerUrl = input.hubBannerUrl?.trim() || null;

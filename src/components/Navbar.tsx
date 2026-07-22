@@ -10,7 +10,7 @@ import { createPortal } from "react-dom";
 const marketingLinksBase = [
   { label: "Arena", href: "/#arena" },
   { label: "Games", href: "/#games" },
-  { label: "Trophies", href: "/#vault" },
+  { label: "Competitive", href: "/esports/leaderboard" },
   { label: "Esports", href: "/esports" },
   { label: "Visit", href: "/#visit" },
 ];
@@ -391,7 +391,7 @@ function MobileMenu({
         aria-label="Close menu"
         onClick={onClose}
       />
-      <div className="absolute inset-x-0 top-0 max-h-[100dvh] overflow-y-auto border-b border-white/10 bg-[#0a0a0a] shadow-2xl">
+      <div className="absolute inset-x-0 bottom-0 max-h-[85dvh] overflow-y-auto border-t border-white/10 bg-[#0a0a0a] shadow-2xl">
         <div className="flex items-center justify-between border-b border-white/[0.06] px-5 py-4">
           <span className="text-[11px] font-bold uppercase tracking-[0.28em] text-white/50">Menu</span>
           <button

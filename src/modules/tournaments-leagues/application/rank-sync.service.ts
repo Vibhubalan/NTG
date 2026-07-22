@@ -123,7 +123,7 @@ const SYNC_RETRY_ATTEMPTS = 3;
 const SYNC_RETRY_BASE_MS = 1_500;
 
 export type MmrSnapshot = {
-  mmr: number;
+  mmr: number | null;
   rankTier: string;
   rankTierId: number;
   gameName?: string;
@@ -167,7 +167,6 @@ function parseV3MmrBody(body: HenrikV3MmrResponse): HenrikMmrParseResult | null 
   const mmr =
     current.elo ??
     (typeof current.rr === "number" ? estimateEloFromTier(tierId, current.rr) : null);
-  if (mmr == null) return null;
 
   return {
     kind: "ranked",
@@ -316,14 +315,24 @@ export async function fetchHenrikV2Lifetime(
 function currentActIsUnranked(bundle: HenrikV2MmrBundle | null): boolean {
   if (!bundle?.currentActSeason) return false;
   const stats = getActSeasonStats(bundle.bySeason, bundle.currentActSeason);
+  // Missing season row ≠ confirmed unranked — keep v3 current rank.
+  if (!stats) return false;
   return !isActSeasonRanked(stats);
 }
 
 function lifetimeDbFields(lifetime: HenrikLifetimeRankMeta | null): {
   currentAct?: string | null;
+  peakRankTier?: string | null;
+  peakRankTierId?: number | null;
+  peakAct?: string | null;
 } {
   if (!lifetime) return {};
-  return { currentAct: lifetime.currentAct };
+  return {
+    currentAct: lifetime.currentAct,
+    peakRankTier: lifetime.peakRankTier,
+    peakRankTierId: lifetime.peakRankTierId,
+    peakAct: lifetime.peakAct,
+  };
 }
 
 export async function fetchCompetitiveMmr(

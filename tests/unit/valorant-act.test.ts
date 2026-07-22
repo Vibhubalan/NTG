@@ -48,6 +48,15 @@ describe("isActSeasonRanked", () => {
       }),
     ).toBe(true);
   });
+
+  it("is true when patched tier exists even if games count is missing", () => {
+    expect(
+      isActSeasonRanked({
+        final_rank_patched: "Platinum 1",
+        final_rank: 15,
+      }),
+    ).toBe(true);
+  });
 });
 
 describe("getActSeasonStats", () => {

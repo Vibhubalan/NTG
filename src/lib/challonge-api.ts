@@ -277,12 +277,23 @@ function normalizeResponse(url: string, data: ChallongeResponse): TournamentBrac
   };
 }
 
+/** Next fetch cache — cup detail only; keep warm to stay under Challonge quota. */
+const FETCH_REVALIDATE_SEC = 600;
+const COOLDOWN_429_MS = 15 * 60_000;
+
+let rateLimitedUntil = 0;
+let logged429 = false;
+
 export async function fetchChallongeBracket(
   bracketUrl: string,
 ): Promise<TournamentBracketView | null> {
   const slug = challongeSlugFromUrl(bracketUrl);
   const apiKey = process.env.CHALLONGE_API_KEY;
   if (!slug || !apiKey) return null;
+
+  if (Date.now() < rateLimitedUntil) {
+    return null;
+  }
 
   const params = new URLSearchParams({
     api_key: apiKey,
@@ -293,11 +304,24 @@ export async function fetchChallongeBracket(
   try {
     const res = await fetch(
       `https://api.challonge.com/v1/tournaments/${encodeURIComponent(slug)}.json?${params}`,
-      { next: { revalidate: 120 } },
+      { next: { revalidate: FETCH_REVALIDATE_SEC } },
     );
 
+    if (res.status === 429) {
+      rateLimitedUntil = Date.now() + COOLDOWN_429_MS;
+      if (!logged429) {
+        logged429 = true;
+        console.warn(
+          `[challonge] rate limited (429) — cooling down ${COOLDOWN_429_MS / 1000}s`,
+        );
+      }
+      return null;
+    }
+
     if (!res.ok) {
-      console.error(`[challonge] ${slug} HTTP ${res.status}`);
+      if (res.status !== 404) {
+        console.warn(`[challonge] ${slug} HTTP ${res.status}`);
+      }
       return null;
     }
 
@@ -309,7 +333,18 @@ export async function fetchChallongeBracket(
 
     return normalizeResponse(bracketUrl, data);
   } catch (error) {
-    console.error("[challonge] fetch failed:", error);
+    console.warn("[challonge] fetch failed:", error);
     return null;
   }
+}
+
+/** Fetch several brackets sequentially (cup detail page only). */
+export async function fetchChallongeBrackets(
+  urls: string[],
+): Promise<{ url: string; bracket: TournamentBracketView | null }[]> {
+  const results: { url: string; bracket: TournamentBracketView | null }[] = [];
+  for (const url of urls) {
+    results.push({ url, bracket: await fetchChallongeBracket(url) });
+  }
+  return results;
 }

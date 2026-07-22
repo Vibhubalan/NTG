@@ -244,8 +244,8 @@ export async function syncValorantRankSnapshots(
   await prisma.tournamentRegistration.updateMany({
     where: { userId, tournament: { game: "VALORANT" } },
     data: {
-      snapshotRankTier: current.tier,
-      snapshotRankTierId: current.tierId,
+      snapshotRankTier: effective.tier,
+      snapshotRankTierId: effective.tierId,
       ...(peak
         ? { snapshotPeakRankTier: peak.tier, snapshotPeakRankTierId: peak.tierId }
         : {}),
@@ -255,8 +255,8 @@ export async function syncValorantRankSnapshots(
   await prisma.listingApplication.updateMany({
     where: { userId, listing: { gameKey: "valorant" } },
     data: {
-      snapshotRankTier: current.tier,
-      snapshotRankTierId: current.tierId,
+      snapshotRankTier: effective.tier,
+      snapshotRankTierId: effective.tierId,
     },
   });
 }

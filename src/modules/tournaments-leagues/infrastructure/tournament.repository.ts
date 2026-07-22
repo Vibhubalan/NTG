@@ -2,6 +2,7 @@ import { prisma } from "@core/database/client";
 import type { TournamentDetail, PrizeSplitRow, TournamentTeamPlayerView, TournamentTeamView } from "@core/contracts";
 import type { GameSlug, TournamentFormat, TournamentStatus } from "@prisma/client";
 import { gameMetaFor } from "@/lib/tournament-display";
+import { normalizeBracketUrls } from "@/lib/challonge";
 import { syncRegistrationStatus } from "../application/admin-tournament.service";
 import { isTournamentRegistrationLive } from "../domain/registration-window";
 
@@ -293,7 +294,16 @@ export class TournamentRepository {
       registrationClosesAt: t.registrationClosesAt?.toISOString() ?? null,
       auctionStartsAt: t.auctionStartsAt?.toISOString() ?? null,
       auctionEndsAt: t.auctionEndsAt?.toISOString() ?? null,
-      bracketUrl: t.bracketUrl ?? null,
+      ...(() => {
+        const urls = normalizeBracketUrls({
+          bracketUrl: t.bracketUrl,
+          bracketUrls: (t as { bracketUrls?: unknown }).bracketUrls,
+        });
+        return {
+          bracketUrl: urls[0] ?? null,
+          bracketUrls: urls,
+        };
+      })(),
       rulebookUrl: t.rulebookUrl ?? null,
       teams,
       teamDetails,
@@ -383,6 +393,7 @@ export class TournamentRepository {
     registrationUrl: string | null;
     format: string | null;
     bracketUrl: string | null;
+    bracketUrls?: unknown;
     placements?: {
       role: string;
       teamLabel: string | null;
@@ -396,6 +407,11 @@ export class TournamentRepository {
     const championName = champ
       ? (champ.user?.playerProfile?.displayName ?? champ.user?.name ?? champ.teamLabel ?? null)
       : null;
+
+    const urls = normalizeBracketUrls({
+      bracketUrl: t.bracketUrl,
+      bracketUrls: t.bracketUrls,
+    });
 
     return {
       id: t.id,
@@ -412,7 +428,8 @@ export class TournamentRepository {
       auctionStartsAt: t.auctionStartsAt?.toISOString() ?? null,
       registrationUrl: t.registrationUrl,
       championName,
-      bracketUrl: t.bracketUrl,
+      bracketUrl: urls[0] ?? t.bracketUrl ?? null,
+      bracketUrls: urls,
     };
   }
 }

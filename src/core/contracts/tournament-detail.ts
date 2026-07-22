@@ -42,6 +42,8 @@ export type TournamentDetail = {
   auctionStartsAt: string | null;
   auctionEndsAt: string | null;
   bracketUrl: string | null;
+  /** All Challonge bracket links for this cup (includes bracketUrl as first). */
+  bracketUrls: string[];
   rulebookUrl: string | null;
   teams: string[];
   teamDetails: TournamentTeamView[];

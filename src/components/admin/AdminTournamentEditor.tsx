@@ -87,6 +87,7 @@ type TournamentData = {
   autoManageStatus: boolean;
   hideAfter: string | null;
   bracketUrl: string | null;
+  bracketUrls: string[];
   rulebookUrl: string | null;
   publicAuction?: boolean;
   tournamentTeams: Team[];
@@ -172,7 +173,8 @@ function getSavePayload(form: TournamentData) {
     endsAt: form.endsAt || null,
     registrationOpensAt: form.registrationOpensAt || null,
     autoManageStatus: form.autoManageStatus,
-    bracketUrl: emptyToNull(form.bracketUrl),
+    bracketUrl: emptyToNull(form.bracketUrls.find((u) => u.trim()) ?? form.bracketUrl),
+    bracketUrls: form.bracketUrls.map((u) => u.trim()).filter(Boolean),
     rulebookUrl: emptyToNull(form.rulebookUrl),
     registrationFormat: SUPPORTS_FORMAT.includes(form.game) ? form.registrationFormat : null,
     format: form.format || null,
@@ -221,7 +223,20 @@ export default function AdminTournamentEditor({
   const router = useRouter();
   const { openDeleteConfirm, DeleteConfirmDialog } = useAdminDeleteConfirm();
 
-  const initialFormState: TournamentData = useMemo(() => ({ ...initial, seasonId: null }), [initial]);
+  const initialFormState: TournamentData = useMemo(() => {
+    const urls =
+      initial.bracketUrls?.length
+        ? initial.bracketUrls
+        : initial.bracketUrl
+          ? [initial.bracketUrl]
+          : [""];
+    return {
+      ...initial,
+      seasonId: null,
+      bracketUrls: urls.length ? urls : [""],
+      bracketUrl: urls[0] ?? null,
+    };
+  }, [initial]);
 
   const [form, setForm] = useState<TournamentData>(initialFormState);
   const [listVersion, setListVersion] = useState(0);
@@ -577,7 +592,8 @@ export default function AdminTournamentEditor({
           registrationOpensAt: form.registrationOpensAt || null,
           autoManageStatus: form.autoManageStatus,
           hideAfter: null,
-          bracketUrl: emptyToNull(form.bracketUrl),
+          bracketUrl: emptyToNull(form.bracketUrls.find((u) => u.trim()) ?? form.bracketUrl),
+          bracketUrls: form.bracketUrls.map((u) => u.trim()).filter(Boolean),
           rulebookUrl: emptyToNull(form.rulebookUrl),
           registrationFormat: SUPPORTS_FORMAT.includes(form.game) ? form.registrationFormat : null,
           format: form.format || null,
@@ -1075,6 +1091,8 @@ export default function AdminTournamentEditor({
                     <option value="DRAFT" className="bg-[#0a1020]">Draft (admin only, hidden from cups list badge)</option>
                     <option value="UPCOMING" className="bg-[#0a1020]">Upcoming (announced, registration not open)</option>
                     <option value="REGISTRATION_OPEN" className="bg-[#0a1020]">Registration Open</option>
+                    <option value="AUCTION_LIVE" className="bg-[#0a1020]">Auction Live</option>
+                    <option value="AUCTION_COMPLETED" className="bg-[#0a1020]">Auction Completed (draft / post-auction)</option>
                     <option value="IN_PROGRESS" className="bg-[#0a1020]">Live (Ongoing)</option>
                     <option value="COMPLETED" className="bg-[#0a1020]">Completed</option>
                     <option value="CANCELLED" className="bg-[#0a1020]">Cancelled</option>
@@ -1650,16 +1668,66 @@ export default function AdminTournamentEditor({
               viewHref={cupUrl}
             >
               <div className="space-y-4">
-                <div className="space-y-1">
-                  <label className="text-[10px] font-bold uppercase tracking-wider text-white/40">Challonge URL Link</label>
-                  <input
-                    className={inputClass}
-                    value={form.bracketUrl ?? ""}
-                    onChange={(e) => setForm({ ...form, bracketUrl: e.target.value || null })}
-                    placeholder="e.g. https://challonge.com/jyln1rx4"
-                  />
+                <div className="space-y-2">
+                  <label className="text-[10px] font-bold uppercase tracking-wider text-white/40">
+                    Challonge URL Links
+                  </label>
+                  {(form.bracketUrls.length ? form.bracketUrls : [""]).map(
+                    (url, index) => (
+                      <div key={index} className="flex gap-2">
+                        <input
+                          className={inputClass}
+                          value={url}
+                          onChange={(e) => {
+                            const next = [...form.bracketUrls];
+                            if (next.length === 0) next.push("");
+                            next[index] = e.target.value;
+                            setForm({
+                              ...form,
+                              bracketUrls: next,
+                              bracketUrl: next.find((u) => u.trim()) || null,
+                            });
+                          }}
+                          placeholder="e.g. https://challonge.com/jyln1rx4"
+                        />
+                        {form.bracketUrls.length > 1 ? (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const next = form.bracketUrls.filter(
+                                (_, i) => i !== index,
+                              );
+                              setForm({
+                                ...form,
+                                bracketUrls: next.length ? next : [""],
+                                bracketUrl:
+                                  next.find((u) => u.trim()) || null,
+                              });
+                            }}
+                            className="shrink-0 rounded-xl border border-white/10 px-3 text-xs text-rose-300/80 hover:bg-rose-500/10"
+                            aria-label="Remove bracket link"
+                          >
+                            ✕
+                          </button>
+                        ) : null}
+                      </div>
+                    ),
+                  )}
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setForm({
+                        ...form,
+                        bracketUrls: [...(form.bracketUrls.length ? form.bracketUrls : [""]), ""],
+                      })
+                    }
+                    className="rounded-xl border border-dashed border-white/15 px-4 py-2.5 text-xs font-semibold uppercase tracking-wider text-white/55 hover:border-white/30 hover:text-white/80"
+                  >
+                    + Add Challonge link
+                  </button>
                   <p className="text-[10px] text-white/30 italic">
-                    Winner and runner-up are loaded from this bracket. Links are verified and normalized automatically.
+                    Challonge is loaded only on this cup&apos;s public page (not homepage/lists).
+                    Add one link per bracket stage if needed.
                   </p>
                 </div>
 

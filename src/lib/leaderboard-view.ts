@@ -4,6 +4,7 @@ import {
   compareValorantBoardEntries,
   effectiveBoardMmr,
 } from "@/lib/leaderboard-sort";
+import { isValorantRanked } from "@/lib/valorant-registration-rank";
 
 export type LeaderboardViewEntry = LeaderboardPreviewEntry & {
   /** Display position 1..n (unique, by current MMR descending). */
@@ -16,7 +17,7 @@ export type LeaderboardViewEntry = LeaderboardPreviewEntry & {
 function currentViewFields(
   entry: LeaderboardPreviewEntry,
 ): Pick<LeaderboardViewEntry, "viewMmr" | "viewRankTier" | "viewRankTierId"> {
-  const ranked = entry.mmr != null;
+  const ranked = isValorantRanked(entry.rankTierId, entry.rankTier);
   return {
     viewMmr: entry.mmr,
     viewRankTier: ranked ? entry.rankTier : null,

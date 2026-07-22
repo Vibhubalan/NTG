@@ -9,7 +9,14 @@ export type TournamentDisplay = {
   game: string;
   format: string;
   date: string;
-  status: "Hosted" | "Soon" | "Live" | "Open" | "Upcoming";
+  status:
+    | "Hosted"
+    | "Soon"
+    | "Live"
+    | "Open"
+    | "Upcoming"
+    | "Auction Live"
+    | "Auction Completed";
   iconPath: string;
   hex: string;
   championName?: string | null;
@@ -57,6 +64,10 @@ function mapDisplayStatus(status: TournamentStatus): TournamentDisplay["status"]
       return "Open";
     case "UPCOMING":
       return "Upcoming";
+    case "AUCTION_LIVE":
+      return "Auction Live";
+    case "AUCTION_COMPLETED":
+      return "Auction Completed";
     case "DRAFT":
     default:
       return "Soon";

@@ -24,6 +24,7 @@ function minimalDetail(overrides: Partial<TournamentDetail> = {}): TournamentDet
     auctionEndsAt: null,
     autoManageStatus: false,
     bracketUrl: null,
+    bracketUrls: [],
     rulebookUrl: null,
     teams: [],
     teamDetails: [],

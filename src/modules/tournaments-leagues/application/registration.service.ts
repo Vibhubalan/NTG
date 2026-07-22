@@ -1762,8 +1762,8 @@ export async function getValorantRegistrationProfileCard(
     tierId: currentEntry?.rankTierId ?? null,
   };
   const peak: ValorantRankSnapshot = {
-    tier: registration.snapshotPeakRankTier,
-    tierId: registration.snapshotPeakRankTierId,
+    tier: registration.snapshotPeakRankTier ?? currentEntry?.peakRankTier ?? null,
+    tierId: registration.snapshotPeakRankTierId ?? currentEntry?.peakRankTierId ?? null,
   };
   const auction = resolveAuctionDisplayRank(current, peak);
   const roles = Array.isArray(registration.snapshotValorantRoles)

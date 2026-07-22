@@ -2,6 +2,9 @@ import BrandIcon from "@/components/ui/BrandIcon";
 import StatusBadge from "@/components/platform/ui/StatusBadge";
 import TournamentBracket from "@/components/platform/tournament/TournamentBracket";
 import TournamentBracketEmpty from "@/components/platform/tournament/TournamentBracketEmpty";
+import TournamentChampionSection, {
+  resolveChampion,
+} from "@/components/platform/tournament/TournamentChampionSection";
 import TournamentFinalResults from "@/components/platform/tournament/TournamentFinalResults";
 import TournamentScheduleCard from "@/components/platform/tournament/TournamentScheduleCard";
 import TournamentTeamsList from "@/components/platform/tournament/TournamentTeamsList";
@@ -14,7 +17,7 @@ import type { TournamentBracketView, FinalStandingView } from "@core/contracts/t
 
 type Props = {
   tournament: TournamentDetail;
-  bracket: TournamentBracketView | null;
+  brackets: { url: string; bracket: TournamentBracketView | null }[];
   isLoggedIn: boolean;
   registrationPreview?: RegistrationPreview | null;
   registrationProfileCard?: ValorantRegistrationProfileCard | null;
@@ -24,7 +27,7 @@ type Props = {
 
 export default function TournamentDetailView({
   tournament,
-  bracket,
+  brackets,
   isLoggedIn,
   registrationPreview,
   registrationProfileCard,
@@ -32,6 +35,7 @@ export default function TournamentDetailView({
   auctionEnded,
 }: Props) {
   const meta = gameMetaFor(tournament.game);
+  const showBracket = brackets.length > 0;
   const dateStr = tournament.startsAt
     ? new Date(tournament.startsAt).toLocaleDateString("en-IN", {
         day: "numeric",
@@ -51,14 +55,22 @@ export default function TournamentDetailView({
     : mvpPlacement?.teamLabel?.trim()
       ? mvpPlacement.displayName
       : null;
-  const mvp = bracket?.mvp ?? adminMvp ?? null;
+  const primaryBracket =
+    brackets.find((b) => b.bracket != null)?.bracket ?? null;
+  const mvp = primaryBracket?.mvp ?? adminMvp ?? null;
 
   const fallbackStandings: FinalStandingView[] = [];
 
   const standings =
-    bracket?.finalStandings && bracket.finalStandings.length > 0
-      ? bracket.finalStandings.filter((s) => s.rank === 1 || s.rank === 2)
+    primaryBracket?.finalStandings && primaryBracket.finalStandings.length > 0
+      ? primaryBracket.finalStandings.filter((s) => s.rank === 1 || s.rank === 2)
       : fallbackStandings;
+
+  const championData = resolveChampion(
+    primaryBracket,
+    tournament.teamDetails,
+    tournament.teams,
+  );
 
   const prizeSplit =
     tournament.prizeSplit && tournament.prizeSplit.length > 0
@@ -71,8 +83,9 @@ export default function TournamentDetailView({
           ]
         : [];
 
-  const showFinalResults = standings.length > 0 || Boolean(mvp);
-  const showBracket = Boolean(tournament.bracketUrl);
+  const showChampion = Boolean(championData);
+  const showFinalResults = !showChampion && (standings.length > 0 || Boolean(mvp));
+  const showMvpOnly = showChampion && Boolean(mvp);
   const showTeams =
     tournament.teams.length > 0 ||
     tournament.teamDetails.length > 0 ||
@@ -138,6 +151,18 @@ export default function TournamentDetailView({
 
       <div className="grid gap-12 lg:grid-cols-[1fr_24rem] lg:items-start">
         <div className="order-1 space-y-16 lg:col-start-1 lg:row-start-1">
+          {showChampion && championData ? (
+            <TournamentChampionSection
+              championData={championData}
+              game={tournament.game}
+              accentHex={meta.hex}
+            />
+          ) : null}
+
+          {showMvpOnly ? (
+            <TournamentFinalResults standings={[]} mvp={mvp} />
+          ) : null}
+
           {showFinalResults ? (
             <TournamentFinalResults
               standings={standings}
@@ -244,20 +269,24 @@ export default function TournamentDetailView({
         ) : null}
       </div>
 
-      {showBracket && tournament.bracketUrl ? (
-        <section className="mt-16">
-          <div className="mb-6 flex items-center gap-3">
-            <div className="h-px w-8 bg-gradient-to-r from-transparent to-rose-500" />
-            <h2 className="font-display text-2xl font-bold uppercase tracking-widest text-white">
-              Bracket
-            </h2>
-            <div className="h-px flex-1 bg-gradient-to-r from-rose-500 to-transparent opacity-30" />
-          </div>
-          {bracket ? (
-            <TournamentBracket bracket={bracket} accentHex={meta.hex} />
-          ) : (
-            <TournamentBracketEmpty url={tournament.bracketUrl} />
-          )}
+      {showBracket ? (
+        <section className="mt-16 space-y-12">
+          {brackets.map(({ url, bracket }, index) => (
+            <div key={url}>
+              <div className="mb-6 flex items-center gap-3">
+                <div className="h-px w-8 bg-gradient-to-r from-transparent to-rose-500" />
+                <h2 className="font-display text-2xl font-bold uppercase tracking-widest text-white">
+                  {brackets.length > 1 ? `Bracket ${index + 1}` : "Bracket"}
+                </h2>
+                <div className="h-px flex-1 bg-gradient-to-r from-rose-500 to-transparent opacity-30" />
+              </div>
+              {bracket ? (
+                <TournamentBracket bracket={bracket} accentHex={meta.hex} />
+              ) : (
+                <TournamentBracketEmpty url={url} />
+              )}
+            </div>
+          ))}
         </section>
       ) : null}
     </article>

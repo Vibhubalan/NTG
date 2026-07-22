@@ -16,6 +16,7 @@ export type TournamentPreview = {
   registrationUrl: string | null;
   championName?: string | null;
   bracketUrl?: string | null;
+  bracketUrls?: string[];
 };
 
 export type TournamentRegistrationBanner = {

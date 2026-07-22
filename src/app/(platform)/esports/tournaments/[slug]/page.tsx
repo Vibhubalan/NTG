@@ -1,9 +1,14 @@
 import { notFound } from "next/navigation";
 import TournamentDetailView from "@/components/platform/TournamentDetailView";
-import { fetchChallongeBracket } from "@/lib/challonge-api";
+import { fetchChallongeBrackets } from "@/lib/challonge-api";
+import { normalizeBracketUrls } from "@/lib/challonge";
 import { getSession } from "@core/auth/session";
 import { requireAdmin } from "@core/auth/require-admin";
-import { getTournamentDetail, getRegistrationEligibility, getValorantRegistrationProfileCard } from "@tournaments-leagues/index";
+import {
+  getTournamentDetail,
+  getRegistrationEligibility,
+  getValorantRegistrationProfileCard,
+} from "@tournaments-leagues/index";
 import { serverEnv } from "@core/config/env.server";
 import { auctionLink } from "@/lib/auction-link";
 import { prisma } from "@core/database/client";
@@ -24,9 +29,13 @@ export default async function TournamentDetailPage({ params }: Props) {
   const raw = await getTournamentDetail(slug, userId);
   if (!raw) notFound();
   const tournament = raw;
-  const bracket = tournament.bracketUrl
-    ? await fetchChallongeBracket(tournament.bracketUrl)
-    : null;
+  const bracketUrls = normalizeBracketUrls({
+    bracketUrl: tournament.bracketUrl,
+    bracketUrls: tournament.bracketUrls,
+  });
+  const brackets = bracketUrls.length
+    ? await fetchChallongeBrackets(bracketUrls)
+    : [];
 
   const admin = await requireAdmin();
   const registrationPreview = userId
@@ -37,17 +46,19 @@ export default async function TournamentDetailPage({ params }: Props) {
       ? await getValorantRegistrationProfileCard(slug, userId)
       : null;
 
-  // Fetch public status of the auction from the database
   const [dbRow] = await prisma.$queryRawUnsafe<{ publicAuction: boolean }[]>(
     'SELECT "publicAuction" FROM "Tournament" WHERE id = $1 LIMIT 1',
-    tournament.id
+    tournament.id,
   );
-  const publicAuction = resolveEffectivePublicAuction(dbRow?.publicAuction ?? false, tournament);
+  const publicAuction = resolveEffectivePublicAuction(
+    dbRow?.publicAuction ?? false,
+    tournament,
+  );
 
-  // Auction handoff: routes the user to the right screen; the auction app re-checks access server-side.
   const auctionView = admin.ok
     ? "auctioneer"
-    : tournament.userParticipantRole === "CAPTAIN" || tournament.userParticipantRole === "CO_CAPTAIN"
+    : tournament.userParticipantRole === "CAPTAIN" ||
+        tournament.userParticipantRole === "CO_CAPTAIN"
       ? "captain"
       : "observe";
   const auctionEligible =
@@ -55,21 +66,21 @@ export default async function TournamentDetailPage({ params }: Props) {
     !!userId &&
     !!serverEnv.auctionUrl &&
     !!serverEnv.auctionJwtSecret;
-  // Admins can always enter, but only for tournaments that are actually auction-format.
-  // Any logged-in main-site account sees the button if publicAuction is enabled by the
-  // admin — they don't need to be registered for this specific tournament, since the
-  // auction app grants them observer access regardless (only captains/admins get controls).
-  const showEnterButton = tournament.registrationFormat === "AUCTION" && (admin.ok || (auctionEligible && publicAuction));
-  const auctionHref = (showEnterButton && userId)
-    ? auctionLink(tournament.id, auctionView, userId)
-    : null;
-  const auctionEnded = auctionEligible && !admin.ok && tournament.status === "COMPLETED";
+  const showEnterButton =
+    tournament.registrationFormat === "AUCTION" &&
+    (admin.ok || (auctionEligible && publicAuction));
+  const auctionHref =
+    showEnterButton && userId
+      ? auctionLink(tournament.id, auctionView, userId)
+      : null;
+  const auctionEnded =
+    auctionEligible && !admin.ok && tournament.status === "COMPLETED";
 
   return (
     <>
       <TournamentDetailView
         tournament={tournament}
-        bracket={bracket}
+        brackets={brackets}
         isLoggedIn={!!userId}
         registrationPreview={registrationPreview}
         registrationProfileCard={registrationProfileCard}

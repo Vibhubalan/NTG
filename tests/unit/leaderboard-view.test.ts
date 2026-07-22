@@ -35,4 +35,17 @@ describe("buildLeaderboardView", () => {
     expect(view.map((e) => e.displayName)).toEqual(["Vachan", "Shanks", "Conor"]);
     expect(view.every((e) => e.viewMmr == null)).toBe(true);
   });
+
+  it("shows tier when ranked even if MMR is missing", () => {
+    const view = buildLeaderboardView([
+      base({
+        displayName: "Ghost",
+        mmr: null,
+        rankTier: "Diamond 2",
+        rankTierId: 19,
+      }),
+    ]);
+    expect(view[0]?.viewRankTier).toBe("Diamond 2");
+    expect(view[0]?.viewRankTierId).toBe(19);
+  });
 });

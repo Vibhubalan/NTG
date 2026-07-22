@@ -77,6 +77,13 @@ export async function PATCH(req: Request, { params }: Props) {
     prizeNotes: normalizeOptionalString(body.prizeNotes),
     prizeSplit: body.prizeSplit as PrizeSplitRow[] | null | undefined,
     bracketUrl: normalizeOptionalString(body.bracketUrl),
+    bracketUrls: Array.isArray(body.bracketUrls)
+      ? (body.bracketUrls as unknown[]).filter(
+          (u): u is string => typeof u === "string",
+        )
+      : body.bracketUrls === null
+        ? null
+        : undefined,
     posterUrl: normalizeOptionalString(body.posterUrl),
     rulebookUrl: normalizeOptionalString(body.rulebookUrl),
     hubBannerUrl: normalizeOptionalString(body.hubBannerUrl),

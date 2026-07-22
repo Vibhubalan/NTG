@@ -34,9 +34,13 @@ export default function StatusBadge({ status, variant = "default" }: Props) {
           ? "Completed"
           : status === "UPCOMING" || status === "Upcoming"
             ? "Upcoming"
-            : status === "DRAFT" || status === "Soon"
-              ? "Draft"
-              : status;
+            : status === "AUCTION_LIVE" || status === "Auction Live"
+              ? "Auction Live"
+              : status === "AUCTION_COMPLETED" || status === "Auction Completed"
+                ? "Auction Completed"
+                : status === "DRAFT" || status === "Soon"
+                  ? "Draft"
+                  : status;
 
   return (
     <span

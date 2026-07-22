@@ -6,7 +6,6 @@ import type {
 } from "@core/contracts";
 import { TournamentRepository } from "../infrastructure/tournament.repository";
 import { LeaderboardRepository } from "../infrastructure/leaderboard.repository";
-import { fetchChallongeBracket } from "@/lib/challonge-api";
 import { resolveAuctionHeroPhase, type HeroCupPhase } from "../domain/auction-hero-phase";
 import { syncRegistrationStatus } from "./admin-tournament.service";
 
@@ -14,34 +13,10 @@ const tournamentRepo = new TournamentRepository();
 const leaderboardRepo = new LeaderboardRepository();
 
 export async function listTournamentPreviews(): Promise<TournamentPreview[]> {
-  const previews = await tournamentRepo.listPreviews();
-
-  return Promise.all(
-    previews.map(async (t) => {
-      let championName = t.championName ?? null;
-
-      const bracketUrl = t.bracketUrl ?? null;
-
-      if (bracketUrl) {
-        championName = null; // Strictly resolve from Challonge, no DB/static fallback
-        try {
-          const bracketData = await fetchChallongeBracket(bracketUrl);
-          const champ = bracketData?.finalStandings.find((s) => s.rank === 1);
-          if (champ) {
-            championName = champ.name;
-          }
-        } catch (err) {
-          console.error(`[challonge-preview-fetch] failed for ${t.slug}:`, err);
-        }
-      }
-
-      return {
-        ...t,
-        championName,
-        bracketUrl,
-      };
-    })
-  );
+  // Do NOT call Challonge here — homepage / lists / APIs would burn the API quota
+  // (one request per cup with a bracket link on every page load). Champion comes
+  // from DB placements. Challonge is only fetched on the cup detail page.
+  return tournamentRepo.listPreviews();
 }
 
 export async function getTournamentBySlug(slug: string): Promise<TournamentPreview | null> {

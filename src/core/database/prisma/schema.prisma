@@ -366,6 +366,8 @@ model Tournament {
   registrationUrl      String?
   hideAfter            DateTime?
   bracketUrl           String?
+  /** Extra Challonge bracket URLs (string[]). First URL is also mirrored in bracketUrl. */
+  bracketUrls          Json?
   rulebookUrl          String?
   teams                Json?
   createdAt            DateTime          @default(now())

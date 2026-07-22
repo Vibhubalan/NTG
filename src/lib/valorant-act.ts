@@ -61,16 +61,21 @@ export type HenrikActSeasonStats = {
 /** True when the player has a comp rank in this act (played placements / has a tier). */
 export function isActSeasonRanked(stats: HenrikActSeasonStats | null | undefined): boolean {
   if (!stats || stats.error) return false;
-  const games = stats.number_of_games ?? 0;
-  if (games <= 0) return false;
 
   const patched = stats.final_rank_patched?.trim().toLowerCase() ?? "";
-  if (!patched || patched === "unranked" || patched === "unused") return false;
+  if (patched && patched !== "unranked" && patched !== "unused") {
+    const tier = stats.final_rank ?? stats.tier;
+    if (typeof tier === "number" && tier <= 0) return false;
+    return true;
+  }
+
+  const games = stats.number_of_games ?? 0;
+  if (games <= 0) return false;
 
   const tier = stats.final_rank ?? stats.tier;
   if (typeof tier === "number" && tier <= 0) return false;
 
-  return true;
+  return false;
 }
 
 export function getActSeasonStats(

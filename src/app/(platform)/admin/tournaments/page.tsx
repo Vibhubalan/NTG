@@ -39,6 +39,19 @@ function getStatusBadge(status: string) {
           Cancelled
         </span>
       );
+    case "AUCTION_LIVE":
+      return (
+        <span className="inline-flex items-center gap-1.5 rounded-full border border-amber-500/25 bg-amber-500/[0.08] px-2.5 py-1 text-[9px] font-semibold uppercase tracking-wider text-amber-300">
+          <span className="h-1.5 w-1.5 rounded-full bg-amber-300 animate-pulse" />
+          Auction Live
+        </span>
+      );
+    case "AUCTION_COMPLETED":
+      return (
+        <span className="inline-flex items-center gap-1.5 rounded-full border border-violet-500/25 bg-violet-500/[0.08] px-2.5 py-1 text-[9px] font-semibold uppercase tracking-wider text-violet-300">
+          Auction Completed
+        </span>
+      );
     default:
       return (
         <span className="inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-white/[0.03] px-2.5 py-1 text-[9px] font-semibold uppercase tracking-wider text-white/50">
