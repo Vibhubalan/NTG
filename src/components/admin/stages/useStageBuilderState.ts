@@ -704,6 +704,27 @@ export function useStageBuilderState(
         ),
       );
 
+      // Seed from cup teams OR earlier-stage qualifiers (own request — Stage 2+).
+      const targetDraft = drafts.find((d) => d.id === stageId);
+      setGenerateProgress(
+        targetDraft?.seedSource === "PREVIOUS_STAGE"
+          ? "Seeding from earlier stages…"
+          : "Seeding teams…",
+      );
+      await requireApiJson(
+        await fetch(
+          `/api/admin/tournaments/${slug}/stages/${stageId}/generate`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              phase: "seed",
+              drafts: drafts.filter((d) => d.id === stageId),
+            }),
+          },
+        ),
+      );
+
       setGenerateProgress("Preparing…");
       const prepareRes = await fetch(
         `/api/admin/tournaments/${slug}/stages/${stageId}/generate`,

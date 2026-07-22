@@ -1624,7 +1624,7 @@ async function seedStageFromFeeders(
     slug,
     stageId,
     ordered.map((id, i) => ({ teamId: id, seed: i + 1 })),
-    { method, redistribute: !draftCoversAll },
+    { method, redistribute: !draftCoversAll, skipGraph: true },
   );
 
   if (draftCoversAll && draft && draft.groups.length > 0) {
@@ -1637,6 +1637,7 @@ async function seedStageFromFeeders(
           .map((s) => s.teamId)
           .filter((id): id is string => Boolean(id) && allowed.has(id!)),
       })),
+      { skipGraph: true },
     );
   }
 
@@ -1644,14 +1645,14 @@ async function seedStageFromFeeders(
 }
 
 /**
- * Persist buffered stage drafts and seed the target stage (no match insert).
- * Client should call prepare → insert → finalize separately to avoid timeouts.
+ * Persist buffered stage drafts only (no seeding / match insert).
+ * Keeps the commit request under Vercel 60s when Stage 1 has many matches.
  */
 export async function commitStageDraftsForGenerate(
   slug: string,
   stageId: string,
   drafts: StageCommitDraft[],
-): Promise<{ moved: number }> {
+): Promise<{ ok: true }> {
   const tournamentId = await resolveTournamentId(slug);
   const target = await prisma.tournamentStage.findFirst({
     where: { id: stageId, tournamentId },
@@ -1662,70 +1663,87 @@ export async function commitStageDraftsForGenerate(
     rebuildGroupsForStageId: stageId,
   });
 
-  const targetDraft = drafts.find((d) => d.id === stageId);
-  const seedSource = targetDraft?.seedSource ?? "TEAMS";
-  let moved = 0;
-
-  if (seedSource === "PREVIOUS_STAGE") {
-    const result = await seedStageFromFeeders(slug, stageId, targetDraft);
-    moved = result.moved;
-  } else {
-    const allTeams = await prisma.tournamentTeam.findMany({
-      where: { tournamentId },
-      orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
-      select: { id: true },
-    });
-    if (allTeams.length === 0) {
-      throw new Error("No teams in this cup to seed from.");
-    }
-    const method = targetDraft?.seedingMethod ?? "MANUAL";
-    const teamIds = allTeams.map((t) => t.id);
-    const assigned =
-      targetDraft?.groups.flatMap((g) =>
-        g.slots.map((s) => s.teamId).filter((id): id is string => Boolean(id)),
-      ) ?? [];
-    const allowed = new Set(teamIds);
-    const draftCoversAll =
-      assigned.length > 0 &&
-      assigned.every((id) => allowed.has(id)) &&
-      new Set(assigned).size === teamIds.length;
-
-    if (draftCoversAll && targetDraft) {
-      await putStageSeeding(
-        slug,
-        stageId,
-        [...new Set(assigned)].map((id, i) => ({ teamId: id, seed: i + 1 })),
-        { method, redistribute: false, skipGraph: true },
-      );
-      await putStagePoolAssignments(
-        slug,
-        stageId,
-        targetDraft.groups.map((g) => ({
-          order: g.order,
-          teamIds: g.slots
-            .map((s) => s.teamId)
-            .filter((id): id is string => Boolean(id)),
-        })),
-        { skipGraph: true },
-      );
-    } else {
-      await putStageSeeding(
-        slug,
-        stageId,
-        teamIds.map((id, i) => ({ teamId: id, seed: i + 1 })),
-        { method, skipGraph: true },
-      );
-    }
-  }
-
-  return { moved };
+  return { ok: true };
 }
 
 /**
- * Persist buffered stage drafts, seed the target stage, then prepare an empty
- * bracket. Client continues with insert/finalize batches.
- * Seed from PREVIOUS_STAGE runs qualification from ALL earlier stages that
- * point here (not only the immediate previous stage).
+ * Seed the target stage from cup teams or earlier-stage qualifiers.
+ * Separate HTTP phase so PREVIOUS_STAGE standings eval does not share a
+ * timeout budget with draft persist or match insert.
+ */
+export async function seedStageForMatchGeneration(
+  slug: string,
+  stageId: string,
+  draft?: StageCommitDraft,
+): Promise<{ moved: number }> {
+  const tournamentId = await resolveTournamentId(slug);
+  const target = await prisma.tournamentStage.findFirst({
+    where: { id: stageId, tournamentId },
+  });
+  if (!target) throw new Error("Stage not found.");
+
+  const seedSource =
+    draft?.seedSource ??
+    readSeedSourceFromConfig(target.config, target.order);
+
+  if (seedSource === "PREVIOUS_STAGE") {
+    const result = await seedStageFromFeeders(slug, stageId, draft);
+    return { moved: result.moved };
+  }
+
+  const allTeams = await prisma.tournamentTeam.findMany({
+    where: { tournamentId },
+    orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
+    select: { id: true },
+  });
+  if (allTeams.length === 0) {
+    throw new Error("No teams in this cup to seed from.");
+  }
+  const method = draft?.seedingMethod ?? "MANUAL";
+  const teamIds = allTeams.map((t) => t.id);
+  const assigned =
+    draft?.groups.flatMap((g) =>
+      g.slots.map((s) => s.teamId).filter((id): id is string => Boolean(id)),
+    ) ?? [];
+  const allowed = new Set(teamIds);
+  const draftCoversAll =
+    assigned.length > 0 &&
+    assigned.every((id) => allowed.has(id)) &&
+    new Set(assigned).size === teamIds.length;
+
+  if (draftCoversAll && draft) {
+    await putStageSeeding(
+      slug,
+      stageId,
+      [...new Set(assigned)].map((id, i) => ({ teamId: id, seed: i + 1 })),
+      { method, redistribute: false, skipGraph: true },
+    );
+    await putStagePoolAssignments(
+      slug,
+      stageId,
+      draft.groups.map((g) => ({
+        order: g.order,
+        teamIds: g.slots
+          .map((s) => s.teamId)
+          .filter((id): id is string => Boolean(id)),
+      })),
+      { skipGraph: true },
+    );
+  } else {
+    await putStageSeeding(
+      slug,
+      stageId,
+      teamIds.map((id, i) => ({ teamId: id, seed: i + 1 })),
+      { method, skipGraph: true },
+    );
+  }
+
+  return { moved: teamIds.length };
+}
+
+/**
+ * Persist drafts, seed, then prepare an empty bracket (legacy one-shot path).
+ * Prefer separate commit → seed → prepare phases from the UI.
  */
 export async function commitStageAndGenerate(
   slug: string,
@@ -1739,7 +1757,13 @@ export async function commitStageAndGenerate(
   complete: false;
   moved: number;
 }> {
-  const { moved } = await commitStageDraftsForGenerate(slug, stageId, drafts);
+  await commitStageDraftsForGenerate(slug, stageId, drafts);
+  const targetDraft = drafts.find((d) => d.id === stageId);
+  const { moved } = await seedStageForMatchGeneration(
+    slug,
+    stageId,
+    targetDraft,
+  );
   const prepared = await prepareMatchGeneration(stageId);
   return { ...prepared, moved };
 }

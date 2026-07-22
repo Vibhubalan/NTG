@@ -6,6 +6,7 @@ import {
   finalizeStageMatchGeneration,
   insertStageMatchGenerationBatch,
   prepareStageMatchGeneration,
+  seedStageForMatchGeneration,
   type StageCommitDraft,
 } from "@tournaments-leagues/index";
 
@@ -15,7 +16,7 @@ export const maxDuration = 60;
 type Params = { params: Promise<{ slug: string; stageId: string }> };
 
 type GenerateBody = {
-  phase?: "commit" | "prepare" | "insert" | "finalize";
+  phase?: "commit" | "seed" | "prepare" | "insert" | "finalize";
   drafts?: StageCommitDraft[];
   cursor?: number;
 };
@@ -37,6 +38,15 @@ export async function POST(req: Request, { params }: Params) {
         slug,
         stageId,
         body.drafts,
+      );
+      return NextResponse.json({ ok: true, ...result });
+    }
+
+    if (phase === "seed") {
+      const result = await seedStageForMatchGeneration(
+        slug,
+        stageId,
+        body.drafts?.find((d) => d.id === stageId),
       );
       return NextResponse.json({ ok: true, ...result });
     }
