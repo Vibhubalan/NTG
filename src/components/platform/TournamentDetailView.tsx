@@ -277,16 +277,14 @@ export default function TournamentDetailView({
       </div>
 
       {showBracket ? (
-        <section className="mt-16 space-y-12">
+        <section className="mt-16 space-y-10">
           {brackets.map(({ url, bracket }, index) => (
             <div key={url}>
-              <div className="mb-6 flex items-center gap-3">
-                <div className="h-px w-8 bg-gradient-to-r from-transparent to-rose-500" />
-                <h2 className="font-display text-2xl font-bold uppercase tracking-widest text-white">
-                  {brackets.length > 1 ? `Bracket ${index + 1}` : "Bracket"}
-                </h2>
-                <div className="h-px flex-1 bg-gradient-to-r from-rose-500 to-transparent opacity-30" />
-              </div>
+              {brackets.length > 1 ? (
+                <p className="mb-3 text-[10px] font-bold uppercase tracking-[0.28em] text-white/40">
+                  Bracket {index + 1}
+                </p>
+              ) : null}
               {bracket ? (
                 <TournamentBracket bracket={bracket} accentHex={meta.hex} />
               ) : (
