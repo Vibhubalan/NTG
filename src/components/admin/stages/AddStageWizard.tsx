@@ -380,7 +380,29 @@ export default function AddStageWizard({ state, onDone, onCancel }: Props) {
             runnable={stage.runnable}
             matchCount={stage.matchCount}
             onGenerate={finishWizard}
+            progressLabel={state.generateProgress}
+            canResume={
+              Boolean(state.pendingGenerate) &&
+              state.pendingGenerate?.stageId === createdId
+            }
+            onResume={() => {
+              if (!createdId) return;
+              void state
+                .resumeGenerate()
+                .then(() => onDone(createdId))
+                .catch(() => {
+                  /* error already set on state */
+                });
+            }}
           />
+          {state.generateProgress ? (
+            <p className="text-center text-xs text-emerald-200/80">
+              {state.generateProgress}
+            </p>
+          ) : null}
+          {state.error ? (
+            <p className="text-center text-xs text-rose-200">{state.error}</p>
+          ) : null}
           <button
             type="button"
             onClick={() => setStep(3)}
