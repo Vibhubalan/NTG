@@ -1469,8 +1469,8 @@ export default function AdminTournamentEditor({
                   {confirmCreateAuction && (
                     <div className="rounded-xl border border-amber-500/25 bg-amber-500/[0.06] p-4 space-y-3">
                       <p className="text-xs text-amber-200">
-                        This will delete and rebuild the auction from scratch — any live progress, sold players, and
-                        team budgets in the auction app will be lost. This cannot be undone.
+                        This will delete and rebuild the live auction session — any in-progress bids and sold
+                        players in the auction app will be lost. Published cup rosters on the teams tab are kept.
                       </p>
                       {auctionFinalized && (
                         <label className="flex items-center gap-2 text-[11px] text-amber-200">
