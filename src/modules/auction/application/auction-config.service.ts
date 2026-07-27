@@ -122,3 +122,28 @@ export async function getAuctionRules(): Promise<AuctionRulesConfig> {
     return defaultAuctionRules();
   }
 }
+
+export async function saveAuctionRules(
+  raw: unknown,
+  updatedById?: string,
+): Promise<AuctionRulesConfig> {
+  const rules = sanitizeAuctionRules(raw);
+  await prisma.platformSetting.upsert({
+    where: { key: AUCTION_RULES_KEY },
+    create: { key: AUCTION_RULES_KEY, value: JSON.stringify(rules), updatedById: updatedById ?? null },
+    update: { value: JSON.stringify(rules), updatedById: updatedById ?? null },
+  });
+  return rules;
+}
+
+export async function resetAuctionRules(updatedById?: string): Promise<AuctionRulesConfig> {
+  return saveAuctionRules(defaultAuctionRules(), updatedById);
+}
+
+/** Rank config for a game, honoring the globally configured rules. */
+export async function getRankConfigForGame(game: string): Promise<AuctionRankConfig> {
+  const rules = await getAuctionRules();
+  if (game === "CS2") return rules.cs2;
+  if (game === "VALORANT") return rules.valorant;
+  return defaultRankConfigForGame(game);
+}

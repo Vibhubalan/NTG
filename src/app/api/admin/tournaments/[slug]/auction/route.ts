@@ -20,10 +20,6 @@ export async function POST(req: Request, { params }: Props) {
   const auth = await requireAdmin();
   if (!isAuthedAdmin(auth)) return guardResponse(auth)!;
 
-  if (!serverEnv.auctionUrl) {
-    return NextResponse.json({ error: "Auction app is not configured." }, { status: 503 });
-  }
-
   const body = await req.json().catch(() => ({}));
   const bypassSavedLock = (body as { bypass?: boolean }).bypass === true;
 

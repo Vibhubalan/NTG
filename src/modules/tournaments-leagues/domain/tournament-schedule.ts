@@ -8,6 +8,7 @@ export type TournamentScheduleInput = {
   autoManageStatus: boolean;
   registrationFormat?: string | null;
   registrationOpensAt: Date | null;
+  registrationClosesAt?: Date | null;
   auctionStartsAt?: Date | null;
   auctionEndsAt?: Date | null;
   startsAt: Date | null;
@@ -144,4 +145,31 @@ export function isTournamentRegistrationLive(
   }
 
   return t.status === "REGISTRATION_OPEN";
+}
+
+export function getEffectiveAuctionStartsAt(
+  t: Pick<TournamentScheduleInput, "auctionStartsAt" | "registrationFormat">,
+): Date | null {
+  if (t.auctionStartsAt) return t.auctionStartsAt;
+  return null;
+}
+
+export function getEffectiveAuctionEndsAt(
+  t: Pick<TournamentScheduleInput, "auctionEndsAt" | "startsAt" | "registrationFormat">,
+): Date | null {
+  if (t.auctionEndsAt) return t.auctionEndsAt;
+  if (t.registrationFormat !== "AUCTION") return null;
+  return t.startsAt ?? null;
+}
+
+export function isAuctionLiveWindow(
+  t: TournamentScheduleInput,
+  now: Date = new Date(),
+): boolean {
+  if (t.registrationFormat !== "AUCTION") return false;
+  const auctionStart = getEffectiveAuctionStartsAt(t);
+  const auctionEnd = getEffectiveAuctionEndsAt(t);
+  if (!auctionStart || !auctionEnd) return false;
+  const ts = now.getTime();
+  return ts >= auctionStart.getTime() && ts < auctionEnd.getTime();
 }

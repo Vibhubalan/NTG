@@ -9,7 +9,6 @@ import {
   getRegistrationEligibility,
   getValorantRegistrationProfileCard,
 } from "@tournaments-leagues/index";
-import { serverEnv } from "@core/config/env.server";
 import { auctionLink } from "@/lib/auction-link";
 import { resolveEffectivePublicAuction } from "@tournaments-leagues/domain/auction-hero-phase";
 
@@ -65,8 +64,7 @@ export default async function TournamentDetailPage({ params }: Props) {
       : "observe";
   const auctionEligible =
     tournament.registrationFormat === "AUCTION" &&
-    !!userId &&
-    !!serverEnv.auctionUrl;
+    !!userId;
   const showEnterButton =
     tournament.registrationFormat === "AUCTION" &&
     (admin.ok || (auctionEligible && publicAuction));

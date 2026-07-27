@@ -5,7 +5,6 @@ import HeroCupStatusBanner from "@/components/HeroCupStatusBanner";
 import SplitText from "./SplitText";
 import { getSession } from "@core/auth/session";
 import { requireAdmin } from "@core/auth/require-admin";
-import { serverEnv } from "@core/config/env.server";
 import { auctionLink } from "@/lib/auction-link";
 
 const heroCtaBase =
@@ -23,8 +22,7 @@ async function resolveHeroAuctionHref(slug: string): Promise<string | null> {
 
   const auctionEligible =
     tournament.registrationFormat === "AUCTION" &&
-    !!userId &&
-    !!serverEnv.auctionUrl;
+    !!userId;
   const showEnterButton = tournament.registrationFormat === "AUCTION" && (admin.ok || (auctionEligible && publicAuction));
   if (!showEnterButton || !userId) return null;
 

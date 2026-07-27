@@ -157,7 +157,7 @@ export default async function AdminTournamentEditPage({ params }: Props) {
     })),
   };
 
-  const auctionHref = userId && t.registrationFormat === "AUCTION" && serverEnv.auctionUrl
+  const auctionHref = userId && t.registrationFormat === "AUCTION"
     ? auctionLink(t.slug, "auctioneer")
     : null;
 

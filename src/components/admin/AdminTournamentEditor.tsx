@@ -1554,8 +1554,8 @@ export default function AdminTournamentEditor({
                 {auctionHref && (
                   <div className="border-t border-white/[0.04] pt-4 flex flex-col sm:flex-row items-center justify-between gap-4">
                     <div>
-                      <h4 className="text-xs font-semibold text-white/80">Direct Link to Auction Site</h4>
-                      <p className="text-[10px] text-white/40 mt-0.5">Open the external auction interface to manage live bidding, teams, and drafts.</p>
+                      <h4 className="text-xs font-semibold text-white/80">Open Auction</h4>
+                      <p className="text-[10px] text-white/40 mt-0.5">Open the live auction interface to manage bidding, teams, and drafts.</p>
                     </div>
                     <a
                       href={auctionHref}
@@ -1563,7 +1563,7 @@ export default function AdminTournamentEditor({
                       rel="noopener noreferrer"
                       className="inline-flex rounded-full border border-cyan-500/30 bg-cyan-500/10 px-5 py-2.5 text-[11px] font-semibold uppercase tracking-[0.16em] text-cyan-200 transition-colors hover:bg-cyan-500/20"
                     >
-                      Go to Auction Site →
+                      View Auction →
                     </a>
                   </div>
                 )}

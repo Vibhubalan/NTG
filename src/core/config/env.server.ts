@@ -36,6 +36,15 @@ export const serverEnv = {
   get auctionJwtSecret() {
     return optional("AUCTION_JWT_SECRET");
   },
+  get supabaseUrl() {
+    return optional("NEXT_PUBLIC_SUPABASE_URL") ?? optional("SUPABASE_URL");
+  },
+  get supabaseAnonKey() {
+    return optional("NEXT_PUBLIC_SUPABASE_ANON_KEY") ?? optional("SUPABASE_ANON_KEY");
+  },
+  get supabaseServiceRoleKey() {
+    return optional("SUPABASE_SERVICE_ROLE_KEY");
+  },
   get emailFrom() {
     return optional("EMAIL_FROM") ?? "NTG Lounge <onboarding@resend.dev>";
   },
