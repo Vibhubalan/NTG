@@ -68,6 +68,15 @@ export async function getLeaderboardRefreshLock(
   return lock;
 }
 
+/** Raw lock row including stale entries (for recovery when a segment ended without clearing). */
+export async function getLeaderboardRefreshLockRaw(
+  lockKey: LeaderboardRefreshLockKey = LEADERBOARD_HOURLY_REFRESH_LOCK_KEY,
+): Promise<{ lock: LockPayload | null; fresh: boolean }> {
+  const lock = await readLock(lockKey);
+  if (!lock) return { lock: null, fresh: false };
+  return { lock, fresh: isLockFresh(lock) };
+}
+
 export async function acquireLeaderboardRefreshLock(
   runId: string,
   lockKey: LeaderboardRefreshLockKey = LEADERBOARD_HOURLY_REFRESH_LOCK_KEY,

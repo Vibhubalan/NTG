@@ -30,21 +30,19 @@ export default async function AdminTournamentEditPage({ params }: Props) {
   const session = await getSession();
   const userId = session?.user?.id;
 
-  const [t, poolPlayers, seasons, [row]] = await Promise.all([
+  const [t, poolPlayers, seasons] = await Promise.all([
     getTournamentAdmin(slug),
     listUnassignedPlayerRegistrations(slug),
     listSeasonsAdmin(),
-    prisma.$queryRawUnsafe<{ publicAuction: boolean }[]>(
-      'SELECT "publicAuction" FROM "Tournament" WHERE slug = $1 LIMIT 1',
-      slug
-    ),
   ]);
   if (!t) notFound();
 
-  const [auctionRow] = await prisma.$queryRawUnsafe<{ finalized: boolean }[]>(
-    'SELECT finalized FROM auction_sessions WHERE tournament_id = $1 LIMIT 1',
-    t.id
-  );
+  const [auctionRow] = await prisma
+    .$queryRawUnsafe<{ finalized: boolean }[]>(
+      'SELECT finalized FROM auction_sessions WHERE tournament_id = $1 LIMIT 1',
+      t.id,
+    )
+    .catch(() => [{ finalized: false }]);
   const auctionFinalized = auctionRow?.finalized ?? false;
 
   const initial = {
@@ -79,7 +77,7 @@ export default async function AdminTournamentEditPage({ params }: Props) {
     groupCount: t.groupCount,
     teamsPerGroup: t.teamsPerGroup,
     advancePerGroup: t.advancePerGroup,
-    publicAuction: resolveEffectivePublicAuction(row?.publicAuction ?? false, t),
+    publicAuction: resolveEffectivePublicAuction(t.publicAuction ?? false, t),
     rankPoints: (t.rankPoints as { rank: string; floor: number }[] | null) ?? null,
     bracketUrl: t.bracketUrl,
     rulebookUrl: t.rulebookUrl,

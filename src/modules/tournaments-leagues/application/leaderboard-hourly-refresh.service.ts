@@ -14,8 +14,8 @@ import {
   acquireLeaderboardRefreshLock,
   clearLeaderboardRefreshLock,
   getLeaderboardRefreshLock,
+  getLeaderboardRefreshLockRaw,
   heartbeatLeaderboardRefreshLock,
-  isLockFresh,
   LEADERBOARD_DAILY_REFRESH_LOCK_KEY,
   LEADERBOARD_HOURLY_REFRESH_LOCK_KEY,
   type LeaderboardRefreshLockKey,
@@ -129,6 +129,52 @@ async function failStaleRun(
       errorMessage: message,
     }).catch(() => {});
   }
+}
+
+async function resumeRunningRefresh(
+  kind: LeaderboardRefreshKind,
+  runId: string,
+  currentAct: string,
+): Promise<LeaderboardRefreshResult> {
+  const lockKey = lockKeyForKind(kind);
+  const acquired = await acquireLeaderboardRefreshLock(runId, lockKey);
+  if (!acquired.ok) {
+    const running = await getRunningRun(kind);
+    return {
+      status: "skipped",
+      reason: "already_running",
+      runId: acquired.runId,
+      totalPlayers: running?.totalPlayers ?? 0,
+      processed: running ? running.successCount + running.failedCount : 0,
+      successCount: running?.successCount ?? 0,
+      failedCount: running?.failedCount ?? 0,
+      pending: running
+        ? Math.max(0, running.totalPlayers - running.successCount - running.failedCount)
+        : 0,
+      henrikRequestCount: running?.henrikRequestCount ?? 0,
+      complete: false,
+    };
+  }
+
+  const segment = await processRunSegment(kind, runId, currentAct);
+  if (segment.status === "error") return segment;
+  return {
+    ...segment,
+    status: segment.complete ? "complete" : "continued",
+  };
+}
+
+async function tryRecoverStaleRefreshLock(
+  kind: LeaderboardRefreshKind,
+  runId: string,
+  currentAct: string,
+): Promise<LeaderboardRefreshResult | null> {
+  const lockKey = lockKeyForKind(kind);
+  const { lock, fresh } = await getLeaderboardRefreshLockRaw(lockKey);
+  if (lock && fresh && lock.runId !== runId) {
+    return null;
+  }
+  return resumeRunningRefresh(kind, runId, currentAct);
 }
 
 async function getRunningRun(kind: LeaderboardRefreshKind) {
@@ -347,16 +393,9 @@ export async function runLeaderboardRefresh(
 
     const lock = await getLeaderboardRefreshLock(lockKey);
     if (!lock || lock.runId !== running.id) {
-      const rawLock = await prisma.platformSetting.findUnique({
-        where: { key: lockKey },
-        select: { value: true },
-      });
-      const parsed = rawLock?.value
-        ? (JSON.parse(rawLock.value) as { runId: string; heartbeatAt: string })
-        : null;
-      if (parsed && !isLockFresh(parsed)) {
-        await failStaleRun(running.id, kind, "Refresh lock expired.");
-      }
+      const recovered = await tryRecoverStaleRefreshLock(kind, running.id, currentAct);
+      if (recovered) return recovered;
+
       return {
         status: "skipped",
         reason: "lock_missing",
@@ -399,21 +438,26 @@ export async function runLeaderboardRefresh(
   const staleRun = await getRunningRun(kind);
   if (staleRun) {
     if (kind === "daily") {
-      return {
-        status: "skipped",
-        reason: "already_running",
-        runId: staleRun.id,
-        totalPlayers: staleRun.totalPlayers,
-        processed: staleRun.successCount + staleRun.failedCount,
-        successCount: staleRun.successCount,
-        failedCount: staleRun.failedCount,
-        pending: Math.max(
-          0,
-          staleRun.totalPlayers - staleRun.successCount - staleRun.failedCount,
-        ),
-        henrikRequestCount: staleRun.henrikRequestCount,
-        complete: false,
-      };
+      const lock = await getLeaderboardRefreshLock(lockKey);
+      if (lock?.runId === staleRun.id) {
+        return {
+          status: "skipped",
+          reason: "already_running",
+          runId: staleRun.id,
+          totalPlayers: staleRun.totalPlayers,
+          processed: staleRun.successCount + staleRun.failedCount,
+          successCount: staleRun.successCount,
+          failedCount: staleRun.failedCount,
+          pending: Math.max(
+            0,
+            staleRun.totalPlayers - staleRun.successCount - staleRun.failedCount,
+          ),
+          henrikRequestCount: staleRun.henrikRequestCount,
+          complete: false,
+        };
+      }
+
+      return resumeRunningRefresh(kind, staleRun.id, currentAct);
     }
     await failStaleRun(staleRun.id, kind, `Superseded by new ${kind} refresh.`);
   }

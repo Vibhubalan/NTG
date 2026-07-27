@@ -363,6 +363,10 @@ model Tournament {
   registrationOpensAt  DateTime?
   registrationClosesAt DateTime?
   autoManageStatus     Boolean           @default(false)
+  /** Admin toggle for public "Enter Live Auction" (auto-manage may override during auction window). */
+  publicAuction        Boolean           @default(false)
+  /** When false, hide the public "Your Games" tab on the cup page. */
+  yourGamesEnabled     Boolean           @default(true)
   registrationUrl      String?
   hideAfter            DateTime?
   bracketUrl           String?

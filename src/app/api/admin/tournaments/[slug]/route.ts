@@ -31,13 +31,12 @@ export async function GET(_req: Request, { params }: Props) {
     return NextResponse.json({ error: "Tournament not found." }, { status: 404 });
   }
 
-  const [row] = await prisma.$queryRawUnsafe<{ publicAuction: boolean }[]>(
-    'SELECT "publicAuction" FROM "Tournament" WHERE slug = $1 LIMIT 1',
-    slug
-  );
-  (tournament as any).publicAuction = row?.publicAuction ?? false;
-
-  return NextResponse.json({ tournament });
+  return NextResponse.json({
+    tournament: {
+      ...tournament,
+      publicAuction: tournament.publicAuction ?? false,
+    },
+  });
 }
 
 export async function PATCH(req: Request, { params }: Props) {
@@ -109,12 +108,11 @@ export async function PATCH(req: Request, { params }: Props) {
 
   if (body.publicAuction !== undefined) {
     const isPublic = !!body.publicAuction;
-    await prisma.$executeRawUnsafe(
-      'UPDATE "Tournament" SET "publicAuction" = $1 WHERE slug = $2',
-      isPublic,
-      slug
-    );
-    (result.tournament as any).publicAuction = isPublic;
+    await prisma.tournament.update({
+      where: { slug },
+      data: { publicAuction: isPublic },
+    });
+    (result.tournament as { publicAuction?: boolean }).publicAuction = isPublic;
   }
 
   await logAdminAction(auth.userId, "tournament.update", slug, {

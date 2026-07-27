@@ -11,7 +11,7 @@ concurrency:
 jobs:
   refresh:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 45
     steps:
       - name: Run full leaderboard sync
         env:
@@ -40,7 +40,7 @@ jobs:
           AUTH_HEADER="$(printf 'Authorization: Bearer %s' "$CRON_SECRET")"
           echo "Calling ${BASE} (SITE_URL length: ${#SITE_URL}, CRON_SECRET length: ${#CRON_SECRET})"
           ATTEMPTS=0
-          MAX_ATTEMPTS=50
+          MAX_ATTEMPTS=80
           MODE="start"
           COMPLETE="false"
 
@@ -82,8 +82,19 @@ jobs:
             fi
 
             if [ "$STATUS" = "skipped" ] && [ "$REASON" = "no_active_run" ] && [ "$MODE" = "continue" ]; then
-              echo "No active run to continue — treating as done."
-              exit 0
+              echo "No active run to continue — starting a fresh sync."
+              MODE="start"
+              ATTEMPTS=$((ATTEMPTS + 1))
+              sleep 5
+              continue
+            fi
+
+            if [ "$STATUS" = "skipped" ] && [ "$REASON" = "lock_missing" ]; then
+              echo "Refresh lock missing — retrying continue after recovery."
+              MODE="continue"
+              ATTEMPTS=$((ATTEMPTS + 1))
+              sleep 5
+              continue
             fi
 
             MODE="continue"

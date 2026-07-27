@@ -7,7 +7,6 @@ import { getSession } from "@core/auth/session";
 import { requireAdmin } from "@core/auth/require-admin";
 import { serverEnv } from "@core/config/env.server";
 import { auctionLink } from "@/lib/auction-link";
-import { prisma } from "@core/database/client";
 
 const heroCtaBase =
   "inline-flex h-10 w-auto cursor-pointer select-none items-center justify-center gap-1.5 whitespace-nowrap rounded-full px-3 text-[10px] font-semibold uppercase tracking-[0.12em] transition-all hover:scale-[1.03] active:scale-[0.98] sm:h-12 sm:gap-2 sm:px-5 sm:text-sm sm:tracking-[0.18em]";
@@ -20,11 +19,7 @@ async function resolveHeroAuctionHref(slug: string): Promise<string | null> {
   const [tournament, admin] = await Promise.all([getTournamentDetail(slug, userId), requireAdmin()]);
   if (!tournament) return null;
 
-  const [dbRow] = await prisma.$queryRawUnsafe<{ publicAuction: boolean }[]>(
-    'SELECT "publicAuction" FROM "Tournament" WHERE id = $1 LIMIT 1',
-    tournament.id
-  );
-  const publicAuction = resolveEffectivePublicAuction(dbRow?.publicAuction ?? false, tournament);
+  const publicAuction = resolveEffectivePublicAuction(tournament.publicAuction ?? false, tournament);
 
   const auctionEligible =
     tournament.registrationFormat === "AUCTION" &&
