@@ -1,7 +1,11 @@
 import { guardResponse, isAuthedAdmin, requireAdmin } from "@/lib/auth-guard";
 import { serverEnv } from "@core/config/env.server";
 import { prisma } from "@core/database/client";
-import { auctionToken } from "@/lib/auction-link";
+import {
+  createAuctionSessionForTournament,
+  getAuctionSessionFinalized,
+  resetAuctionSessionForTournament,
+} from "@/modules/auction/application/auction-init.service";
 import { NextResponse } from "next/server";
 
 export const dynamic = "force-dynamic";
@@ -16,7 +20,7 @@ export async function POST(req: Request, { params }: Props) {
   const auth = await requireAdmin();
   if (!isAuthedAdmin(auth)) return guardResponse(auth)!;
 
-  if (!serverEnv.auctionUrl || !serverEnv.auctionJwtSecret) {
+  if (!serverEnv.auctionUrl) {
     return NextResponse.json({ error: "Auction app is not configured." }, { status: 503 });
   }
 
@@ -37,6 +41,7 @@ export async function POST(req: Request, { params }: Props) {
       auctionEndsAt: true,
       rankPoints: true,
       game: true,
+      auctionSession: { select: { id: true, status: true } },
     },
   });
   if (!tournament) {
@@ -46,144 +51,39 @@ export async function POST(req: Request, { params }: Props) {
     return NextResponse.json({ error: "This cup is not an auction draft." }, { status: 400 });
   }
 
-  const [existingSession] = await prisma.$queryRawUnsafe<{ finalized: boolean }[]>(
-    "SELECT finalized FROM auction_sessions WHERE tournament_id = $1 LIMIT 1",
-    tournament.id
-  );
-  if (existingSession?.finalized && !bypassSavedLock) {
+  const finalized = await getAuctionSessionFinalized(tournament.id);
+  if (finalized && !bypassSavedLock) {
     return NextResponse.json(
-      { error: "This auction has already been saved. Enable the bypass option if you really need to reset it." },
+      {
+        error:
+          "This auction has already been saved. Enable the bypass option if you really need to reset it.",
+      },
       { status: 409 },
     );
   }
 
-  const auctionBaseUrl = serverEnv.auctionUrl!.trim().replace(/\/+$/, "");
+  const initOptions = {
+    startingBudget: tournament.startingBudget,
+    rosterSize: tournament.rosterSize,
+    minBidIncrement: tournament.minBidIncrement,
+    rankTable:
+      tournament.game === "VALORANT" && Array.isArray(tournament.rankPoints)
+        ? tournament.rankPoints
+        : undefined,
+  };
 
-  let res: Response;
-  try {
-    res = await fetch(`${auctionBaseUrl}/api/init`, {
-      method: "POST",
-      headers: {
-        authorization: `Bearer ${auctionToken(auth.userId)}`,
-        "content-type": "application/json",
-      },
-      body: JSON.stringify({
-        tournamentId: tournament.id,
-        settings: {
-          startingBudget: tournament.startingBudget,
-          rosterSize: tournament.rosterSize,
-          minBidIncrement: tournament.minBidIncrement,
-          coCaptainSlots: tournament.coCaptainSlots,
-          auctionStartsAt: tournament.auctionStartsAt?.toISOString() ?? null,
-          auctionEndsAt: tournament.auctionEndsAt?.toISOString() ?? null,
-        },
-        // Valorant rank points from the main site; auction app falls back to its defaults if absent.
-        rankTable:
-          tournament.game === "VALORANT" && Array.isArray(tournament.rankPoints)
-            ? tournament.rankPoints
-            : undefined,
-      }),
-    });
-  } catch (err) {
-    console.error("[auction init] fetch to auction app failed:", err);
-    return NextResponse.json(
-      {
-        error: `Could not reach the auction app at ${auctionBaseUrl}. Check AUCTION_URL is correct (no trailing slash/spaces) and the auction app is running.`,
-      },
-      { status: 502 },
-    );
+  const result = tournament.auctionSession
+    ? await resetAuctionSessionForTournament(slug, initOptions)
+    : await createAuctionSessionForTournament(slug, initOptions);
+
+  if (!result.ok) {
+    return NextResponse.json({ error: result.error }, { status: 400 });
   }
 
-  const data = await res.json().catch(() => ({}));
-  if (!res.ok) {
-    return NextResponse.json(
-      { error: (data as { error?: string }).error ?? "Failed to create auction." },
-      { status: res.status },
-    );
-  }
-
-  // Reset / reconstruct registration teams on the main site's DB
-  try {
-    await prisma.$transaction(async (tx) => {
-      // 1. Fetch existing teams to preserve logoUrl if they exist
-      const existingTeams = await tx.tournamentTeam.findMany({
-        where: { tournamentId: tournament.id },
-        select: { id: true, sourceRegistrationId: true, logoUrl: true },
-      });
-      const logoMap = new Map<string, string>();
-      const teamIdToCaptainRegId = new Map<string, string>();
-      for (const et of existingTeams) {
-        if (et.sourceRegistrationId) {
-          teamIdToCaptainRegId.set(et.id, et.sourceRegistrationId);
-          if (et.logoUrl) {
-            logoMap.set(et.sourceRegistrationId, et.logoUrl);
-          }
-        }
-      }
-
-      // 2. Delete all existing teams for this tournament (cascades to TournamentTeamPlayer)
-      await tx.tournamentTeam.deleteMany({
-        where: { tournamentId: tournament.id },
-      });
-
-      // 3. Find all APPROVED registrations for this tournament
-      const registrations = await tx.tournamentRegistration.findMany({
-        where: {
-          tournamentId: tournament.id,
-          status: "APPROVED",
-        },
-      });
-
-      // 4. Get all captains
-      const captains = registrations.filter((r) => r.participantRole === "CAPTAIN");
-
-      // 5. Recreate teams for each captain and link the captain and co-captains
-      for (let i = 0; i < captains.length; i++) {
-        const captain = captains[i];
-        const teamName = captain.teamName?.trim() || `${captain.snapshotDisplayName || "Team"}`;
-        const logoUrl = logoMap.get(captain.id) || null;
-
-        // Create the team
-        const newTeam = await tx.tournamentTeam.create({
-          data: {
-            tournamentId: tournament.id,
-            name: teamName,
-            captainUserId: captain.userId,
-            logoUrl: logoUrl,
-            sortOrder: i,
-            sourceRegistrationId: captain.id,
-          },
-        });
-
-        // Link the captain registration to the team
-        await tx.tournamentRegistration.update({
-          where: { id: captain.id },
-          data: { teamId: newTeam.id },
-        });
-
-        // Link the co-captains registration to the team
-        const coCaptains = registrations.filter((r) => {
-          if (r.participantRole !== "CO_CAPTAIN") return false;
-          
-          // Match by original team link if it existed
-          const originalCaptainRegId = r.teamId ? teamIdToCaptainRegId.get(r.teamId) : undefined;
-          if (originalCaptainRegId === captain.id) return true;
-
-          // Or match by team name
-          return r.teamName?.trim().toLowerCase() === teamName.toLowerCase();
-        });
-
-        for (const cc of coCaptains) {
-          await tx.tournamentRegistration.update({
-            where: { id: cc.id },
-            data: { teamId: newTeam.id },
-          });
-        }
-      }
-    });
-  } catch (dbErr) {
-    console.error("[auction init db reset error]", dbErr);
-  }
-
-  return NextResponse.json(data);
+  return NextResponse.json({
+    sessionId: result.data.sessionId,
+    tournamentId: tournament.id,
+    auctionStartsAt: tournament.auctionStartsAt?.toISOString() ?? null,
+    auctionEndsAt: tournament.auctionEndsAt?.toISOString() ?? null,
+  });
 }

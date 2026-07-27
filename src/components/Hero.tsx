@@ -24,8 +24,7 @@ async function resolveHeroAuctionHref(slug: string): Promise<string | null> {
   const auctionEligible =
     tournament.registrationFormat === "AUCTION" &&
     !!userId &&
-    !!serverEnv.auctionUrl &&
-    !!serverEnv.auctionJwtSecret;
+    !!serverEnv.auctionUrl;
   const showEnterButton = tournament.registrationFormat === "AUCTION" && (admin.ok || (auctionEligible && publicAuction));
   if (!showEnterButton || !userId) return null;
 
@@ -34,7 +33,7 @@ async function resolveHeroAuctionHref(slug: string): Promise<string | null> {
     : tournament.userParticipantRole === "CAPTAIN" || tournament.userParticipantRole === "CO_CAPTAIN"
       ? "captain"
       : "observe";
-  return auctionLink(tournament.id, auctionView, userId);
+  return auctionLink(tournament.slug, auctionView);
 }
 
 export default async function Hero() {

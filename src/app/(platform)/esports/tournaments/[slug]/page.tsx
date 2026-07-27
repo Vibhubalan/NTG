@@ -66,14 +66,13 @@ export default async function TournamentDetailPage({ params }: Props) {
   const auctionEligible =
     tournament.registrationFormat === "AUCTION" &&
     !!userId &&
-    !!serverEnv.auctionUrl &&
-    !!serverEnv.auctionJwtSecret;
+    !!serverEnv.auctionUrl;
   const showEnterButton =
     tournament.registrationFormat === "AUCTION" &&
     (admin.ok || (auctionEligible && publicAuction));
   const auctionHref =
     showEnterButton && userId
-      ? auctionLink(tournament.id, auctionView, userId)
+      ? auctionLink(tournament.slug, auctionView)
       : null;
   const auctionEnded =
     auctionEligible && !admin.ok && tournament.status === "COMPLETED";
