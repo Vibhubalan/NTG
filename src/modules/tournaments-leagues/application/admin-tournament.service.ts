@@ -16,7 +16,10 @@ import {
   isAuctionCup,
   validateAutoSchedule,
 } from "../domain/tournament-schedule";
-import { bracketUrlsForSave, normalizeBracketUrls } from "@/lib/challonge";
+import { bracketUrlsForSave, normalizeBracketUrls, normalizeBracketUrlItems } from "@/lib/challonge";
+import { clearAutoSyncedChampions, syncBracketChampionsToPlacements } from "@/lib/sync-bracket-champions";
+import { fetchChallongeBracket } from "@/lib/challonge-api";
+import { slugWhere } from "@/lib/slug-utils";
 
 export type CreateTournamentInput = {
   slug: string;
@@ -53,6 +56,7 @@ export type UpdateTournamentInput = Partial<
     | "description"
     | "prizeNotes"
     | "bracketUrl"
+    | "bracketUrls"
     | "posterUrl"
     | "rulebookUrl"
     | "hubBannerUrl"
@@ -69,7 +73,7 @@ export type UpdateTournamentInput = Partial<
   description?: string | null;
   prizeNotes?: string | null;
   bracketUrl?: string | null;
-  bracketUrls?: string[] | null;
+  bracketUrls?: (string | import("@/lib/challonge").BracketUrlItem)[] | null;
   posterUrl?: string | null;
   rulebookUrl?: string | null;
   hubBannerUrl?: string | null;
@@ -136,8 +140,8 @@ export async function listTournamentsAdmin() {
 }
 
 export async function getTournamentAdmin(slug: string) {
-  return prisma.tournament.findUnique({
-    where: { slug },
+  return prisma.tournament.findFirst({
+    where: slugWhere(slug),
     include: {
       season: true,
       placements: {
@@ -258,7 +262,7 @@ export type AdminCupFieldsSnapshot = {
   registrationClosesAt: string | null;
   autoManageStatus: boolean;
   bracketUrl: string | null;
-  bracketUrls: string[];
+  bracketUrls: (string | import("@/lib/challonge").BracketUrlItem)[];
   rulebookUrl: string | null;
   format: BracketType | null;
   coCaptainSlots: number;
@@ -317,7 +321,7 @@ export function toAdminCupFieldsSnapshot(
     registrationClosesAt: t.registrationClosesAt?.toISOString() ?? null,
     autoManageStatus: t.autoManageStatus,
     bracketUrl: t.bracketUrl,
-    bracketUrls: normalizeBracketUrls({
+    bracketUrls: normalizeBracketUrlItems({
       bracketUrl: t.bracketUrl,
       bracketUrls: (t as { bracketUrls?: unknown }).bracketUrls,
     }),
@@ -340,7 +344,7 @@ export async function updateTournamentFull(
   slug: string,
   input: UpdateTournamentInput,
 ): Promise<{ ok: true; tournament: AdminCupFieldsSnapshot } | { ok: false; error: string }> {
-  const tournament = await prisma.tournament.findUnique({ where: { slug } });
+  const tournament = await prisma.tournament.findFirst({ where: slugWhere(slug) });
   if (!tournament) return { ok: false, error: "Tournament not found." };
 
   const data: Prisma.TournamentUpdateInput = {};
@@ -391,6 +395,10 @@ export async function updateTournamentFull(
         ? (input.prizeSplit as unknown as Prisma.InputJsonValue)
         : Prisma.JsonNull;
   }
+  let syncWinnerLinks:
+    | { url: string; isFinal: boolean }[]
+    | null = null;
+  let clearWinnersAfterSave = false;
   if (input.bracketUrl !== undefined || input.bracketUrls !== undefined) {
     const saved = bracketUrlsForSave(
       input.bracketUrls ??
@@ -400,6 +408,16 @@ export async function updateTournamentFull(
     data.bracketUrls = saved.bracketUrls
       ? (saved.bracketUrls as unknown as Prisma.InputJsonValue)
       : Prisma.JsonNull;
+    const items = normalizeBracketUrlItems({
+      bracketUrl: saved.bracketUrl,
+      bracketUrls: saved.bracketUrls,
+    });
+    syncWinnerLinks = items.map((i) => ({
+      url: i.url,
+      isFinal: i.isFinal !== false,
+    }));
+    // Unticking "Use for Winners" on every stage should remove auto-synced champs.
+    clearWinnersAfterSave = !items.some((i) => i.isFinal !== false);
   }
   if (input.posterUrl !== undefined) data.posterUrl = input.posterUrl?.trim() || null;
   if (input.rulebookUrl !== undefined) data.rulebookUrl = input.rulebookUrl?.trim() || null;
@@ -503,7 +521,21 @@ export async function updateTournamentFull(
     }
   }
 
-  await prisma.tournament.update({ where: { slug }, data });
+  await prisma.tournament.update({ where: { id: tournament.id }, data });
+
+  if (clearWinnersAfterSave) {
+    await clearAutoSyncedChampions(tournament.id);
+  } else if (syncWinnerLinks && syncWinnerLinks.some((l) => l.isFinal)) {
+    // Persist winners immediately on save so Preview / cups list update without waiting for a page visit.
+    const brackets = await Promise.all(
+      syncWinnerLinks.map(async (link) => ({
+        url: link.url,
+        isFinal: link.isFinal,
+        bracket: link.isFinal ? await fetchChallongeBracket(link.url) : null,
+      })),
+    );
+    await syncBracketChampionsToPlacements(tournament.id, brackets).catch(() => {});
+  }
 
   if (
     nextAutoManage &&
@@ -519,11 +551,11 @@ export async function updateTournamentFull(
       ...scheduleInput,
     });
     if (target && target !== tournament.status) {
-      await prisma.tournament.update({ where: { slug }, data: { status: target } });
+      await prisma.tournament.update({ where: { id: tournament.id }, data: { status: target } });
     }
   }
 
-  const saved = await getTournamentAdmin(slug);
+  const saved = await getTournamentAdmin(tournament.slug);
   if (!saved) return { ok: false, error: "Tournament not found after save." };
 
   return { ok: true, tournament: toAdminCupFieldsSnapshot(saved) };
@@ -875,7 +907,9 @@ export async function listTournamentRegistrationsAdmin(
 }
 
 export async function listUnassignedPlayerRegistrations(slug: string) {
-  const tournament = await prisma.tournament.findUnique({ where: { slug } });
+  const tournament = await prisma.tournament.findFirst({
+    where: slugWhere(slug),
+  });
   if (!tournament) return [];
 
   const rows = await prisma.tournamentRegistration.findMany({

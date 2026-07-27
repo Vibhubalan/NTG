@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import type { TournamentRegistrationBanner } from "@core/contracts";
@@ -48,10 +49,16 @@ export default function EsportsRegistrationSlides({ banners, intervalMs = 7000 }
             } hover:scale-[1.01] hover:ring-white/20 hover:shadow-[0_0_40px_rgba(34,211,238,0.15)] active:scale-[0.98] isolate [transform:translateZ(0)]`}
           >
             {banner.hubBannerUrl || (banner.hubCarouselImages && banner.hubCarouselImages.length > 0) ? (
-              <div
-                className="absolute inset-0 z-0 bg-cover bg-center opacity-50 transition-transform duration-700 group-hover/card:scale-105"
-                style={{ backgroundImage: `url('${banner.hubBannerUrl || banner.hubCarouselImages[0]}')` }}
-              />
+              <div className="absolute inset-0 z-0 opacity-50 transition-transform duration-700 group-hover/card:scale-105">
+                <Image
+                  src={banner.hubBannerUrl || banner.hubCarouselImages![0]}
+                  alt=""
+                  fill
+                  sizes="(max-width: 768px) 100vw, 1200px"
+                  className="object-cover object-center"
+                  priority={i === 0}
+                />
+              </div>
             ) : null}
             <div
               className="pointer-events-none absolute inset-0 z-0 bg-gradient-to-t from-black via-[#0A0A0A]/80 to-[#0A0A0A]/20"

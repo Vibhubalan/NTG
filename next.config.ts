@@ -10,16 +10,41 @@ const securityHeaders = [
   },
 ];
 
+function remoteImagePatterns() {
+  const patterns: NonNullable<NextConfig["images"]>["remotePatterns"] = [
+    {
+      protocol: "https",
+      hostname: "images.unsplash.com",
+      pathname: "/**",
+    },
+    {
+      protocol: "https",
+      hostname: "media.valorant-api.com",
+      pathname: "/**",
+    },
+  ];
+
+  const s3PublicUrl = process.env.S3_PUBLIC_URL;
+  if (s3PublicUrl) {
+    try {
+      const host = new URL(s3PublicUrl).hostname;
+      patterns.push({
+        protocol: "https",
+        hostname: host,
+        pathname: "/**",
+      });
+    } catch {
+      // ignore invalid S3_PUBLIC_URL at build time
+    }
+  }
+
+  return patterns;
+}
+
 const nextConfig: NextConfig = {
   images: {
     formats: ["image/avif", "image/webp"],
-    remotePatterns: [
-      {
-        protocol: "https",
-        hostname: "images.unsplash.com",
-        pathname: "/**",
-      },
-    ],
+    remotePatterns: remoteImagePatterns(),
   },
   async headers() {
     return [

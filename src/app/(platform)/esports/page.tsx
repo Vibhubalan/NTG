@@ -1,12 +1,12 @@
 import Link from "next/link";
 import { getSession } from "@core/auth/session";
 import { getPlayerGameProfile } from "@auth-membership/index";
-import { listActiveRegistrationBanners, listTournamentPreviews, getValorantRankings } from "@tournaments-leagues/index";
+import { listActiveRegistrationBanners, listTournamentPreviews, getValorantRankings, getActiveAuction } from "@tournaments-leagues/index";
 import { prisma } from "@core/database/client";
 import { rankIconUrl } from "@/lib/valorant-rank";
 import { sortTournamentsByHostingOrder, sortTournamentsByHostingOrderNewestFirst } from "@/lib/tournament-display";
 import EsportsRegistrationSlides from "@/components/platform/EsportsRegistrationSlides";
-import TournamentVaultSection from "@/components/tournaments/TournamentVaultSection";
+import TournamentVaultSection, { buildTournamentVaultProps } from "@/components/tournaments/TournamentVaultSection";
 
 export const dynamic = "force-dynamic";
 
@@ -18,7 +18,7 @@ export default async function EsportsHubPage() {
   const session = await getSession();
   const userId = session?.user?.id;
 
-  const [tournaments, openRegistrations, leaderboardData, profile, userRegistrations] = await Promise.all([
+  const [tournaments, openRegistrations, leaderboardData, profile, userRegistrations, auction] = await Promise.all([
     listTournamentPreviews(),
     listActiveRegistrationBanners(),
     getValorantRankings(3),
@@ -38,6 +38,7 @@ export default async function EsportsHubPage() {
         },
       })
       : Promise.resolve([]),
+    getActiveAuction(),
   ]);
 
   const openCount = tournaments.filter(
@@ -351,7 +352,10 @@ export default async function EsportsHubPage() {
           </h2>
           <p className="mt-1 ml-0.5 text-sm text-white/40">Our latest community cups. Every champion etched into the lounge&apos;s history.</p>
         </div>
-        <TournamentVaultSection hideHeader={true} />
+        <TournamentVaultSection
+          hideHeader={true}
+          preloaded={buildTournamentVaultProps(tournaments, openRegistrations[0] ?? null, auction)}
+        />
       </div>
 
 

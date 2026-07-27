@@ -77,8 +77,8 @@ export async function PATCH(req: Request, { params }: Props) {
     prizeSplit: body.prizeSplit as PrizeSplitRow[] | null | undefined,
     bracketUrl: normalizeOptionalString(body.bracketUrl),
     bracketUrls: Array.isArray(body.bracketUrls)
-      ? (body.bracketUrls as unknown[]).filter(
-          (u): u is string => typeof u === "string",
+        ? (body.bracketUrls as unknown[]).filter(
+          (u): u is string | import("@/lib/challonge").BracketUrlItem => typeof u === "string" || (typeof u === "object" && u !== null),
         )
       : body.bracketUrls === null
         ? null

@@ -55,4 +55,36 @@ describe("resolveChampion", () => {
     expect(result?.championTeam.players).toHaveLength(2);
     expect(result?.matchScore).toBe("3 - 0");
   });
+
+  it("matches sparse teams", () => {
+    const sparseTeams: TournamentTeamView[] = [
+      {
+        id: "t1",
+        name: "NTG ESPORTS",
+        seed: null,
+        logoUrl: null,
+        players: [
+          {
+            id: "p1",
+            displayName: "Player One",
+            riotId: "one#tag",
+            participantRole: "CAPTAIN",
+          },
+        ],
+      },
+    ];
+
+    const sparseBracket: TournamentBracketView = {
+      ...bracket,
+      finalStandings: [{ rank: 1, name: "NTG Esports", record: "2-0" }],
+    };
+
+    const result = resolveChampion(
+      sparseBracket,
+      sparseTeams,
+      sparseTeams.map((t) => t.name),
+    );
+    expect(result?.championTeam.players).toHaveLength(1);
+    expect(result?.championTeam.players[0]?.displayName).toBe("Player One");
+  });
 });

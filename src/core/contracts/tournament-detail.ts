@@ -9,6 +9,9 @@ export type TournamentPlacementView = {
     riotId: string | null;
     username: string;
     rankTier: string | null;
+    rankTierId?: number | null;
+    riotPlayerCard?: string | null;
+    riotPlayerCardWide?: string | null;
   } | null;
 };
 
@@ -19,6 +22,13 @@ export type TournamentMatchView = {
   status: string;
   scoreSummary: string | null;
   participants: { slot: number; label: string }[];
+};
+
+export type TournamentBracketLink = {
+  name?: string | null;
+  url: string;
+  /** When false, this stage is not used to extract champions. Defaults to true. */
+  isFinal?: boolean;
 };
 
 export type TournamentDetail = {
@@ -42,8 +52,8 @@ export type TournamentDetail = {
   auctionStartsAt: string | null;
   auctionEndsAt: string | null;
   bracketUrl: string | null;
-  /** All Challonge bracket links for this cup (includes bracketUrl as first). */
-  bracketUrls: string[];
+  /** Challonge bracket links (structured so isFinal / stage name survive). */
+  bracketUrls: TournamentBracketLink[];
   rulebookUrl: string | null;
   teams: string[];
   teamDetails: TournamentTeamView[];
@@ -65,6 +75,7 @@ export type PrizeSplitRow = {
 
 export type TournamentTeamPlayerView = {
   id: string;
+  userId?: string | null;
   displayName: string;
   riotId: string | null;
   olympusId?: string | null;
@@ -72,6 +83,9 @@ export type TournamentTeamPlayerView = {
   cs2FaceitRank?: string | null;
   cs2PeakPremier?: string | null;
   valorantRankTier?: string | null;
+  valorantRankTierId?: number | null;
+  riotPlayerCard?: string | null;
+  riotPlayerCardWide?: string | null;
   valorantRoles?: string[] | null;
   participantRole?: "CAPTAIN" | "CO_CAPTAIN" | "PLAYER";
 };

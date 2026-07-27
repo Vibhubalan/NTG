@@ -2,9 +2,10 @@ import { prisma } from "@core/database/client";
 import type { TournamentDetail, PrizeSplitRow, TournamentTeamPlayerView, TournamentTeamView } from "@core/contracts";
 import type { GameSlug, TournamentFormat, TournamentStatus } from "@prisma/client";
 import { gameMetaFor } from "@/lib/tournament-display";
-import { normalizeBracketUrls } from "@/lib/challonge";
-import { syncRegistrationStatus } from "../application/admin-tournament.service";
+import { normalizeBracketUrlItems, normalizeBracketUrls } from "@/lib/challonge";
+import { teamNamesMatch } from "@/lib/tournament-champion";
 import { isTournamentRegistrationLive } from "../domain/registration-window";
+import { slugWhere } from "@/lib/slug-utils";
 
 function parsePrizeSplit(value: unknown): PrizeSplitRow[] | null {
   if (!Array.isArray(value)) return null;
@@ -35,7 +36,10 @@ function parseValorantRoles(value: unknown): string[] | null {
 
 const registrationPlayerSelect = {
   id: true,
+  userId: true,
   participantRole: true,
+  teamName: true,
+  teamId: true,
   snapshotDisplayName: true,
   snapshotOlympusId: true,
   snapshotRiotId: true,
@@ -43,12 +47,22 @@ const registrationPlayerSelect = {
   snapshotCs2FaceitRank: true,
   snapshotCs2PeakPremier: true,
   snapshotRankTier: true,
+  snapshotRankTierId: true,
   snapshotValorantRoles: true,
+  user: {
+    select: {
+      riotPlayerCard: true,
+      riotPlayerCardWide: true,
+    },
+  },
 } as const;
 
 type RegistrationPlayerRow = {
   id: string;
+  userId: string;
   participantRole: string;
+  teamName: string | null;
+  teamId: string | null;
   snapshotDisplayName: string | null;
   snapshotOlympusId: string | null;
   snapshotRiotId: string | null;
@@ -56,12 +70,148 @@ type RegistrationPlayerRow = {
   snapshotCs2FaceitRank: string | null;
   snapshotCs2PeakPremier: string | null;
   snapshotRankTier: string | null;
+  snapshotRankTierId: number | null;
   snapshotValorantRoles: unknown;
+  user?: {
+    riotPlayerCard: string | null;
+    riotPlayerCardWide: string | null;
+  } | null;
 };
+
+function sortRegsByRole(regs: RegistrationPlayerRow[]): RegistrationPlayerRow[] {
+  return [...regs].sort((a, b) => {
+    const order = (role: string) =>
+      role === "CAPTAIN" ? 0 : role === "CO_CAPTAIN" ? 1 : 2;
+    return order(a.participantRole) - order(b.participantRole);
+  });
+}
+
+function registrationsForTeam(
+  teamName: string,
+  teamId: string,
+  allRegs: RegistrationPlayerRow[],
+): RegistrationPlayerRow[] {
+  return allRegs.filter((r) => {
+    if (r.teamId === teamId) return true;
+    const label = r.teamName?.trim();
+    return label ? teamNamesMatch(label, teamName) : false;
+  });
+}
+
+function buildTeamDetailsFromData(
+  tournamentTeams: Array<{
+    id: string;
+    name: string;
+    seed: number | null;
+    logoUrl: string | null;
+    players: Array<{
+      id: string;
+      displayName: string;
+      riotGameName: string | null;
+      riotTagLine: string | null;
+      peakPremierRank: string | null;
+      valorantRoles: unknown;
+      registration: RegistrationPlayerRow | null;
+    }>;
+    registrations: RegistrationPlayerRow[];
+  }>,
+  allRegs: RegistrationPlayerRow[],
+): TournamentTeamView[] {
+  const claimedRegIds = new Set<string>();
+
+  const fromTeams = tournamentTeams.map((team) => {
+    let rosterPlayers: TournamentTeamPlayerView[] =
+      team.players.length > 0
+        ? team.players.map((p) => {
+            if (p.registration) {
+              claimedRegIds.add(p.registration.id);
+              return mapRegistrationToPlayerView(p.registration);
+            }
+            return {
+              id: p.id,
+              displayName: p.displayName,
+              riotId:
+                p.riotGameName && p.riotTagLine
+                  ? `${p.riotGameName}#${p.riotTagLine}`
+                  : null,
+              cs2PeakPremier: p.peakPremierRank,
+              valorantRoles: parseValorantRoles(p.valorantRoles),
+            };
+          })
+        : sortRegsByRole(team.registrations).map((r) => {
+            claimedRegIds.add(r.id);
+            return mapRegistrationToPlayerView(r);
+          });
+
+    if (rosterPlayers.length === 0) {
+      const fallbackRegs = sortRegsByRole(
+        registrationsForTeam(team.name, team.id, allRegs),
+      );
+      rosterPlayers = fallbackRegs.map((r) => {
+        claimedRegIds.add(r.id);
+        return mapRegistrationToPlayerView(r);
+      });
+    }
+
+    return {
+      id: team.id,
+      name: team.name,
+      seed: team.seed,
+      logoUrl: team.logoUrl,
+      players: rosterPlayers,
+    };
+  });
+
+  const leftoverByTeam = new Map<string, RegistrationPlayerRow[]>();
+  for (const reg of allRegs) {
+    if (claimedRegIds.has(reg.id)) continue;
+    const teamLabel = reg.teamName?.trim();
+    if (!teamLabel) continue;
+    const key = normalizeTeamNameKey(teamLabel);
+    const bucket = leftoverByTeam.get(key) ?? [];
+    bucket.push(reg);
+    leftoverByTeam.set(key, bucket);
+  }
+
+  const merged = [...fromTeams];
+  for (const [, regs] of leftoverByTeam) {
+    const displayName = regs[0]?.teamName?.trim();
+    if (!displayName) continue;
+
+    const existing = merged.find((t) => teamNamesMatch(t.name, displayName));
+    if (existing) {
+      if (existing.players.length === 0) {
+        existing.players = sortRegsByRole(regs).map(mapRegistrationToPlayerView);
+      }
+      continue;
+    }
+
+    merged.push({
+      id: `reg-team-${displayName}`,
+      name: displayName,
+      seed: null,
+      logoUrl: null,
+      players: sortRegsByRole(regs).map(mapRegistrationToPlayerView),
+    });
+  }
+
+  return merged;
+}
+
+function normalizeTeamNameKey(name: string): string {
+  return name
+    .toLowerCase()
+    .normalize("NFKD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
 
 function mapRegistrationToPlayerView(r: RegistrationPlayerRow): TournamentTeamPlayerView {
   return {
     id: r.id,
+    userId: r.userId,
     displayName: r.snapshotDisplayName ?? "Player",
     riotId: r.snapshotRiotId,
     olympusId: r.snapshotOlympusId,
@@ -69,6 +219,9 @@ function mapRegistrationToPlayerView(r: RegistrationPlayerRow): TournamentTeamPl
     cs2FaceitRank: r.snapshotCs2FaceitRank,
     cs2PeakPremier: r.snapshotCs2PeakPremier,
     valorantRankTier: r.snapshotRankTier,
+    valorantRankTierId: r.snapshotRankTierId,
+    riotPlayerCard: r.user?.riotPlayerCard ?? null,
+    riotPlayerCardWide: r.user?.riotPlayerCardWide ?? null,
     valorantRoles: parseValorantRoles(r.snapshotValorantRoles),
     participantRole: r.participantRole as TournamentTeamPlayerView["participantRole"],
   };
@@ -149,7 +302,6 @@ function toRegistrationBanner(t: RegistrationBannerRow) {
 
 export class TournamentRepository {
   async listPreviews() {
-    await syncRegistrationStatus().catch(() => {});
     const rows = await prisma.tournament.findMany({
       where: { status: { notIn: ["DRAFT", "CANCELLED"] } },
       orderBy: [{ startsAt: "desc" }, { createdAt: "desc" }],
@@ -167,8 +319,8 @@ export class TournamentRepository {
   }
 
   async findPreviewBySlug(slug: string) {
-    const t = await prisma.tournament.findUnique({
-      where: { slug },
+    const t = await prisma.tournament.findFirst({
+      where: slugWhere(slug),
       include: {
         season: true,
         placements: {
@@ -183,9 +335,8 @@ export class TournamentRepository {
   }
 
   async findDetailBySlug(slug: string, userId?: string): Promise<TournamentDetail | null> {
-    await syncRegistrationStatus().catch(() => {});
-    const t = await prisma.tournament.findUnique({
-      where: { slug },
+    const t = await prisma.tournament.findFirst({
+      where: slugWhere(slug),
       include: {
         season: true,
         placements: {
@@ -193,7 +344,7 @@ export class TournamentRepository {
             user: {
               include: {
                 playerProfile: { include: { gameLinks: true } },
-                registrations: { where: { tournament: { slug } } },
+                registrations: { where: { tournament: slugWhere(slug) } },
                 leaderboard: { orderBy: { updatedAt: "desc" }, take: 1 },
               },
             },
@@ -227,52 +378,22 @@ export class TournamentRepository {
             },
           },
         },
-        registrations: userId
-          ? { where: { userId }, select: { id: true, participantRole: true } }
-          : { select: { id: true, participantRole: true } },
+        registrations: {
+          where: { status: "APPROVED" },
+          select: registrationPlayerSelect,
+        },
         _count: { select: { registrations: true } },
       },
     });
     if (!t) return null;
 
-    const teamDetails: TournamentTeamView[] = t.tournamentTeams.map((team) => {
-      const rosterPlayers =
-        team.players.length > 0
-          ? team.players.map((p) => {
-              if (p.registration) {
-                return mapRegistrationToPlayerView(p.registration);
-              }
-              return {
-                id: p.id,
-                displayName: p.displayName,
-                riotId:
-                  p.riotGameName && p.riotTagLine
-                    ? `${p.riotGameName}#${p.riotTagLine}`
-                    : null,
-                cs2PeakPremier: p.peakPremierRank,
-                valorantRoles: parseValorantRoles(p.valorantRoles),
-              };
-            })
-          : [...team.registrations]
-              .sort((a, b) => {
-                const order = (role: string) =>
-                  role === "CAPTAIN" ? 0 : role === "CO_CAPTAIN" ? 1 : 2;
-                const diff = order(a.participantRole) - order(b.participantRole);
-                if (diff !== 0) return diff;
-                return 0;
-              })
-              .map((r) => mapRegistrationToPlayerView(r));
-
-      return {
-        id: team.id,
-        name: team.name,
-        seed: team.seed,
-        logoUrl: team.logoUrl,
-        players: rosterPlayers,
-      };
-    });
+    const allRegs = t.registrations;
+    const teamDetails = buildTeamDetailsFromData(t.tournamentTeams, allRegs);
 
     const teams = teamDetails.map((team) => team.name);
+    const userRegistration = userId
+      ? allRegs.find((r) => r.userId === userId)
+      : undefined;
 
     return {
       id: t.id,
@@ -295,13 +416,14 @@ export class TournamentRepository {
       auctionStartsAt: t.auctionStartsAt?.toISOString() ?? null,
       auctionEndsAt: t.auctionEndsAt?.toISOString() ?? null,
       ...(() => {
-        const urls = normalizeBracketUrls({
+        const items = normalizeBracketUrlItems({
           bracketUrl: t.bracketUrl,
           bracketUrls: (t as { bracketUrls?: unknown }).bracketUrls,
         });
         return {
-          bracketUrl: urls[0] ?? null,
-          bracketUrls: urls,
+          bracketUrl: items[0]?.url ?? t.bracketUrl ?? null,
+          // Keep structured items so "Use for Winners" (isFinal) is not lost.
+          bracketUrls: items,
         };
       })(),
       rulebookUrl: t.rulebookUrl ?? null,
@@ -324,6 +446,9 @@ export class TournamentRepository {
                 username: p.user.playerProfile?.usernameKey ?? p.user.name ?? "",
                 riotId: liveRiotId ?? reg?.snapshotRiotId ?? null,
                 rankTier: lb?.rankTier ?? reg?.snapshotRankTier ?? null,
+                rankTierId: lb?.rankTierId ?? reg?.snapshotRankTierId ?? null,
+                riotPlayerCard: p.user.riotPlayerCard ?? null,
+                riotPlayerCardWide: p.user.riotPlayerCardWide ?? null,
               }
             : null,
         };
@@ -345,8 +470,10 @@ export class TournamentRepository {
           })),
         })) ?? [],
       registrationCount: t._count.registrations,
-      userRegistered: userId ? t.registrations.length > 0 : false,
-      userParticipantRole: userId ? (t.registrations[0]?.participantRole ?? null) : null,
+      userRegistered: Boolean(userRegistration),
+      userParticipantRole: userRegistration
+        ? (userRegistration.participantRole as TournamentDetail["userParticipantRole"])
+        : null,
       coCaptainSlots: t.coCaptainSlots,
       autoManageStatus: t.autoManageStatus,
       publicAuction: t.publicAuction,
@@ -354,7 +481,6 @@ export class TournamentRepository {
   }
 
   async findActiveRegistrationBanners() {
-    await syncRegistrationStatus().catch(() => {});
     const candidates = await prisma.tournament.findMany({
       where: {
         status: { not: "CANCELLED" },

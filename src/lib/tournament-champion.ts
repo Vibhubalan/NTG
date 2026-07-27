@@ -27,7 +27,7 @@ export function normalizeTeamName(name: string): string {
     .trim();
 }
 
-function namesMatch(a: string, b: string): boolean {
+export function teamNamesMatch(a: string, b: string): boolean {
   const na = normalizeTeamName(a);
   const nb = normalizeTeamName(b);
   if (!na || !nb) return false;
@@ -44,6 +44,9 @@ function namesMatch(a: string, b: string): boolean {
   }
   return true;
 }
+
+/** @deprecated Use teamNamesMatch */
+export const namesMatch = teamNamesMatch;
 
 export function resolveChampion(
   bracket: TournamentBracketView | null = null,
@@ -130,38 +133,63 @@ function findTeamDetail(
   const exact = teamDetails.find(
     (t) => t.name.trim().toLowerCase() === label.toLowerCase(),
   );
-  if (exact) return exact;
+  if (exact) return withRoster(exact, teamDetails, label);
 
-  const fuzzy = teamDetails.find((t) => namesMatch(t.name, label));
-  if (fuzzy) return fuzzy;
+  const fuzzy = teamDetails.find((t) => teamNamesMatch(t.name, label));
+  if (fuzzy) return withRoster(fuzzy, teamDetails, label);
 
   const listedExact = teams.find((t) => t.trim().toLowerCase() === label.toLowerCase());
   if (listedExact) {
-    return {
-      id: `team-${listedExact}`,
-      name: listedExact,
-      seed: null,
-      logoUrl: null,
-      players: [],
-    };
+    return withRoster(
+      {
+        id: `team-${listedExact}`,
+        name: listedExact,
+        seed: null,
+        logoUrl: null,
+        players: [],
+      },
+      teamDetails,
+      label,
+    );
   }
 
-  const listedFuzzy = teams.find((t) => namesMatch(t, label));
+  const listedFuzzy = teams.find((t) => teamNamesMatch(t, label));
   if (listedFuzzy) {
-    return {
-      id: `team-${listedFuzzy}`,
-      name: listedFuzzy,
+    return withRoster(
+      {
+        id: `team-${listedFuzzy}`,
+        name: listedFuzzy,
+        seed: null,
+        logoUrl: null,
+        players: [],
+      },
+      teamDetails,
+      label,
+    );
+  }
+
+  return withRoster(
+    {
+      id: `team-${label}`,
+      name: label,
       seed: null,
       logoUrl: null,
       players: [],
-    };
-  }
+    },
+    teamDetails,
+    label,
+  );
+}
 
-  return {
-    id: `team-${label}`,
-    name: label,
-    seed: null,
-    logoUrl: null,
-    players: [],
-  };
+function withRoster(
+  team: TournamentTeamView,
+  teamDetails: TournamentTeamView[],
+  label: string,
+): TournamentTeamView {
+  if (team.players.length > 0) return team;
+  const donor = teamDetails.find(
+    (t) => t.players.length > 0 && teamNamesMatch(t.name, label),
+  );
+  if (donor) return { ...team, players: donor.players };
+  return team;
 }

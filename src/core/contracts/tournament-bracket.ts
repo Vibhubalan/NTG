@@ -28,13 +28,34 @@ export type FinalStandingView = {
   record: string;
 };
 
+export type GroupStandingView = {
+  rank: number;
+  name: string;
+  matchRecord: string; // e.g. "2 - 0 - 0"
+  ptsDiff: number;
+  pts: number;
+  tb: number;
+  setWins: number;
+  setTies: number;
+  matchHistory: ("W" | "L" | "T")[];
+};
+
+export type GroupView = {
+  id: string;
+  name: string;
+  standings: GroupStandingView[];
+  rounds: BracketRoundView[];
+};
+
 export type TournamentBracketView = {
   tournamentName: string;
   tournamentType: string;
   rounds: BracketRoundView[];
   participants: string[];
   finalStandings: FinalStandingView[];
+  groups?: GroupView[] | null;
   mvp: string | null;
   sourceUrl: string | null;
   fetchedAt: string;
 };
+

@@ -9,6 +9,7 @@ import { useAdminDeleteConfirm } from "@/components/admin/useAdminDeleteConfirm"
 import type { PrizeSplitRow } from "@core/contracts";
 import { emptyToNull, prizeSplitForSave } from "@/lib/admin-fields";
 import { formatParticipantRole } from "@/lib/tournament-display";
+import { parseBracketUrlItem, normalizeBracketUrlItems, type BracketUrlItem } from "@/lib/challonge";
 
 type Team = {
   id: string;
@@ -87,7 +88,8 @@ type TournamentData = {
   autoManageStatus: boolean;
   hideAfter: string | null;
   bracketUrl: string | null;
-  bracketUrls: string[];
+  bracketUrls: (string | BracketUrlItem)[];
+  bracketLinks?: { name: string; url: string; isFinal: boolean }[];
   rulebookUrl: string | null;
   publicAuction?: boolean;
   tournamentTeams: Team[];
@@ -153,7 +155,40 @@ type CupFields = Omit<
 >;
 
 function applyCupFields(form: TournamentData, fields: CupFields): TournamentData {
-  return { ...form, ...fields };
+  const next = { ...form, ...fields };
+  if (fields.bracketUrls !== undefined || fields.bracketUrl !== undefined) {
+    const items = normalizeBracketUrlItems({
+      bracketUrl: fields.bracketUrl ?? next.bracketUrl,
+      bracketUrls: fields.bracketUrls ?? next.bracketUrls,
+    });
+    next.bracketLinks = items.length
+      ? items.map((i) => ({
+          name: i.name ?? "",
+          url: i.url ?? "",
+          isFinal: i.isFinal !== false,
+        }))
+      : [{ name: "", url: "", isFinal: true }];
+  }
+  return next;
+}
+
+function bracketUrlsPayload(links?: { name: string; url: string; isFinal: boolean }[]) {
+  const items = links ?? [];
+  const primaryUrl = items.map((l) => l.url.trim()).find(Boolean) ?? null;
+  const bracketUrls: (string | BracketUrlItem)[] = items
+    .map((l): string | BracketUrlItem | null => {
+      const url = l.url.trim();
+      const name = l.name.trim() || undefined;
+      const isFinal = l.isFinal;
+      if (!url) return null;
+      if (name || !isFinal) {
+        return { name, url, isFinal };
+      }
+      return url;
+    })
+    .filter((u): u is string | BracketUrlItem => u !== null);
+
+  return { bracketUrl: primaryUrl, bracketUrls };
 }
 
 /** Normalized cup fields compared against the last saved state (matches saveAll payload). */
@@ -173,8 +208,7 @@ function getSavePayload(form: TournamentData) {
     endsAt: form.endsAt || null,
     registrationOpensAt: form.registrationOpensAt || null,
     autoManageStatus: form.autoManageStatus,
-    bracketUrl: emptyToNull(form.bracketUrls.find((u) => u.trim()) ?? form.bracketUrl),
-    bracketUrls: form.bracketUrls.map((u) => u.trim()).filter(Boolean),
+    ...bracketUrlsPayload(form.bracketLinks),
     rulebookUrl: emptyToNull(form.rulebookUrl),
     registrationFormat: SUPPORTS_FORMAT.includes(form.game) ? form.registrationFormat : null,
     format: form.format || null,
@@ -224,17 +258,23 @@ export default function AdminTournamentEditor({
   const { openDeleteConfirm, DeleteConfirmDialog } = useAdminDeleteConfirm();
 
   const initialFormState: TournamentData = useMemo(() => {
-    const urls =
-      initial.bracketUrls?.length
-        ? initial.bracketUrls
-        : initial.bracketUrl
-          ? [initial.bracketUrl]
-          : [""];
+    const items = normalizeBracketUrlItems({
+      bracketUrl: initial.bracketUrl,
+      bracketUrls: initial.bracketUrls,
+    });
+    const links = items.length
+      ? items.map((i) => ({
+          name: i.name ?? "",
+          url: i.url ?? "",
+          isFinal: i.isFinal !== false,
+        }))
+      : [{ name: "", url: "", isFinal: true }];
     return {
       ...initial,
       seasonId: null,
-      bracketUrls: urls.length ? urls : [""],
-      bracketUrl: urls[0] ?? null,
+      bracketLinks: links,
+      bracketUrls: initial.bracketUrls || [],
+      bracketUrl: initial.bracketUrl || null,
     };
   }, [initial]);
 
@@ -592,8 +632,7 @@ export default function AdminTournamentEditor({
           registrationOpensAt: form.registrationOpensAt || null,
           autoManageStatus: form.autoManageStatus,
           hideAfter: null,
-          bracketUrl: emptyToNull(form.bracketUrls.find((u) => u.trim()) ?? form.bracketUrl),
-          bracketUrls: form.bracketUrls.map((u) => u.trim()).filter(Boolean),
+          ...bracketUrlsPayload(form.bracketLinks),
           rulebookUrl: emptyToNull(form.rulebookUrl),
           registrationFormat: SUPPORTS_FORMAT.includes(form.game) ? form.registrationFormat : null,
           format: form.format || null,
@@ -623,7 +662,8 @@ export default function AdminTournamentEditor({
         mvpEnabled !== savedMvpRef.current.enabled ||
         (mvpEnabled && selectedMvp?.id !== savedMvpRef.current.userId);
 
-      if (mvpChanged) {
+      // Always send MVP update when state differs OR when explicitly disabling
+      if (mvpChanged || !mvpEnabled) {
         const placements = mvpEnabled && selectedMvp ? [{ role: "MVP" as const, userId: selectedMvp.id }] : [];
         const clearRoles = ["MVP"] as const;
 
@@ -1662,6 +1702,7 @@ export default function AdminTournamentEditor({
         {/* Tab 4: Bracket & MVP */}
         {activeTab === "standings" && (
           <div className="space-y-6 animate-in fade-in duration-200">
+
             <AdminSection
               title="Bracket Link & MVP"
               showsOn="Challonge bracket on the cup page; MVP card in Final Results"
@@ -1672,53 +1713,91 @@ export default function AdminTournamentEditor({
                   <label className="text-[10px] font-bold uppercase tracking-wider text-white/40">
                     Challonge URL Links
                   </label>
-                  {(form.bracketUrls.length ? form.bracketUrls : [""]).map(
-                    (url, index) => (
-                      <div key={index} className="flex gap-2">
+                  {(form.bracketLinks?.length
+                    ? form.bracketLinks
+                    : [{ name: "", url: "", isFinal: true }]
+                  ).map((link, index) => (
+                    <div
+                      key={index}
+                      className="flex flex-col sm:flex-row gap-2.5 items-center rounded-xl border border-white/[0.08] bg-white/[0.02] p-3"
+                    >
+                      <div className="w-full sm:w-1/3">
                         <input
                           className={inputClass}
-                          value={url}
+                          value={link.name}
                           onChange={(e) => {
-                            const next = [...form.bracketUrls];
-                            if (next.length === 0) next.push("");
-                            next[index] = e.target.value;
+                            const val = e.target.value;
+                            const next = [...(form.bracketLinks ?? [])];
+                            next[index] = { ...next[index], name: val };
+                            setForm({ ...form, bracketLinks: next });
+                          }}
+                          placeholder="Stage Heading (e.g. Group A, Playoffs)"
+                        />
+                      </div>
+                      <div className="w-full sm:flex-1">
+                        <input
+                          className={inputClass}
+                          value={link.url}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            const next = [...(form.bracketLinks ?? [])];
+                            next[index] = { ...next[index], url: val };
+                            setForm({ ...form, bracketLinks: next });
+                          }}
+                          placeholder="https://challonge.com/jyln1rx4"
+                        />
+                      </div>
+                      <label className="flex items-center gap-2 text-xs font-medium text-white/70 hover:text-white cursor-pointer select-none shrink-0 px-3 py-2 rounded-xl bg-white/[0.03] border border-white/10 hover:bg-white/[0.06] transition-colors">
+                        <input
+                          type="checkbox"
+                          checked={link.isFinal !== false}
+                          onChange={(e) => {
+                            const checked = e.target.checked;
+                            const next = [...(form.bracketLinks ?? [])].map((row, i) => {
+                              if (i === index) return { ...row, isFinal: checked };
+                              // Only one stage should drive winners.
+                              if (checked) return { ...row, isFinal: false };
+                              return row;
+                            });
+                            setForm({ ...form, bracketLinks: next });
+                          }}
+                          className="rounded border-white/20 bg-white/5 text-[#22c55e] focus:ring-[#22c55e] focus:ring-offset-0 cursor-pointer"
+                        />
+                        <span className="text-[11px] font-bold uppercase tracking-wider text-emerald-400">
+                          Use for Winners
+                        </span>
+                      </label>
+                      {(form.bracketLinks?.length ?? 0) > 1 ? (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const next = (form.bracketLinks ?? []).filter(
+                              (_, i) => i !== index,
+                            );
                             setForm({
                               ...form,
-                              bracketUrls: next,
-                              bracketUrl: next.find((u) => u.trim()) || null,
+                              bracketLinks: next.length
+                                ? next
+                                : [{ name: "", url: "", isFinal: true }],
                             });
                           }}
-                          placeholder="e.g. https://challonge.com/jyln1rx4"
-                        />
-                        {form.bracketUrls.length > 1 ? (
-                          <button
-                            type="button"
-                            onClick={() => {
-                              const next = form.bracketUrls.filter(
-                                (_, i) => i !== index,
-                              );
-                              setForm({
-                                ...form,
-                                bracketUrls: next.length ? next : [""],
-                                bracketUrl:
-                                  next.find((u) => u.trim()) || null,
-                              });
-                            }}
-                            className="shrink-0 rounded-xl border border-white/10 px-3 text-xs text-rose-300/80 hover:bg-rose-500/10"
-                            aria-label="Remove bracket link"
-                          >
-                            ✕
-                          </button>
-                        ) : null}
-                      </div>
-                    ),
-                  )}
+                          className="shrink-0 rounded-xl border border-rose-500/20 bg-rose-500/10 px-3 py-2.5 text-xs font-semibold text-rose-300 hover:bg-rose-500/20"
+                          aria-label="Remove bracket link"
+                        >
+                          ✕
+                        </button>
+                      ) : null}
+                    </div>
+                  ))}
                   <button
                     type="button"
                     onClick={() =>
                       setForm({
                         ...form,
-                        bracketUrls: [...(form.bracketUrls.length ? form.bracketUrls : [""]), ""],
+                        bracketLinks: [
+                          ...(form.bracketLinks ?? []),
+                          { name: "", url: "", isFinal: true },
+                        ],
                       })
                     }
                     className="rounded-xl border border-dashed border-white/15 px-4 py-2.5 text-xs font-semibold uppercase tracking-wider text-white/55 hover:border-white/30 hover:text-white/80"
@@ -1726,8 +1805,8 @@ export default function AdminTournamentEditor({
                     + Add Challonge link
                   </button>
                   <p className="text-[10px] text-white/30 italic">
-                    Challonge is loaded only on this cup&apos;s public page (not homepage/lists).
-                    Add one link per bracket stage if needed.
+                    Add optional Stage Headings (e.g. Group A, Knockouts) and Challonge URLs for each stage.
+                    Tick <span className="text-emerald-400/80">Use for Winners</span> on exactly one final stage to crown champions; untick and save to clear them.
                   </p>
                 </div>
 
@@ -1790,6 +1869,17 @@ export default function AdminTournamentEditor({
                   <p className="text-[10px] text-white/40">
                     Optional. Shown on the cup page below the Challonge results.
                   </p>
+                </div>
+
+                <div className="pt-3 border-t border-white/[0.04]">
+                  <button
+                    type="button"
+                    onClick={saveAll}
+                    disabled={loading}
+                    className="rounded-xl bg-[#22c55e] px-6 py-2.5 text-xs font-bold uppercase tracking-[0.16em] text-black shadow-lg hover:bg-[#16a34a] transition-all disabled:opacity-50"
+                  >
+                    {loading ? "Saving..." : "Save Bracket Links & MVP"}
+                  </button>
                 </div>
               </div>
             </AdminSection>

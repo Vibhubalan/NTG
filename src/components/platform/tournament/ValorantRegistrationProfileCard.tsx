@@ -92,9 +92,16 @@ export default function ValorantRegistrationProfileCard({ profile }: Props) {
 
         <div className="flex min-w-0 flex-1 flex-col justify-between gap-4">
           <div>
-            <p className="text-[9px] font-bold uppercase tracking-[0.28em] text-[var(--color-brand)]">
-              Your profile
-            </p>
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <p className="text-[9px] font-bold uppercase tracking-[0.28em] text-[var(--color-brand)]">
+                Your profile
+              </p>
+              {profile.teamName ? (
+                <span className="inline-flex items-center rounded-md border border-[#22c55e]/30 bg-[#22c55e]/10 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-[#22c55e] shadow-sm">
+                  Team: {profile.teamName}
+                </span>
+              ) : null}
+            </div>
             <h3 className="mt-1 font-display text-xl font-bold text-white sm:text-2xl">
               {profile.displayName}
             </h3>
@@ -144,12 +151,6 @@ export default function ValorantRegistrationProfileCard({ profile }: Props) {
         </div>
       </div>
 
-      {profile.teamName ? (
-        <div className="rounded-xl border border-white/[0.08] bg-white/[0.03] px-4 py-3">
-          <p className="text-[9px] font-bold uppercase tracking-[0.22em] text-white/35">Team</p>
-          <p className="mt-1 font-display text-lg font-bold text-white">{profile.teamName}</p>
-        </div>
-      ) : null}
     </div>
   );
 }

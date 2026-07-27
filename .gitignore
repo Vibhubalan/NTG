@@ -31,6 +31,9 @@
 *.pem
 .commit-msg.txt
 
+# local Challonge / API disk caches
+.cache/
+
 # local DB dumps (never commit)
 *.dump
 ntg-neon-backup.dump

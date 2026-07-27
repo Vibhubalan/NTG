@@ -12,7 +12,7 @@ import type { PrizeSplitRow } from "@core/contracts";
 import { prisma } from "@core/database/client";
 import { getSession } from "@core/auth/session";
 import { auctionLink } from "@/lib/auction-link";
-import { normalizeBracketUrls } from "@/lib/challonge";
+import { normalizeBracketUrlItems } from "@/lib/challonge";
 import { resolveEffectivePublicAuction } from "@tournaments-leagues/domain/auction-hero-phase";
 
 export const metadata = { title: "Edit Cup" };
@@ -81,7 +81,7 @@ export default async function AdminTournamentEditPage({ params }: Props) {
     publicAuction: resolveEffectivePublicAuction(t.publicAuction ?? false, t),
     rankPoints: (t.rankPoints as { rank: string; floor: number }[] | null) ?? null,
     bracketUrl: t.bracketUrl,
-    bracketUrls: normalizeBracketUrls({
+    bracketUrls: normalizeBracketUrlItems({
       bracketUrl: t.bracketUrl,
       bracketUrls: (t as { bracketUrls?: unknown }).bracketUrls,
     }),

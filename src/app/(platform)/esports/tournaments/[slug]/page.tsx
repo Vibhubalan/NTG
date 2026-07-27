@@ -1,8 +1,7 @@
 import { notFound } from "next/navigation";
 import TournamentDetailView from "@/components/platform/TournamentDetailView";
-import { fetchChallongeBrackets } from "@/lib/challonge-api";
-import { normalizeBracketUrls } from "@/lib/challonge";
-import { syncBracketChampionsToPlacements } from "@/lib/sync-bracket-champions";
+import { fetchChallongeBracket } from "@/lib/challonge-api";
+import { normalizeBracketUrlItems } from "@/lib/challonge";
 import { getSession } from "@core/auth/session";
 import { requireAdmin } from "@core/auth/require-admin";
 import {
@@ -18,7 +17,8 @@ type Props = { params: Promise<{ slug: string }> };
 
 export async function generateMetadata({ params }: Props) {
   const { slug } = await params;
-  const t = await getTournamentDetail(slug);
+  const session = await getSession();
+  const t = await getTournamentDetail(slug, session?.user?.id);
   return { title: t ? t.name : "Tournament" };
 }
 
@@ -26,30 +26,31 @@ export default async function TournamentDetailPage({ params }: Props) {
   const { slug } = await params;
   const session = await getSession();
   const userId = session?.user?.id;
-  const raw = await getTournamentDetail(slug, userId);
-  if (!raw) notFound();
-  const tournament = raw;
-  const bracketUrls = normalizeBracketUrls({
+  const tournament = await getTournamentDetail(slug, userId);
+  if (!tournament) notFound();
+  const isCompleted = tournament.status === "COMPLETED";
+  const bracketItems = normalizeBracketUrlItems({
     bracketUrl: tournament.bracketUrl,
     bracketUrls: tournament.bracketUrls,
   });
-  const brackets = bracketUrls.length
-    ? await fetchChallongeBrackets(bracketUrls)
-    : [];
 
-  // Persist Challonge winners to DB so cups list shows them without API spam.
-  if (brackets.some((b) => b.bracket?.finalStandings?.length)) {
-    await syncBracketChampionsToPlacements(tournament.id, brackets).catch(() => {});
-  }
-
-  const admin = await requireAdmin();
-  const registrationPreview = userId
-    ? await getRegistrationEligibility(slug, userId)
-    : null;
-  const registrationProfileCard =
-    userId && raw.game === "VALORANT" && raw.userRegistered
-      ? await getValorantRegistrationProfileCard(slug, userId)
-      : null;
+  const [brackets, admin, registrationPreview, registrationProfileCard] = await Promise.all([
+    bracketItems.length
+      ? Promise.all(
+          bracketItems.map(async (item) => ({
+            url: item.url,
+            name: item.name ?? null,
+            isFinal: item.isFinal !== false,
+            bracket: await fetchChallongeBracket(item.url, isCompleted),
+          })),
+        )
+      : Promise.resolve([]),
+    requireAdmin(),
+    userId ? getRegistrationEligibility(slug, userId) : Promise.resolve(null),
+    userId && tournament.game === "VALORANT" && tournament.userRegistered
+      ? getValorantRegistrationProfileCard(slug, userId)
+      : Promise.resolve(null),
+  ]);
 
   const publicAuction = resolveEffectivePublicAuction(
     tournament.publicAuction ?? false,
@@ -91,7 +92,7 @@ export default async function TournamentDetailPage({ params }: Props) {
       {admin.ok ? (
         <div className="mt-16 border-t border-white/[0.06] pt-8 text-center">
           <a
-            href={`/admin/tournaments/${slug}`}
+            href={`/admin/tournaments/${tournament.slug}`}
             className="inline-flex rounded-full border border-amber-500/30 bg-amber-500/10 px-6 py-2.5 text-[11px] font-semibold uppercase tracking-[0.16em] text-amber-200 transition-colors hover:bg-amber-500/20"
           >
             Edit in admin →

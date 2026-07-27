@@ -1,22 +1,38 @@
+"use client";
+
+import dynamic from "next/dynamic";
+import Image from "next/image";
+import { useEffect, useState } from "react";
 import BrandIcon from "@/components/ui/BrandIcon";
 import StatusBadge from "@/components/platform/ui/StatusBadge";
-import ChallongeEmbed from "@/components/platform/tournament/ChallongeEmbed";
-import TournamentBracket from "@/components/platform/tournament/TournamentBracket";
+import TournamentBracketEmpty from "@/components/platform/tournament/TournamentBracketEmpty";
 import TournamentChampionSection from "@/components/platform/tournament/TournamentChampionSection";
 import TournamentFinalResults from "@/components/platform/tournament/TournamentFinalResults";
 import TournamentScheduleCard from "@/components/platform/tournament/TournamentScheduleCard";
 import TournamentTeamsList from "@/components/platform/tournament/TournamentTeamsList";
 import { resolveChampion } from "@/lib/tournament-champion";
 import { gameMetaFor, formatRegistrationLabel, buildTournamentScheduleCardView } from "@/lib/tournament-display";
-import TournamentRegisterForm from "./TournamentRegisterForm";
 import type { RegistrationPreview } from "./TournamentRegisterForm";
 import type { TournamentDetail } from "@core/contracts";
 import type { ValorantRegistrationProfileCard } from "@core/contracts/registration-profile";
 import type { TournamentBracketView, FinalStandingView } from "@core/contracts/tournament-bracket";
 
+const TournamentBracket = dynamic(
+  () => import("@/components/platform/tournament/TournamentBracket"),
+  {
+    loading: () => (
+      <div className="rounded-2xl border border-white/10 bg-white/[0.02] p-12 text-center text-white/40">
+        Loading brackets...
+      </div>
+    ),
+  },
+);
+
+const TournamentRegisterForm = dynamic(() => import("./TournamentRegisterForm"));
+
 type Props = {
   tournament: TournamentDetail;
-  brackets: { url: string; bracket: TournamentBracketView | null }[];
+  brackets: { url: string; name?: string | null; isFinal?: boolean; bracket: TournamentBracketView | null }[];
   isLoggedIn: boolean;
   registrationPreview?: RegistrationPreview | null;
   registrationProfileCard?: ValorantRegistrationProfileCard | null;
@@ -33,8 +49,10 @@ export default function TournamentDetailView({
   auctionHref,
   auctionEnded,
 }: Props) {
+  const [activeTab, setActiveTab] = useState<"overview" | "brackets">("overview");
+  const [activeStageIndex, setActiveStageIndex] = useState<number>(0);
+  const [generatedFallback, setGeneratedFallback] = useState<TournamentBracketView | null>(null);
   const meta = gameMetaFor(tournament.game);
-  const showBracket = brackets.length > 0;
   const dateStr = tournament.startsAt
     ? new Date(tournament.startsAt).toLocaleDateString("en-IN", {
         day: "numeric",
@@ -47,22 +65,26 @@ export default function TournamentDetailView({
   const mvpPlacement = tournament.placements.find((p) => p.role === "MVP");
   const adminMvp = mvpPlacement?.user
     ? {
-        displayName: mvpPlacement.user.username,
+        displayName: mvpPlacement.displayName || mvpPlacement.user.username,
+        userId: mvpPlacement.user.id,
         riotId: mvpPlacement.user.riotId,
         rankTier: mvpPlacement.user.rankTier,
+        valorantRankTierId: mvpPlacement.user.rankTierId ?? null,
+        riotPlayerCard: mvpPlacement.user.riotPlayerCard ?? null,
+        riotPlayerCardWide: mvpPlacement.user.riotPlayerCardWide ?? null,
       }
     : mvpPlacement?.teamLabel?.trim()
       ? mvpPlacement.displayName
       : null;
-  const loadedBrackets = brackets
-    .map((b) => b.bracket)
-    .filter((b): b is TournamentBracketView => b != null);
+  const hasWinnerStage = brackets.some((b) => b.isFinal !== false);
   const primaryBracket =
-    [...loadedBrackets].reverse().find((b) =>
-      b.finalStandings.some((s) => s.rank === 1 && s.name?.trim()),
-    ) ??
-    loadedBrackets[0] ??
-    null;
+    brackets
+      .filter((b) => b.isFinal !== false)
+      .map((b) => b.bracket)
+      .reverse()
+      .find((b): b is TournamentBracketView =>
+        Boolean(b?.finalStandings?.some((s) => s.rank === 1 && s.name?.trim())),
+      ) ?? null;
   const mvp = primaryBracket?.mvp ?? adminMvp ?? null;
 
   const fallbackStandings: FinalStandingView[] = [];
@@ -76,7 +98,7 @@ export default function TournamentDetailView({
     primaryBracket,
     tournament.teamDetails,
     tournament.teams,
-    tournament.placements,
+    hasWinnerStage ? tournament.placements : [],
   );
 
   const prizeSplit =
@@ -93,6 +115,7 @@ export default function TournamentDetailView({
   const showChampion = Boolean(championData);
   const showFinalResults = !showChampion && (standings.length > 0 || Boolean(mvp));
   const showMvpOnly = showChampion && Boolean(mvp);
+  const showResultsBlock = showChampion || showFinalResults || showMvpOnly;
   const showTeams =
     tournament.teams.length > 0 ||
     tournament.teamDetails.length > 0 ||
@@ -112,15 +135,44 @@ export default function TournamentDetailView({
     auctionStartsAt: tournament.auctionStartsAt,
   });
 
+  const posterSrc = tournament.posterUrl ?? "/images/tournament_poster.png";
+
+  useEffect(() => {
+    if (activeTab !== "brackets" || brackets.length > 0) return;
+    if (!tournament.teams.length) return;
+
+    let cancelled = false;
+    void import("@/lib/challonge-bracket-gen").then(
+      ({ generateBracketFromParticipants, generateRoundRobinBracketFromParticipants }) => {
+        if (cancelled) return;
+        const isAuction =
+          tournament.registrationFormat === "AUCTION" || tournament.slug.includes("auc-cup");
+        const participants = tournament.teams.map((t, i) => ({ seed: i + 1, name: t }));
+        const fallback = isAuction
+          ? generateRoundRobinBracketFromParticipants(participants, tournament.name)
+          : generateBracketFromParticipants(participants, tournament.name);
+        setGeneratedFallback(fallback);
+      },
+    );
+
+    return () => {
+      cancelled = true;
+    };
+  }, [activeTab, brackets.length, tournament.teams, tournament.registrationFormat, tournament.slug, tournament.name]);
+
   return (
     <article className="pb-24">
       <div className="relative mb-12 flex min-h-[24rem] flex-col justify-end overflow-hidden rounded-[2rem] border border-white/[0.08] p-8 shadow-2xl sm:min-h-[30rem] sm:p-12">
-        <div
-          className="absolute inset-0 z-0 bg-cover bg-center opacity-80"
-          style={{
-            backgroundImage: `url('${tournament.posterUrl ?? "/images/tournament_poster.png"}')`,
-          }}
-        />
+        <div className="absolute inset-0 z-0">
+          <Image
+            src={posterSrc}
+            alt=""
+            fill
+            priority
+            sizes="(max-width: 768px) 100vw, 1200px"
+            className="object-cover object-center opacity-80"
+          />
+        </div>
         <div className="absolute inset-0 z-0 bg-gradient-to-t from-[#050505] via-[#050505]/60 to-transparent" />
 
         <div className="relative z-10 flex flex-col gap-6 sm:flex-row sm:items-end sm:justify-between">
@@ -156,74 +208,124 @@ export default function TournamentDetailView({
         </div>
       </div>
 
-      <div className="grid gap-12 lg:grid-cols-[1fr_24rem] lg:items-start">
-        <div className="order-1 space-y-16 lg:col-start-1 lg:row-start-1">
-          {showChampion && championData ? (
-            <TournamentChampionSection
-              championData={championData}
-              game={tournament.game}
-              accentHex={meta.hex}
-            />
-          ) : null}
-
-          {showMvpOnly ? (
-            <TournamentFinalResults standings={[]} mvp={mvp} />
-          ) : null}
-
-          {showFinalResults ? (
-            <TournamentFinalResults
-              standings={standings}
-              mvp={mvp}
-            />
-          ) : null}
-
-          {showRegistrationSection ? (
-            <TournamentRegisterForm
-              layout="featured"
-              slug={tournament.slug}
-              game={tournament.game}
-              registrationFormat={tournament.registrationFormat}
-              isLoggedIn={isLoggedIn}
-              alreadyRegistered={tournament.userRegistered}
-              registrationOpen={tournament.registrationOpen}
-              rulebookUrl={tournament.rulebookUrl}
-              preview={registrationPreview ?? null}
-              coCaptainSlots={tournament.coCaptainSlots}
-              registrationProfileCard={registrationProfileCard ?? null}
-              userParticipantRole={tournament.userParticipantRole}
-            />
-          ) : null}
+      <div className="mb-10 flex items-center border-b border-white/[0.08] pb-4">
+        <div className="flex items-center gap-2 rounded-2xl bg-white/[0.03] p-1.5 border border-white/[0.06] w-fit">
+          <button
+            onClick={() => setActiveTab("overview")}
+            className={`rounded-xl px-6 py-2.5 text-xs font-bold uppercase tracking-[0.2em] transition-all ${
+              activeTab === "overview"
+                ? "bg-white text-black shadow-lg"
+                : "text-white/50 hover:text-white"
+            }`}
+          >
+            Overview
+          </button>
+          <button
+            onClick={() => setActiveTab("brackets")}
+            className={`rounded-xl px-6 py-2.5 text-xs font-bold uppercase tracking-[0.2em] transition-all flex items-center gap-2 ${
+              activeTab === "brackets"
+                ? "bg-[#22c55e] text-[#070a12] shadow-lg shadow-emerald-500/20"
+                : "text-white/50 hover:text-white"
+            }`}
+          >
+            <span>Brackets</span>
+          </button>
         </div>
+      </div>
 
-        <aside className="order-2 space-y-8 lg:col-start-2 lg:row-start-1 lg:row-span-2">
-          <TournamentScheduleCard schedule={scheduleCard} />
+      {activeTab === "overview" ? (
+        <div className={`grid gap-12 lg:items-start ${isCompleted ? "lg:grid-cols-1" : "lg:grid-cols-[1fr_24rem]"}`}>
+          <div className="order-1 space-y-16 lg:col-start-1 lg:row-start-1">
+            {showResultsBlock ? (
+              <section className="space-y-8">
+                <div className="flex items-center gap-4">
+                  <div className="h-px w-10 bg-gradient-to-r from-transparent to-amber-300/70" />
+                  <div className="flex items-center gap-3">
+                    <span className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-amber-300/25 bg-amber-400/10 text-amber-200 shadow-[0_0_20px_rgba(251,191,36,0.12)]">
+                      <svg className="h-4 w-4" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
+                        <path d="M12 2l2.4 7.4H22l-6 4.6 2.3 7-6.3-4.6L5.7 21l2.3-7-6-4.6h7.6L12 2z" />
+                      </svg>
+                    </span>
+                    <h2 className="font-display text-2xl font-black uppercase tracking-[0.18em] text-transparent bg-clip-text bg-gradient-to-r from-white via-amber-100 to-white/70 sm:text-3xl">
+                      Final Results
+                    </h2>
+                  </div>
+                  <div className="h-px flex-1 bg-gradient-to-r from-amber-300/40 to-transparent" />
+                </div>
 
-          {auctionHref ? (
-            <div className="group relative overflow-hidden rounded-[1.25rem] p-[1px] transition-all duration-300 hover:shadow-[0_0_30px_rgba(6,182,212,0.35)] shadow-xl">
-              {/* Outer cyan-indigo-purple gradient glowing background */}
-              <div className="absolute inset-0 bg-gradient-to-r from-cyan-500 via-indigo-500 to-purple-600 opacity-90 transition-all duration-300 group-hover:opacity-100" />
-              
-              <a
-                href={auctionHref}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="relative block w-full rounded-[19px] bg-[#0c0c0e]/95 px-6 py-4.5 text-center text-xs font-bold uppercase tracking-[0.25em] text-white transition-all duration-300 group-hover:bg-[#0c0c0e]/75"
-              >
-                <span className="relative z-10 flex items-center justify-center gap-2.5">
-                  <span className="h-2 w-2 rounded-full bg-cyan-400" />
-                  Enter Live Auction
+                {showChampion && championData ? (
+                  <div className={isCompleted ? "max-w-7xl" : ""}>
+                    <TournamentChampionSection
+                      championData={championData}
+                      game={tournament.game}
+                      accentHex={meta.hex}
+                      mvp={mvp}
+                      allTeams={tournament.teamDetails}
+                    />
+                  </div>
+                ) : null}
+
+                {showMvpOnly && !showChampion ? (
+                  <TournamentFinalResults standings={[]} mvp={mvp} showHeading={false} />
+                ) : null}
+
+                {showFinalResults && !showChampion ? (
+                  <TournamentFinalResults
+                    standings={standings}
+                    mvp={mvp}
+                    showHeading={false}
+                  />
+                ) : null}
+              </section>
+            ) : null}
+
+            {showRegistrationSection ? (
+              <TournamentRegisterForm
+                layout="featured"
+                slug={tournament.slug}
+                game={tournament.game}
+                registrationFormat={tournament.registrationFormat}
+                isLoggedIn={isLoggedIn}
+                alreadyRegistered={tournament.userRegistered}
+                registrationOpen={tournament.registrationOpen}
+                rulebookUrl={tournament.rulebookUrl}
+                preview={registrationPreview ?? null}
+                coCaptainSlots={tournament.coCaptainSlots}
+                registrationProfileCard={registrationProfileCard ?? null}
+                userParticipantRole={tournament.userParticipantRole}
+              />
+            ) : null}
+          </div>
+
+          {!isCompleted && (
+            <aside className="order-2 space-y-8 lg:col-start-2 lg:row-start-1 lg:row-span-2">
+              <TournamentScheduleCard schedule={scheduleCard} />
+
+            {auctionHref ? (
+              <div className="group relative overflow-hidden rounded-[1.25rem] p-[1px] transition-all duration-300 hover:shadow-[0_0_30px_rgba(6,182,212,0.35)] shadow-xl">
+                <div className="absolute inset-0 bg-gradient-to-r from-cyan-500 via-indigo-500 to-purple-600 opacity-90 transition-all duration-300 group-hover:opacity-100" />
+                
+                <a
+                  href={auctionHref}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="relative block w-full rounded-[19px] bg-[#0c0c0e]/95 px-6 py-4.5 text-center text-xs font-bold uppercase tracking-[0.25em] text-white transition-all duration-300 group-hover:bg-[#0c0c0e]/75"
+                >
+                  <span className="relative z-10 flex items-center justify-center gap-2.5">
+                    <span className="h-2 w-2 rounded-full bg-cyan-400" />
+                    Enter Live Auction
+                  </span>
+                </a>
+              </div>
+            ) : auctionEnded ? (
+              <div className="rounded-[1.25rem] border border-white/[0.06] bg-[#0c0c0e]/40 p-4 text-center">
+                <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-white/30">
+                  Auction Ended
                 </span>
-              </a>
-            </div>
-          ) : auctionEnded ? (
-            <div className="rounded-[1.25rem] border border-white/[0.06] bg-[#0c0c0e]/40 p-4 text-center">
-              <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-white/30">
-                Auction Ended
-              </span>
-            </div>
-          ) : null}
+              </div>
+            ) : null}
 
-          {(tournament.prizePool || tournament.prizeNotes) && (
+            {(tournament.prizePool || tournament.prizeNotes) && (
               <div className="rounded-[1.5rem] border border-white/[0.08] bg-[#0A0A0A]/80 p-8 shadow-2xl backdrop-blur-xl">
                 <p className="text-[10px] font-medium uppercase tracking-[0.3em] text-white/40">Prizepool</p>
                 {tournament.prizePool ? (
@@ -261,46 +363,112 @@ export default function TournamentDetailView({
                 ) : null}
               </div>
             )}
-        </aside>
+          </aside>
+          )}
 
-        {showTeams ? (
-          <div className="order-3 lg:col-start-1 lg:row-start-2">
-            <TournamentTeamsList
-              teams={tournament.teams}
-              teamDetails={tournament.teamDetails}
-              accentHex={meta.hex}
-              game={tournament.game}
-              registrationFormat={tournament.registrationFormat}
-            />
-          </div>
-        ) : null}
-      </div>
-
-      {showBracket ? (
-        <section className="mt-16 space-y-10">
-          {brackets.map(({ url, bracket }, index) => (
-            <div key={url}>
-              {brackets.length > 1 ? (
-                <p className="mb-3 text-[10px] font-bold uppercase tracking-[0.28em] text-white/40">
-                  Bracket {index + 1}
-                </p>
-              ) : null}
-              {bracket ? (
-                <TournamentBracket bracket={bracket} accentHex={meta.hex} />
-              ) : (
-                <ChallongeEmbed
-                  url={url}
-                  title={
-                    brackets.length > 1
-                      ? `${tournament.name} — Bracket ${index + 1}`
-                      : `${tournament.name} bracket`
-                  }
-                />
-              )}
+          {showTeams ? (
+            <div className="order-3 lg:col-start-1 lg:row-start-2">
+              <TournamentTeamsList
+                teams={tournament.teams}
+                teamDetails={tournament.teamDetails}
+                accentHex={meta.hex}
+                game={tournament.game}
+                registrationFormat={tournament.registrationFormat}
+              />
             </div>
-          ))}
+          ) : null}
+        </div>
+      ) : (
+        <section className="space-y-8">
+          {brackets.length > 1 && (
+            <div className="flex flex-wrap items-center gap-2 rounded-2xl bg-white/[0.03] p-1.5 border border-white/[0.06] w-fit mb-6">
+              {brackets.map((b, idx) => {
+                const label = b.name || `Bracket ${idx + 1}`;
+                return (
+                  <button
+                    key={b.url}
+                    type="button"
+                    onClick={() => setActiveStageIndex(idx)}
+                    className={`rounded-xl px-5 py-2 text-xs font-bold uppercase tracking-[0.16em] transition-all ${
+                      activeStageIndex === idx
+                        ? "bg-[#22c55e] text-[#070a12] shadow-md shadow-emerald-500/20"
+                        : "text-white/60 hover:text-white hover:bg-white/5"
+                    }`}
+                  >
+                    {label}
+                  </button>
+                );
+              })}
+            </div>
+          )}
+
+          {brackets.length > 0 ? (
+            [brackets[activeStageIndex] ?? brackets[0]].map(({ url, name: stageHeading, bracket }, index) => {
+              const isAuction = tournament.registrationFormat === "AUCTION" || tournament.slug.includes("auc-cup");
+              const displayBracket = bracket;
+
+              const displayName = stageHeading
+                ? `${tournament.name} — ${stageHeading}`
+                : brackets.length > 1
+                  ? `${tournament.name} — Stage ${index + 1}`
+                  : tournament.name;
+
+              const tournamentTeamsList =
+                tournament.teams && tournament.teams.length > 0
+                  ? tournament.teams
+                  : tournament.teamDetails.map((t) => t.name);
+
+              return (
+                <div key={url}>
+                  {displayBracket ? (
+                    <TournamentBracket
+                      bracket={displayBracket}
+                      accentHex={meta.hex}
+                      tournamentName={displayName}
+                      stageName={stageHeading}
+                      fallbackTeams={tournamentTeamsList}
+                      format={
+                        displayBracket.tournamentType
+                          ?.toLowerCase()
+                          .includes("round")
+                          ? "Round Robin"
+                          : displayBracket.tournamentType
+                              ?.toLowerCase()
+                              .includes("double")
+                            ? "Double Elimination"
+                            : isAuction
+                              ? "Round Robin"
+                              : "Single Elimination"
+                      }
+                    />
+                  ) : (
+                    <TournamentBracketEmpty />
+                  )}
+                </div>
+              );
+            })
+          ) : generatedFallback ? (
+            <TournamentBracket
+              bracket={generatedFallback}
+              accentHex={meta.hex}
+              tournamentName={tournament.name}
+              format={
+                tournament.registrationFormat === "AUCTION" || tournament.slug.includes("auc-cup")
+                  ? "Round Robin"
+                  : "Single Elimination"
+              }
+            />
+          ) : tournament.teams.length > 0 ? (
+            <div className="rounded-2xl border border-white/10 bg-white/[0.02] p-12 text-center text-white/40">
+              Loading brackets...
+            </div>
+          ) : (
+            <div className="rounded-2xl border border-white/10 bg-white/[0.02] p-8 text-center text-white/40">
+              No brackets or teams available yet for this tournament.
+            </div>
+          )}
         </section>
-      ) : null}
+      )}
     </article>
   );
 }

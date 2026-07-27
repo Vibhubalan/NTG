@@ -1,3 +1,4 @@
+import { cache } from "react";
 import { prisma } from "@core/database/client";
 import type {
   LeaderboardPreview,
@@ -7,7 +8,6 @@ import type {
 import { TournamentRepository } from "../infrastructure/tournament.repository";
 import { LeaderboardRepository } from "../infrastructure/leaderboard.repository";
 import { resolveAuctionHeroPhase, type HeroCupPhase } from "../domain/auction-hero-phase";
-import { syncRegistrationStatus } from "./admin-tournament.service";
 
 const tournamentRepo = new TournamentRepository();
 const leaderboardRepo = new LeaderboardRepository();
@@ -23,9 +23,9 @@ export async function getTournamentBySlug(slug: string): Promise<TournamentPrevi
   return tournamentRepo.findPreviewBySlug(slug);
 }
 
-export async function getTournamentDetail(slug: string, userId?: string) {
+export const getTournamentDetail = cache(async (slug: string, userId?: string) => {
   return tournamentRepo.findDetailBySlug(slug, userId);
-}
+});
 
 export async function getActiveRegistrationBanner(): Promise<TournamentRegistrationBanner | null> {
   return tournamentRepo.findActiveRegistrationBanner();
@@ -42,8 +42,6 @@ export type HeroCupStatus = {
 
 /** Nearest upcoming auction cup phase for the homepage hero CTA strip. */
 export async function getHeroCupStatus(): Promise<HeroCupStatus | null> {
-  await syncRegistrationStatus().catch(() => {});
-
   const now = new Date();
   const tournaments = await prisma.tournament.findMany({
     where: {

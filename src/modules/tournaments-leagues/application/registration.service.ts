@@ -1770,6 +1770,20 @@ export async function getValorantRegistrationProfileCard(
     ? (registration.snapshotValorantRoles as ValorantRole[])
     : (user.playerProfile?.valorantRoles ?? []);
 
+  let teamName = registration.teamName?.trim() || null;
+  if (!teamName) {
+    const teamPlayer = await prisma.tournamentTeamPlayer.findFirst({
+      where: {
+        userId,
+        team: { tournamentId: tournament.id },
+      },
+      select: { team: { select: { name: true } } },
+    });
+    if (teamPlayer?.team?.name) {
+      teamName = teamPlayer.team.name.trim();
+    }
+  }
+
   return {
     displayName:
       registration.snapshotDisplayName ??
@@ -1778,7 +1792,7 @@ export async function getValorantRegistrationProfileCard(
       "Player",
     riotGameName: user.riotGameName ?? registration.snapshotRiotId?.split("#")[0]?.trim() ?? null,
     riotId: registration.snapshotRiotId,
-    teamName: registration.teamName?.trim() || null,
+    teamName,
     valorantRoles: roles,
     riotPlayerCard: user.riotPlayerCard,
     riotPlayerCardWide: user.riotPlayerCardWide,

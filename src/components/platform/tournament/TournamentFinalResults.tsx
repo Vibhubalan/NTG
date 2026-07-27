@@ -2,13 +2,19 @@ import type { FinalStandingView } from "@core/contracts/tournament-bracket";
 
 export type MvpData = {
   displayName: string;
+  userId?: string | null;
   riotId?: string | null;
   rankTier?: string | null;
+  valorantRankTierId?: number | null;
+  riotPlayerCard?: string | null;
+  riotPlayerCardWide?: string | null;
 };
 
 type Props = {
   standings: FinalStandingView[];
   mvp?: string | MvpData | null;
+  /** When false, parent owns the "Final Results" heading. */
+  showHeading?: boolean;
 };
 
 const rankStyles: Record<
@@ -35,18 +41,24 @@ const rankStyles: Record<
   },
 };
 
-export default function TournamentFinalResults({ standings, mvp }: Props) {
+export default function TournamentFinalResults({
+  standings,
+  mvp,
+  showHeading = true,
+}: Props) {
   if (standings.length === 0 && !mvp) return null;
 
   return (
     <section>
-      <div className="mb-6 flex items-center gap-3">
-        <div className="h-px w-8 bg-gradient-to-r from-transparent to-[var(--color-brand)]" />
-        <h2 className="font-display text-2xl font-bold uppercase tracking-widest text-white">
-          Final Results
-        </h2>
-        <div className="h-px flex-1 bg-gradient-to-r from-[var(--color-brand)] to-transparent opacity-30" />
-      </div>
+      {showHeading ? (
+        <div className="mb-6 flex items-center gap-3">
+          <div className="h-px w-8 bg-gradient-to-r from-transparent to-[var(--color-brand)]" />
+          <h2 className="font-display text-2xl font-bold uppercase tracking-widest text-white">
+            Final Results
+          </h2>
+          <div className="h-px flex-1 bg-gradient-to-r from-[var(--color-brand)] to-transparent opacity-30" />
+        </div>
+      ) : null}
 
       {standings.length > 0 ? (
         <div
@@ -90,70 +102,86 @@ export default function TournamentFinalResults({ standings, mvp }: Props) {
       ) : null}
 
       {mvp ? (
-        <div className="group relative mt-10 overflow-hidden rounded-[2rem] border border-[var(--color-iris)]/30 bg-gradient-to-br from-[#0F0F0F] to-[#050505] shadow-[0_0_50px_rgba(124,58,237,0.15)] transition-all hover:border-[var(--color-iris)]/60 hover:shadow-[0_0_80px_rgba(124,58,237,0.25)]">
-          {/* Animated Backgrounds */}
-          <div className="absolute -inset-24 z-0 animate-pulse bg-gradient-to-tr from-[var(--color-iris)]/20 via-transparent to-[var(--color-iris)]/5 blur-3xl opacity-50 group-hover:opacity-100 transition-opacity duration-700" />
-          
-          <div className="relative z-10 px-6 py-5 sm:px-8 sm:py-6 flex flex-col items-center text-center">
-            {/* Top Badge */}
-            <div className="inline-flex items-center gap-2 rounded-full border border-[var(--color-iris)]/30 bg-[var(--color-iris)]/10 px-4 py-1.5 shadow-[0_0_15px_rgba(124,58,237,0.3)] backdrop-blur-md mb-4">
-              <span className="h-2 w-2 rounded-full bg-[var(--color-iris)] shadow-[0_0_8px_rgba(124,58,237,1)] animate-pulse" />
-              <span className="text-[10px] font-black uppercase tracking-[0.25em] text-[var(--color-iris)]">
-                Tournament MVP
-              </span>
-            </div>
+        <div
+          className={`relative isolate overflow-hidden rounded-[2rem] border border-[var(--color-iris)]/35 bg-[#07080b] shadow-[0_30px_80px_-40px_rgba(124,58,237,0.55)] ${
+            standings.length > 0 ? "mt-10" : ""
+          }`}
+        >
+          <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_top,rgba(124,58,237,0.28),transparent_55%),radial-gradient(ellipse_at_bottom_left,rgba(56,189,248,0.08),transparent_45%)]" />
+          <div
+            className="pointer-events-none absolute inset-0 opacity-[0.06]"
+            style={{
+              backgroundImage:
+                "url(\"data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23a78bfa' fill-opacity='1'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E\")",
+            }}
+          />
+          <div className="pointer-events-none absolute -top-1 left-1/2 h-px w-[min(80%,36rem)] -translate-x-1/2 bg-gradient-to-r from-transparent via-[var(--color-iris)]/80 to-transparent" />
 
-            {/* Rank Logo and User Info */}
-            <div className="relative mb-3">
-              {/* If we have a rank, show it big */}
-              {typeof mvp === "object" && mvp?.rankTier ? (
-                <div className="relative flex h-16 w-16 items-center justify-center transition-transform duration-500 group-hover:scale-110 group-hover:drop-shadow-[0_0_30px_rgba(124,58,237,0.6)]">
-                  {/* Outer glow */}
-                  <div className="absolute inset-0 rounded-full bg-[var(--color-iris)]/20 blur-xl group-hover:bg-[var(--color-iris)]/40 transition-colors duration-500" />
-                  <img
-                    src={`/valorant/ranks/${mvp.rankTier.replace(" ", "_")}_Rank.png`}
-                    alt={mvp.rankTier}
-                    className="relative z-10 h-full w-full object-contain drop-shadow-2xl"
+          <div className="relative z-10 px-5 py-8 sm:px-10 sm:py-10">
+            <div className="flex flex-col items-center text-center">
+              <div className="mb-5 flex items-center gap-3">
+                <svg className="h-14 w-8 text-[var(--color-iris)]/70" viewBox="0 0 48 80" fill="none" aria-hidden>
+                  <path
+                    d="M38 8c-10 6-16 18-16 32s6 26 16 32c-14-4-24-18-24-32S24 12 38 8Z"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    opacity="0.55"
                   />
-                </div>
-              ) : (
-                /* Fallback Icon if no rank */
-                <div className="relative flex h-16 w-16 items-center justify-center rounded-[1.5rem] bg-gradient-to-br from-[var(--color-iris)]/20 to-[var(--color-iris)]/5 shadow-[inset_0_0_0_1px_rgba(124,58,237,0.3)] backdrop-blur-xl transition-transform duration-500 group-hover:scale-110 group-hover:shadow-[inset_0_0_0_1px_rgba(124,58,237,0.6)] group-hover:drop-shadow-[0_0_30px_rgba(124,58,237,0.4)]">
-                  <svg className="h-8 w-8 text-[var(--color-iris)] drop-shadow-[0_0_15px_rgba(124,58,237,0.8)]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M13 10V3L4 14h7v8l9-11h-7z" />
-                  </svg>
-                  <div className="absolute inset-0 rounded-[1.5rem] shadow-[0_0_30px_rgba(124,58,237,0.2)]" />
-                </div>
-              )}
-            </div>
+                  <path d="M22 20c-6 4-10 10-10 20" stroke="currentColor" strokeWidth="1.5" opacity="0.35" />
+                  <path d="M24 36c-7 3-11 9-11 16" stroke="currentColor" strokeWidth="1.5" opacity="0.35" />
+                </svg>
 
-            {/* Name */}
-            <h3 className="font-display text-2xl sm:text-3xl font-black uppercase tracking-tight text-white drop-shadow-lg group-hover:bg-gradient-to-r group-hover:from-white group-hover:to-[var(--color-iris)] group-hover:bg-clip-text group-hover:text-transparent transition-all duration-500">
-              {typeof mvp === "string" ? mvp : mvp?.displayName}
-            </h3>
+                {typeof mvp === "object" && mvp.rankTier ? (
+                  <div className="flex h-20 w-20 items-center justify-center sm:h-24 sm:w-24">
+                    <img
+                      src={`/valorant/ranks/${mvp.rankTier.replace(" ", "_")}_Rank.png`}
+                      alt={mvp.rankTier}
+                      className="h-full w-full object-contain drop-shadow-[0_8px_24px_rgba(124,58,237,0.45)]"
+                    />
+                  </div>
+                ) : (
+                  <div className="flex h-20 w-20 items-center justify-center rounded-full border border-[var(--color-iris)]/50 bg-gradient-to-b from-[var(--color-iris)]/25 to-[var(--color-iris)]/5 text-[var(--color-iris)] shadow-[0_0_40px_rgba(124,58,237,0.3)] sm:h-24 sm:w-24">
+                    <svg className="h-10 w-10" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5} aria-hidden>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M13 10V3L4 14h7v8l9-11h-7z" />
+                    </svg>
+                  </div>
+                )}
 
-            {/* Additional Details */}
-            {typeof mvp === "object" && mvp && (mvp.riotId || mvp.rankTier) && (
-              <div className="mt-2 flex flex-col items-center gap-1.5">
-                {mvp.rankTier && (
-                  <span className="text-xs font-bold uppercase tracking-[0.2em] text-[var(--color-iris)]/80">
-                    {mvp.rankTier}
-                  </span>
-                )}
-                {mvp.riotId && (
-                  <span className="inline-block rounded-lg bg-white/5 px-2.5 py-1 text-[10px] font-medium text-white/60 tracking-wider ring-1 ring-white/10 backdrop-blur-sm">
-                    {mvp.riotId}
-                  </span>
-                )}
+                <svg className="h-14 w-8 -scale-x-100 text-[var(--color-iris)]/70" viewBox="0 0 48 80" fill="none" aria-hidden>
+                  <path
+                    d="M38 8c-10 6-16 18-16 32s6 26 16 32c-14-4-24-18-24-32S24 12 38 8Z"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    opacity="0.55"
+                  />
+                  <path d="M22 20c-6 4-10 10-10 20" stroke="currentColor" strokeWidth="1.5" opacity="0.35" />
+                  <path d="M24 36c-7 3-11 9-11 16" stroke="currentColor" strokeWidth="1.5" opacity="0.35" />
+                </svg>
               </div>
-            )}
-          </div>
-          
-          {/* Faint Watermark Logo */}
-          <div className="pointer-events-none absolute -bottom-10 -right-10 opacity-5 transition-opacity duration-700 group-hover:opacity-10">
-            <svg className="h-96 w-96 text-[var(--color-iris)]" fill="currentColor" viewBox="0 0 24 24">
-              <path d="M13 10V3L4 14h7v8l9-11h-7z" />
-            </svg>
+
+              <div className="mb-3 inline-flex items-center rounded-md bg-[var(--color-iris)] px-3 py-1 text-[10px] font-black uppercase tracking-[0.22em] text-white">
+                Tournament MVP
+              </div>
+
+              <h3 className="max-w-full break-words font-display text-[clamp(2rem,5vw,4rem)] font-black uppercase leading-[0.92] tracking-tight text-white">
+                {typeof mvp === "string" ? mvp : mvp.displayName}
+              </h3>
+
+              {typeof mvp === "object" && mvp && (mvp.rankTier || mvp.riotId) ? (
+                <div className="mt-5 flex flex-col items-center gap-2.5">
+                  {mvp.rankTier ? (
+                    <span className="text-xs font-black uppercase tracking-[0.28em] text-[var(--color-iris)]">
+                      {mvp.rankTier}
+                    </span>
+                  ) : null}
+                  {mvp.riotId ? (
+                    <span className="inline-flex rounded-full border border-white/10 bg-white/[0.04] px-4 py-1.5 text-[11px] font-medium tracking-wide text-white/65">
+                      {mvp.riotId}
+                    </span>
+                  ) : null}
+                </div>
+              ) : null}
+            </div>
           </div>
         </div>
       ) : null}

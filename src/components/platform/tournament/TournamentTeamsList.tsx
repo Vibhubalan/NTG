@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { useCallback, useEffect, useState } from "react";
 import type { GameSlug } from "@prisma/client";
 import type { TournamentTeamView, TournamentTeamPlayerView } from "@core/contracts";
@@ -165,10 +166,11 @@ export default function TournamentTeamsList({
                   }`}
                 >
                   {team.logoUrl ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img
+                    <Image
                       src={team.logoUrl}
                       alt=""
+                      width={40}
+                      height={40}
                       className="h-10 w-10 shrink-0 rounded-xl object-cover"
                     />
                   ) : (
