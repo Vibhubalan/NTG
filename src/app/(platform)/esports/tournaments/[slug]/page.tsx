@@ -12,7 +12,6 @@ import {
 } from "@tournaments-leagues/index";
 import { serverEnv } from "@core/config/env.server";
 import { auctionLink } from "@/lib/auction-link";
-import { prisma } from "@core/database/client";
 import { resolveEffectivePublicAuction } from "@tournaments-leagues/domain/auction-hero-phase";
 
 type Props = { params: Promise<{ slug: string }> };
@@ -52,12 +51,8 @@ export default async function TournamentDetailPage({ params }: Props) {
       ? await getValorantRegistrationProfileCard(slug, userId)
       : null;
 
-  const [dbRow] = await prisma.$queryRawUnsafe<{ publicAuction: boolean }[]>(
-    'SELECT "publicAuction" FROM "Tournament" WHERE id = $1 LIMIT 1',
-    tournament.id,
-  );
   const publicAuction = resolveEffectivePublicAuction(
-    dbRow?.publicAuction ?? false,
+    tournament.publicAuction ?? false,
     tournament,
   );
 
