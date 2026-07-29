@@ -11,7 +11,7 @@ import { displayCs2Ranks, displayValorantRegistration } from "@auth-membership/d
 import type { PrizeSplitRow } from "@core/contracts";
 import { prisma } from "@core/database/client";
 import { getSession } from "@core/auth/session";
-import { auctionLink } from "@/lib/auction-link";
+import { tryAuctionLink } from "@/lib/auction-link";
 import { normalizeBracketUrlItems } from "@/lib/challonge";
 import { resolveEffectivePublicAuction } from "@tournaments-leagues/domain/auction-hero-phase";
 
@@ -38,14 +38,13 @@ export default async function AdminTournamentEditPage({ params }: Props) {
   ]);
   if (!t) notFound();
 
-  const [auctionRow] = await prisma.auctionSession
-    .findFirst({
-      where: { tournamentId: t.id },
-      select: { status: true },
-    })
-    .then((row) => [row])
-    .catch(() => [null]);
-  const auctionFinalized = auctionRow?.status === "COMPLETE";
+  const [auctionRow] = await prisma
+    .$queryRawUnsafe<{ finalized: boolean }[]>(
+      "SELECT finalized FROM auction_sessions WHERE tournament_id = $1 LIMIT 1",
+      t.id,
+    )
+    .catch(() => []);
+  const auctionFinalized = auctionRow?.finalized === true;
 
   const initial = {
     slug: t.slug,
@@ -159,7 +158,7 @@ export default async function AdminTournamentEditPage({ params }: Props) {
   };
 
   const auctionHref = userId && t.registrationFormat === "AUCTION"
-    ? auctionLink(t.slug, "auctioneer")
+    ? tryAuctionLink(t.id, "auctioneer", userId)
     : null;
 
   return (

@@ -10,7 +10,7 @@ import {
   getValorantRegistrationProfileCard,
   listPublishedTournamentGames,
 } from "@tournaments-leagues/index";
-import { auctionLink } from "@/lib/auction-link";
+import { tryAuctionLink } from "@/lib/auction-link";
 import { resolveEffectivePublicAuction } from "@tournaments-leagues/domain/auction-hero-phase";
 
 type Props = { params: Promise<{ slug: string }> };
@@ -78,7 +78,7 @@ export default async function TournamentDetailPage({ params }: Props) {
     (admin.ok || (auctionEligible && publicAuction));
   const auctionHref =
     showEnterButton && userId
-      ? auctionLink(tournament.slug, auctionView)
+      ? tryAuctionLink(tournament.id, auctionView, userId)
       : null;
   const auctionEnded =
     auctionEligible && !admin.ok && tournament.status === "COMPLETED";

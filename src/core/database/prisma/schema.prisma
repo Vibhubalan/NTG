@@ -56,21 +56,6 @@ enum TournamentFormat {
   DUO
 }
 
-enum AuctionSessionStatus {
-  IDLE
-  SHOWCASE
-  LIVE
-  PAUSED
-  COMPLETE
-}
-
-enum AuctionPlayerStatus {
-  POOL
-  ON_AUCTION
-  SOLD
-  UNSOLD
-}
-
 enum RegistrationGameIntent {
   VALORANT
   CS2
@@ -253,7 +238,6 @@ model User {
   rosterPlayers           RosterPlayer[]
   listingApplications     ListingApplication[]
   timeLimitedQaResponses  TimeLimitedQaResponse[]
-  auctionCaptainTeams     AuctionTeam[]
 }
 
 model EmailOtp {
@@ -416,7 +400,6 @@ model Tournament {
   registrations   TournamentRegistration[]
   placements      TournamentPlacement[]
   badges          PlayerBadge[]
-  auctionSession  AuctionSession?
   tournamentGames TournamentGame[]
 }
 
@@ -561,10 +544,6 @@ model TournamentRegistration {
   status                  RegistrationStatus          @default(APPROVED)
   createdAt               DateTime                    @default(now())
   teamPlayerRows          TournamentTeamPlayer[]
-  currentAuctionSessions  AuctionSession[]            @relation("CurrentNominee")
-  captainedAuctionTeams   AuctionTeam[]
-  auctionPlayerRows       AuctionPlayer[]
-  auctionSales            AuctionSale[]
 
   @@unique([tournamentId, userId])
   @@index([tournamentId, participantRole])
@@ -1057,111 +1036,4 @@ model TimeLimitedQaResponse {
   createdAt     DateTime              @default(now())
 
   @@index([campaignId, createdAt])
-}
-
-// ─── Integrated auction (shared DB with auction app) ─────────────────────────
-
-model AuctionSession {
-  id                    String                 @id @default(cuid())
-  tournamentId          String                 @unique
-  tournament            Tournament             @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
-  status                AuctionSessionStatus   @default(IDLE)
-  pass                  Int                    @default(1)
-  startingBudget        Int                    @default(150)
-  rosterSize            Int                    @default(3)
-  timerSeconds          Int                    @default(15)
-  minBidIncrement       Int                    @default(1)
-  rankTable             Json?
-  currentRegistrationId String?
-  currentRegistration   TournamentRegistration? @relation("CurrentNominee", fields: [currentRegistrationId], references: [id], onDelete: SetNull)
-  currentPrice          Int                    @default(0)
-  highestBidderTeamId   String?
-  highestBidderTeam     AuctionTeam?           @relation("HighestBidderTeam", fields: [highestBidderTeamId], references: [id], onDelete: SetNull)
-  highestBidderName     String?
-  timerEndsAt           DateTime?
-  pausedRemainingMs     Int?
-  bidHistory            Json?
-  lastSaleId            String?                @unique
-  lastSale              AuctionSale?           @relation("LastSale", fields: [lastSaleId], references: [id], onDelete: SetNull)
-  version               Int                    @default(0)
-  createdAt             DateTime               @default(now())
-  updatedAt             DateTime               @updatedAt
-
-  teams                 AuctionTeam[]
-  players               AuctionPlayer[]
-  sales                 AuctionSale[]          @relation("SessionSales")
-  events                AuctionEvent[]
-
-  @@index([status, timerEndsAt])
-}
-
-model AuctionTeam {
-  id                    String               @id @default(cuid())
-  sessionId             String
-  session               AuctionSession       @relation(fields: [sessionId], references: [id], onDelete: Cascade)
-  name                  String
-  captainUserId         String
-  captain               User                 @relation(fields: [captainUserId], references: [id], onDelete: Cascade)
-  captainRegistrationId String
-  captainRegistration   TournamentRegistration @relation(fields: [captainRegistrationId], references: [id], onDelete: Cascade)
-  startingBudget        Int
-  currentBudget         Int
-  coreDeduction         Int                  @default(0)
-  slotsFilled           Int                  @default(0)
-  createdAt             DateTime             @default(now())
-  updatedAt             DateTime             @updatedAt
-
-  players               AuctionPlayer[]
-  winningBids           AuctionSession[]     @relation("HighestBidderTeam")
-  sales                 AuctionSale[]
-
-  @@unique([sessionId, captainRegistrationId])
-  @@index([sessionId])
-}
-
-model AuctionPlayer {
-  sessionId        String
-  session          AuctionSession      @relation(fields: [sessionId], references: [id], onDelete: Cascade)
-  registrationId   String
-  registration     TournamentRegistration @relation(fields: [registrationId], references: [id], onDelete: Cascade)
-  floorPrice       Int
-  status           AuctionPlayerStatus @default(POOL)
-  soldPrice        Int?
-  teamId           String?
-  team             AuctionTeam?        @relation(fields: [teamId], references: [id], onDelete: SetNull)
-  soldAt           DateTime?
-  nominationOrder  Int?
-  createdAt        DateTime            @default(now())
-  updatedAt        DateTime            @updatedAt
-
-  @@id([sessionId, registrationId])
-  @@index([sessionId, status])
-  @@index([teamId])
-}
-
-model AuctionSale {
-  id             String       @id @default(cuid())
-  sessionId      String
-  session        AuctionSession @relation("SessionSales", fields: [sessionId], references: [id], onDelete: Cascade)
-  registrationId String
-  registration   TournamentRegistration @relation(fields: [registrationId], references: [id], onDelete: Cascade)
-  teamId         String
-  team           AuctionTeam   @relation(fields: [teamId], references: [id], onDelete: Cascade)
-  price          Int
-  undoneAt       DateTime?
-  createdAt      DateTime      @default(now())
-  lastForSession AuctionSession? @relation("LastSale")
-
-  @@index([sessionId, createdAt])
-}
-
-model AuctionEvent {
-  id        String         @id @default(cuid())
-  sessionId String
-  session   AuctionSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
-  type      String
-  payload   Json?
-  createdAt DateTime       @default(now())
-
-  @@index([sessionId, createdAt])
 }

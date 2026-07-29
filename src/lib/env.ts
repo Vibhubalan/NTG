@@ -29,10 +29,6 @@ export const showPlansSection = process.env.NEXT_PUBLIC_SHOW_PLANS_SECTION === "
 
 export const sponsorEmail = process.env.NEXT_PUBLIC_SPONSOR_EMAIL || "sponsor@ntgesports.com";
 
-/** Optional — auction client falls back to polling when unset. */
-export const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "";
-export const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? "";
-
 
 export function whatsappInquiryUrl(
   message = "Hi NTG Lounge, I'd like to inquire about a slot.",
