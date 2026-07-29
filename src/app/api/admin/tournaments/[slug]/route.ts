@@ -35,6 +35,7 @@ export async function GET(_req: Request, { params }: Props) {
     tournament: {
       ...tournament,
       publicAuction: tournament.publicAuction ?? false,
+      yourGamesEnabled: tournament.yourGamesEnabled ?? true,
     },
   });
 }
@@ -120,6 +121,15 @@ export async function PATCH(req: Request, { params }: Props) {
       data: { publicAuction: isPublic },
     });
     (result.tournament as { publicAuction?: boolean }).publicAuction = isPublic;
+  }
+
+  if (body.yourGamesEnabled !== undefined) {
+    const enabled = !!body.yourGamesEnabled;
+    await prisma.tournament.update({
+      where: { slug },
+      data: { yourGamesEnabled: enabled },
+    });
+    (result.tournament as { yourGamesEnabled?: boolean }).yourGamesEnabled = enabled;
   }
 
   await logAdminAction(auth.userId, "tournament.update", slug, {

@@ -6,7 +6,7 @@ import SplitText from "./SplitText";
 import { getSession } from "@core/auth/session";
 import { requireAdmin } from "@core/auth/require-admin";
 import { serverEnv } from "@core/config/env.server";
-import { auctionLink } from "@/lib/auction-link";
+import { tryAuctionLink } from "@/lib/auction-link";
 
 const heroCtaBase =
   "inline-flex h-10 w-auto cursor-pointer select-none items-center justify-center gap-1.5 whitespace-nowrap rounded-full px-3 text-[10px] font-semibold uppercase tracking-[0.12em] transition-all hover:scale-[1.03] active:scale-[0.98] sm:h-12 sm:gap-2 sm:px-5 sm:text-sm sm:tracking-[0.18em]";
@@ -21,12 +21,16 @@ async function resolveHeroAuctionHref(slug: string): Promise<string | null> {
 
   const publicAuction = resolveEffectivePublicAuction(tournament.publicAuction ?? false, tournament);
 
+  const auctionConfigured =
+    !!serverEnv.auctionUrl && !!serverEnv.auctionJwtSecret;
   const auctionEligible =
     tournament.registrationFormat === "AUCTION" &&
     !!userId &&
-    !!serverEnv.auctionUrl &&
-    !!serverEnv.auctionJwtSecret;
-  const showEnterButton = tournament.registrationFormat === "AUCTION" && (admin.ok || (auctionEligible && publicAuction));
+    auctionConfigured;
+  const showEnterButton =
+    tournament.registrationFormat === "AUCTION" &&
+    auctionConfigured &&
+    (admin.ok || (auctionEligible && publicAuction));
   if (!showEnterButton || !userId) return null;
 
   const auctionView = admin.ok
@@ -34,7 +38,7 @@ async function resolveHeroAuctionHref(slug: string): Promise<string | null> {
     : tournament.userParticipantRole === "CAPTAIN" || tournament.userParticipantRole === "CO_CAPTAIN"
       ? "captain"
       : "observe";
-  return auctionLink(tournament.id, auctionView, userId);
+  return tryAuctionLink(tournament.id, auctionView, userId);
 }
 
 export default async function Hero() {

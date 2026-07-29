@@ -11,7 +11,7 @@ import { displayCs2Ranks, displayValorantRegistration } from "@auth-membership/d
 import type { PrizeSplitRow } from "@core/contracts";
 import { prisma } from "@core/database/client";
 import { getSession } from "@core/auth/session";
-import { auctionLink } from "@/lib/auction-link";
+import { tryAuctionLink } from "@/lib/auction-link";
 import { normalizeBracketUrlItems } from "@/lib/challonge";
 import { resolveEffectivePublicAuction } from "@tournaments-leagues/domain/auction-hero-phase";
 
@@ -79,6 +79,7 @@ export default async function AdminTournamentEditPage({ params }: Props) {
     teamsPerGroup: t.teamsPerGroup,
     advancePerGroup: t.advancePerGroup,
     publicAuction: resolveEffectivePublicAuction(t.publicAuction ?? false, t),
+    yourGamesEnabled: t.yourGamesEnabled ?? true,
     rankPoints: (t.rankPoints as { rank: string; floor: number }[] | null) ?? null,
     bracketUrl: t.bracketUrl,
     bracketUrls: normalizeBracketUrlItems({
@@ -157,7 +158,7 @@ export default async function AdminTournamentEditPage({ params }: Props) {
   };
 
   const auctionHref = userId && t.registrationFormat === "AUCTION" && serverEnv.auctionUrl && serverEnv.auctionJwtSecret
-    ? auctionLink(t.id, "auctioneer", userId)
+    ? tryAuctionLink(t.id, "auctioneer", userId)
     : null;
 
   return (

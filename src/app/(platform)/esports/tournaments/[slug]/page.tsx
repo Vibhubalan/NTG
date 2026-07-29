@@ -8,9 +8,10 @@ import {
   getTournamentDetail,
   getRegistrationEligibility,
   getValorantRegistrationProfileCard,
+  listPublishedTournamentGames,
 } from "@tournaments-leagues/index";
 import { serverEnv } from "@core/config/env.server";
-import { auctionLink } from "@/lib/auction-link";
+import { tryAuctionLink } from "@/lib/auction-link";
 import { resolveEffectivePublicAuction } from "@tournaments-leagues/domain/auction-hero-phase";
 
 type Props = { params: Promise<{ slug: string }> };
@@ -34,23 +35,30 @@ export default async function TournamentDetailPage({ params }: Props) {
     bracketUrls: tournament.bracketUrls,
   });
 
-  const [brackets, admin, registrationPreview, registrationProfileCard] = await Promise.all([
-    bracketItems.length
-      ? Promise.all(
-          bracketItems.map(async (item) => ({
-            url: item.url,
-            name: item.name ?? null,
-            isFinal: item.isFinal !== false,
-            bracket: await fetchChallongeBracket(item.url, isCompleted),
-          })),
-        )
-      : Promise.resolve([]),
-    requireAdmin(),
-    userId ? getRegistrationEligibility(slug, userId) : Promise.resolve(null),
-    userId && tournament.game === "VALORANT" && tournament.userRegistered
-      ? getValorantRegistrationProfileCard(slug, userId)
-      : Promise.resolve(null),
-  ]);
+  const [brackets, admin, registrationPreview, registrationProfileCard, publishedGames] =
+    await Promise.all([
+      bracketItems.length
+        ? Promise.all(
+            bracketItems.map(async (item) => ({
+              url: item.url,
+              name: item.name ?? null,
+              isFinal: item.isFinal !== false,
+              bracket: await fetchChallongeBracket(item.url, isCompleted),
+            })),
+          )
+        : Promise.resolve([]),
+      requireAdmin(),
+      userId ? getRegistrationEligibility(slug, userId) : Promise.resolve(null),
+      userId && tournament.game === "VALORANT" && tournament.userRegistered
+        ? getValorantRegistrationProfileCard(slug, userId)
+        : Promise.resolve(null),
+      listPublishedTournamentGames(slug),
+    ]);
+
+  const publishedList = publishedGames.ok ? publishedGames.games : [];
+  const publishedCount = publishedList.length;
+  const showMatchesTab =
+    (tournament.yourGamesEnabled ?? true) || publishedCount > 0;
 
   const publicAuction = resolveEffectivePublicAuction(
     tournament.publicAuction ?? false,
@@ -63,17 +71,19 @@ export default async function TournamentDetailPage({ params }: Props) {
         tournament.userParticipantRole === "CO_CAPTAIN"
       ? "captain"
       : "observe";
+  const auctionConfigured =
+    !!serverEnv.auctionUrl && !!serverEnv.auctionJwtSecret;
   const auctionEligible =
     tournament.registrationFormat === "AUCTION" &&
     !!userId &&
-    !!serverEnv.auctionUrl &&
-    !!serverEnv.auctionJwtSecret;
+    auctionConfigured;
   const showEnterButton =
     tournament.registrationFormat === "AUCTION" &&
+    auctionConfigured &&
     (admin.ok || (auctionEligible && publicAuction));
   const auctionHref =
     showEnterButton && userId
-      ? auctionLink(tournament.id, auctionView, userId)
+      ? tryAuctionLink(tournament.id, auctionView, userId)
       : null;
   const auctionEnded =
     auctionEligible && !admin.ok && tournament.status === "COMPLETED";
@@ -88,6 +98,8 @@ export default async function TournamentDetailPage({ params }: Props) {
         registrationProfileCard={registrationProfileCard}
         auctionHref={auctionHref}
         auctionEnded={auctionEnded}
+        showMatchesTab={showMatchesTab}
+        publishedGames={publishedList}
       />
       {admin.ok ? (
         <div className="mt-16 border-t border-white/[0.06] pt-8 text-center">

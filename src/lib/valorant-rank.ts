@@ -100,3 +100,68 @@ export function rankAccentClass(tierId: number | null | undefined): string {
   if (tierId >= 6) return "text-orange-400/70"; // Bronze
   return "text-stone-400/70"; // Iron
 }
+
+/** Resolves rank tier string like "Ascendant 1" to local rank icon asset URL. */
+export function rankIconFromTierName(rankTierStr: string | null | undefined): string {
+  if (!rankTierStr || rankTierStr.toLowerCase().includes("unrated") || rankTierStr.toLowerCase().includes("unranked")) {
+    return "/valorant/ranks/Unranked_Rank.png";
+  }
+  const clean = rankTierStr.trim();
+  if (clean.toLowerCase() === "radiant") {
+    return "/valorant/ranks/Radiant_Rank.png";
+  }
+  const parts = clean.split(/\s+/);
+  if (parts.length >= 2) {
+    const name = parts[0]!.charAt(0).toUpperCase() + parts[0]!.slice(1).toLowerCase();
+    const div = parts[1];
+    return `/valorant/ranks/${name}_${div}_Rank.png`;
+  }
+  return "/valorant/ranks/Unranked_Rank.png";
+}
+
+const TIER_NUM_MAP: Record<string, number> = {
+  iron: 3,
+  bronze: 6,
+  silver: 9,
+  gold: 12,
+  platinum: 15,
+  diamond: 18,
+  ascendant: 21,
+  immortal: 24,
+  radiant: 27,
+};
+
+const ROMAN_MAP: Record<number, string> = {
+  1: "I",
+  2: "II",
+  3: "III",
+};
+
+/** Calculates average rank tier label for a team (e.g. "Ascendant I") */
+export function calculateAverageRankLabel(rankTiers: (string | null | undefined)[]): string {
+  const validNumericTiers: number[] = [];
+
+  for (const tierStr of rankTiers) {
+    if (!tierStr || tierStr.toLowerCase().includes("unrated")) continue;
+    const parts = tierStr.trim().toLowerCase().split(/\s+/);
+    const baseName = parts[0];
+    const divNum = parseInt(parts[1] || "1", 10);
+    const baseVal = TIER_NUM_MAP[baseName ?? ""];
+    if (baseVal != null) {
+      validNumericTiers.push(baseVal + (divNum - 1));
+    }
+  }
+
+  if (validNumericTiers.length === 0) return "Unranked";
+  const avg = Math.round(validNumericTiers.reduce((a, b) => a + b, 0) / validNumericTiers.length);
+
+  if (avg >= 27) return "Radiant";
+  if (avg < 3) return "Iron I";
+
+  const index = avg - 3;
+  const rankIndex = Math.floor(index / 3);
+  const div = (index % 3) + 1;
+  const rankName = RANK_NAMES[Math.min(rankIndex, RANK_NAMES.length - 1)] ?? "Ascendant";
+  return `${rankName} ${ROMAN_MAP[div] ?? div}`;
+}
+
