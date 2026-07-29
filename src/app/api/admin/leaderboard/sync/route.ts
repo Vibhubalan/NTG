@@ -12,6 +12,7 @@ import { serverEnv } from "@core/config/env.server";
 import {
   getLeaderboardSyncStats,
   RANK_SYNC_BATCH_SIZE,
+  reconcileStaleDailyRefreshRun,
   syncAllLinkedPlayers,
   type SyncRunTotals,
 } from "@tournaments-leagues/index";
@@ -56,6 +57,9 @@ export async function GET() {
 
   try {
     const isSuperAdmin = isSuperAdminEmail(auth.session.user.email);
+    if (isSuperAdmin) {
+      await reconcileStaleDailyRefreshRun().catch(() => {});
+    }
     const [stats, cronRun] = await Promise.all([
       getLeaderboardSyncStats(),
       isSuperAdmin ? getLeaderboardCronStatus() : Promise.resolve(null),

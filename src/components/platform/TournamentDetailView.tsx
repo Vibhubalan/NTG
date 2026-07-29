@@ -10,6 +10,10 @@ import TournamentChampionSection from "@/components/platform/tournament/Tourname
 import TournamentFinalResults from "@/components/platform/tournament/TournamentFinalResults";
 import TournamentScheduleCard from "@/components/platform/tournament/TournamentScheduleCard";
 import TournamentTeamsList from "@/components/platform/tournament/TournamentTeamsList";
+import TournamentGamesSection, {
+  type PublicGame,
+} from "@/components/platform/tournament/TournamentGamesSection";
+import TournamentStatsSection from "@/components/platform/tournament/TournamentStatsSection";
 import { resolveChampion } from "@/lib/tournament-champion";
 import { gameMetaFor, formatRegistrationLabel, buildTournamentScheduleCardView } from "@/lib/tournament-display";
 import type { RegistrationPreview } from "./TournamentRegisterForm";
@@ -38,6 +42,10 @@ type Props = {
   registrationProfileCard?: ValorantRegistrationProfileCard | null;
   auctionHref?: string | null;
   auctionEnded?: boolean;
+  /** When set, overrides tournament.yourGamesEnabled for tab visibility. */
+  showMatchesTab?: boolean;
+  /** SSR-published custom games for the Matches tab. */
+  publishedGames?: PublicGame[];
 };
 
 export default function TournamentDetailView({
@@ -48,10 +56,13 @@ export default function TournamentDetailView({
   registrationProfileCard,
   auctionHref,
   auctionEnded,
+  showMatchesTab: showMatchesTabProp,
+  publishedGames,
 }: Props) {
-  const [activeTab, setActiveTab] = useState<"overview" | "brackets">("overview");
+  const [activeTab, setActiveTab] = useState<"overview" | "brackets" | "matches" | "stats">("overview");
   const [activeStageIndex, setActiveStageIndex] = useState<number>(0);
   const [generatedFallback, setGeneratedFallback] = useState<TournamentBracketView | null>(null);
+  const showMatchesTab = showMatchesTabProp ?? tournament.yourGamesEnabled ?? true;
   const meta = gameMetaFor(tournament.game);
   const dateStr = tournament.startsAt
     ? new Date(tournament.startsAt).toLocaleDateString("en-IN", {
@@ -209,8 +220,9 @@ export default function TournamentDetailView({
       </div>
 
       <div className="mb-10 flex items-center border-b border-white/[0.08] pb-4">
-        <div className="flex items-center gap-2 rounded-2xl bg-white/[0.03] p-1.5 border border-white/[0.06] w-fit">
+        <div className="flex flex-wrap items-center gap-2 rounded-2xl bg-white/[0.03] p-1.5 border border-white/[0.06] w-fit max-w-full">
           <button
+            type="button"
             onClick={() => setActiveTab("overview")}
             className={`rounded-xl px-6 py-2.5 text-xs font-bold uppercase tracking-[0.2em] transition-all ${
               activeTab === "overview"
@@ -221,6 +233,7 @@ export default function TournamentDetailView({
             Overview
           </button>
           <button
+            type="button"
             onClick={() => setActiveTab("brackets")}
             className={`rounded-xl px-6 py-2.5 text-xs font-bold uppercase tracking-[0.2em] transition-all flex items-center gap-2 ${
               activeTab === "brackets"
@@ -230,6 +243,32 @@ export default function TournamentDetailView({
           >
             <span>Brackets</span>
           </button>
+          {showMatchesTab ? (
+            <>
+              <button
+                type="button"
+                onClick={() => setActiveTab("matches")}
+                className={`rounded-xl px-6 py-2.5 text-xs font-bold uppercase tracking-[0.2em] transition-all ${
+                  activeTab === "matches"
+                    ? "bg-amber-400 text-[#070a12] shadow-lg shadow-amber-500/20"
+                    : "text-white/50 hover:text-white"
+                }`}
+              >
+                Matches
+              </button>
+              <button
+                type="button"
+                onClick={() => setActiveTab("stats")}
+                className={`rounded-xl px-6 py-2.5 text-xs font-bold uppercase tracking-[0.2em] transition-all ${
+                  activeTab === "stats"
+                    ? "bg-cyan-400 text-[#070a12] shadow-lg shadow-cyan-500/20"
+                    : "text-white/50 hover:text-white"
+                }`}
+              >
+                Stats
+              </button>
+            </>
+          ) : null}
         </div>
       </div>
 
@@ -378,6 +417,17 @@ export default function TournamentDetailView({
             </div>
           ) : null}
         </div>
+      ) : activeTab === "matches" && showMatchesTab ? (
+        <section className="space-y-6">
+          <TournamentGamesSection
+            slug={tournament.slug}
+            initialGames={publishedGames ?? []}
+          />
+        </section>
+      ) : activeTab === "stats" && showMatchesTab ? (
+        <section className="space-y-6">
+          <TournamentStatsSection games={publishedGames ?? []} />
+        </section>
       ) : (
         <section className="space-y-8">
           {brackets.length > 1 && (

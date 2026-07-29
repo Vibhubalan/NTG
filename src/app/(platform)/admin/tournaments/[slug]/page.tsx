@@ -80,6 +80,7 @@ export default async function AdminTournamentEditPage({ params }: Props) {
     teamsPerGroup: t.teamsPerGroup,
     advancePerGroup: t.advancePerGroup,
     publicAuction: resolveEffectivePublicAuction(t.publicAuction ?? false, t),
+    yourGamesEnabled: t.yourGamesEnabled ?? true,
     rankPoints: (t.rankPoints as { rank: string; floor: number }[] | null) ?? null,
     bracketUrl: t.bracketUrl,
     bracketUrls: normalizeBracketUrlItems({

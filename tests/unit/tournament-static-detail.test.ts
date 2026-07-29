@@ -35,6 +35,7 @@ function minimalDetail(overrides: Partial<TournamentDetail> = {}): TournamentDet
     userParticipantRole: null,
     coCaptainSlots: 0,
     publicAuction: false,
+    yourGamesEnabled: true,
     ...overrides,
   };
 }

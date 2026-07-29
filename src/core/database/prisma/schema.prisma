@@ -120,6 +120,17 @@ enum RegistrationParticipantRole {
   PLAYER
 }
 
+enum TournamentGameStatus {
+  CANDIDATE
+  PUBLISHED
+  HIDDEN
+}
+
+enum TournamentGameSide {
+  Red
+  Blue
+}
+
 enum ValorantRole {
   DUELIST
   INITIATOR
@@ -235,6 +246,7 @@ model User {
   captainedTeams          TournamentTeam[]          @relation("TeamCaptain")
   coCaptainedTeams        TournamentTeam[]          @relation("TeamCoCaptain")
   teamPlayers             TournamentTeamPlayer[]
+  tournamentGamePlayers   TournamentGamePlayer[]
   adminAuditLogs          AdminAuditLog[]
   userActivityLogs        UserActivityLog[]
   platformSettingsUpdated PlatformSetting[]         @relation("PlatformSettingUpdatedBy")
@@ -405,6 +417,7 @@ model Tournament {
   placements      TournamentPlacement[]
   badges          PlayerBadge[]
   auctionSession  AuctionSession?
+  tournamentGames TournamentGame[]
 }
 
 model TournamentTeam {
@@ -424,6 +437,8 @@ model TournamentTeam {
   updatedAt            DateTime                 @updatedAt
   players              TournamentTeamPlayer[]
   registrations        TournamentRegistration[]
+  gamesAsTeamA         TournamentGame[]         @relation("GameTeamA")
+  gamesAsTeamB         TournamentGame[]         @relation("GameTeamB")
 
   @@index([tournamentId, sortOrder])
 }
@@ -446,6 +461,68 @@ model TournamentTeamPlayer {
 
   @@index([teamId, sortOrder])
   @@index([registrationId])
+}
+
+model TournamentGame {
+  id             String               @id @default(cuid())
+  tournamentId   String
+  tournament     Tournament           @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
+  henrikMatchId  String
+  mapName        String?
+  gameLengthSec  Int?
+  startedAt      DateTime?
+  region         String?
+  teamAId        String
+  teamA          TournamentTeam       @relation("GameTeamA", fields: [teamAId], references: [id], onDelete: Cascade)
+  teamBId        String
+  teamB          TournamentTeam       @relation("GameTeamB", fields: [teamBId], references: [id], onDelete: Cascade)
+  teamARounds    Int                  @default(0)
+  teamBRounds    Int                  @default(0)
+  /** Valorant side that won: Red or Blue */
+  winnerSide     TournamentGameSide?
+  /** How many Team A roster puuids were present when scanned */
+  teamAPresent   Int                  @default(0)
+  /** How many Team B roster puuids were present when scanned */
+  teamBPresent   Int                  @default(0)
+  status         TournamentGameStatus @default(CANDIDATE)
+  payloadJson    Json?
+  scannedAt      DateTime             @default(now())
+  publishedAt    DateTime?
+  createdAt      DateTime             @default(now())
+  updatedAt      DateTime             @updatedAt
+  players        TournamentGamePlayer[]
+
+  @@unique([tournamentId, henrikMatchId])
+  @@index([tournamentId, status])
+  @@index([teamAId])
+  @@index([teamBId])
+}
+
+model TournamentGamePlayer {
+  id           String             @id @default(cuid())
+  gameId       String
+  game         TournamentGame     @relation(fields: [gameId], references: [id], onDelete: Cascade)
+  puuid        String
+  userId       String?
+  user         User?              @relation(fields: [userId], references: [id], onDelete: SetNull)
+  teamId       String?
+  riotGameName String
+  riotTagLine  String
+  side         TournamentGameSide
+  agent        String?
+  kills        Int                @default(0)
+  deaths       Int                @default(0)
+  assists      Int                @default(0)
+  score        Int                @default(0)
+  damage       Int                @default(0)
+  headshots    Int                @default(0)
+  bodyshots    Int                @default(0)
+  legshots     Int                @default(0)
+
+  @@index([gameId])
+  @@index([puuid])
+  @@index([userId])
+  @@unique([gameId, puuid])
 }
 
 model TournamentRegistration {

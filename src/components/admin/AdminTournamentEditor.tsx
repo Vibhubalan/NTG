@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState, useMemo } from "react";
 import ImageUploadField from "@/components/admin/ImageUploadField";
 import RulebookUploadField from "@/components/admin/RulebookUploadField";
+import AdminTournamentGamesPanel from "@/components/admin/AdminTournamentGamesPanel";
 import { AdminSection } from "@/components/admin/AdminSection";
 import { useAdminDeleteConfirm } from "@/components/admin/useAdminDeleteConfirm";
 import type { PrizeSplitRow } from "@core/contracts";
@@ -92,6 +93,7 @@ type TournamentData = {
   bracketLinks?: { name: string; url: string; isFinal: boolean }[];
   rulebookUrl: string | null;
   publicAuction?: boolean;
+  yourGamesEnabled?: boolean;
   tournamentTeams: Team[];
   registrations: RegistrationRow[];
   poolPlayers: PoolPlayer[];
@@ -223,6 +225,7 @@ function getSavePayload(form: TournamentData) {
     advancePerGroup: form.advancePerGroup,
     rankPoints: form.rankPoints,
     publicAuction: form.publicAuction ?? false,
+    yourGamesEnabled: form.yourGamesEnabled ?? true,
   };
 }
 
@@ -284,7 +287,7 @@ export default function AdminTournamentEditor({
   const tournamentTeams = initial.tournamentTeams;
   const poolPlayers = initial.poolPlayers;
   const [activeTab, setActiveTab] = useState<
-    "general" | "auction" | "media" | "prizes" | "standings" | "registrations" | "teams"
+    "general" | "auction" | "media" | "prizes" | "standings" | "registrations" | "teams" | "matches"
   >("general");
   const initialMvpRole = initial.placements.find((p) => p.role === "MVP");
   const initialMvpUser = initialMvpRole?.user;
@@ -646,6 +649,7 @@ export default function AdminTournamentEditor({
           teamsPerGroup: form.teamsPerGroup,
           advancePerGroup: form.advancePerGroup,
           rankPoints: form.rankPoints,
+          yourGamesEnabled: form.yourGamesEnabled ?? true,
         }),
       });
       const data = await readJsonResponse(res);
@@ -930,6 +934,15 @@ export default function AdminTournamentEditor({
         </svg>
       ),
     },
+    {
+      id: "matches" as const,
+      label: "Matches",
+      icon: (
+        <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" d="M9 17V7m0 10a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2h2a2 2 0 012 2m0 10a2 2 0 002 2h2a2 2 0 002-2M9 7a2 2 0 012-2h2a2 2 0 012 2m0 10V7m0 10a2 2 0 002 2h2a2 2 0 002-2V7a2 2 0 00-2-2h-2a2 2 0 00-2 2" />
+        </svg>
+      ),
+    },
   ] as const;
 
   return (
@@ -1173,6 +1186,23 @@ export default function AdminTournamentEditor({
                     <div>
                       <p className="font-semibold text-white/95">Feature on Esports Hub</p>
                       <p className="text-xs text-white/40 mt-0.5">Sorts first in the esports hub registration slideshow</p>
+                    </div>
+                  </label>
+                </div>
+
+                <div>
+                  <label className={checkboxLabelClass}>
+                    <input
+                      type="checkbox"
+                      className="rounded border-white/20 bg-white/5 text-amber-500 focus:ring-0"
+                      checked={form.yourGamesEnabled ?? true}
+                      onChange={(e) => setForm({ ...form, yourGamesEnabled: e.target.checked })}
+                    />
+                    <div>
+                      <p className="font-semibold text-white/95">Show Matches tab</p>
+                      <p className="text-xs text-white/40 mt-0.5">
+                        Public cup page shows a Matches tab for published custom games
+                      </p>
                     </div>
                   </label>
                 </div>
@@ -2329,6 +2359,18 @@ export default function AdminTournamentEditor({
                   </div>
                 )}
               </div>
+            </AdminSection>
+          </div>
+        )}
+
+        {activeTab === "matches" && (
+          <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-300">
+            <AdminSection
+              title="Custom lobby matches"
+              showsOn="Public Matches tab after you publish candidates"
+              viewHref={`/esports/tournaments/${form.slug}`}
+            >
+              <AdminTournamentGamesPanel slug={form.slug} teams={form.tournamentTeams} />
             </AdminSection>
           </div>
         )}

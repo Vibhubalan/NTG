@@ -469,10 +469,6 @@ export async function syncUserRank(
     v2Bundle = null;
   }
 
-  if (strictHenrik && !v2Bundle) {
-    return fail("Henrik v2 request failed.");
-  }
-
   let fetched:
     | { status: "ranked"; snapshot: MmrSnapshot; region: string }
     | { status: "unranked"; region: string; gameName?: string; tagLine?: string }
@@ -513,12 +509,23 @@ export async function syncUserRank(
 
   const lookupName = resolvedGameName || syncName;
   const lookupTag = resolvedTagLine || syncTag;
-  if (!strictHenrik && (resolvedRegion !== region || !v2Bundle)) {
+  // Re-try v2 with resolved identity from v3 (or corrected region), even in strict mode.
+  // This avoids false failures when players changed Riot name/tag and DB still has old identity.
+  if (
+    resolvedRegion !== region ||
+    !v2Bundle ||
+    resolvedGameName !== syncName ||
+    resolvedTagLine !== syncTag
+  ) {
     try {
       v2Bundle = await fetchHenrikV2MmrBundle(resolvedRegion, lookupName, lookupTag, v2Opts);
     } catch {
       /* keep prior bundle if any */
     }
+  }
+
+  if (strictHenrik && !v2Bundle) {
+    return fail("Henrik v2 request failed.");
   }
 
   if (currentActIsUnranked(v2Bundle)) {
@@ -534,6 +541,7 @@ export async function syncUserRank(
 
   let cardLarge: string | undefined;
   let cardWide: string | undefined;
+  let cardLookupHardFailed = false;
   if (!options?.skipPlayerCard) {
     try {
       const name = resolvedGameName || user.riotGameName;
@@ -548,16 +556,18 @@ export async function syncUserRank(
         const accData = (await res.json()) as { data?: { card?: { large?: string; wide?: string } } };
         cardLarge = accData.data?.card?.large;
         cardWide = accData.data?.card?.wide;
-      } else if (strictHenrik) {
+      } else if (strictHenrik && res.status !== 404) {
+        cardLookupHardFailed = true;
         return fail(`Henrik player card request failed (${res.status}).`);
       }
     } catch (e) {
       console.error("Failed to fetch player card on rank sync:", e);
       if (strictHenrik) {
+        cardLookupHardFailed = true;
         return fail("Henrik player card request failed.");
       }
     }
-    if (strictHenrik && !cardLarge && !cardWide) {
+    if (strictHenrik && cardLookupHardFailed && !cardLarge && !cardWide) {
       return fail("Henrik player card request returned no card data.");
     }
   }

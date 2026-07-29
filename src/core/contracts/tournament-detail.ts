@@ -65,6 +65,7 @@ export type TournamentDetail = {
   coCaptainSlots: number;
   autoManageStatus: boolean;
   publicAuction: boolean;
+  yourGamesEnabled: boolean;
 };
 
 export type PrizeSplitRow = {

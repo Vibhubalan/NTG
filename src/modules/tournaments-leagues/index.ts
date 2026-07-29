@@ -35,6 +35,7 @@ export {
   runHourlyLeaderboardRefresh,
   runDailyLeaderboardRefresh,
   runLeaderboardRefresh,
+  reconcileStaleDailyRefreshRun,
   listLeaderboardRefreshRuns,
   playersAfterCursor,
   type HourlyRefreshResult,
@@ -79,3 +80,14 @@ export {
   defaultPrizeSplit,
   syncRegistrationStatus,
 } from "./application/admin-tournament.service";
+export {
+  listTournamentGamesAdmin,
+  listPublishedTournamentGames,
+  scanTournamentGamesChunk,
+  publishTournamentGames,
+  setTournamentGameStatus,
+  deleteTournamentGame,
+  type TournamentGameView,
+  type TournamentGamePlayerView,
+  type ScanChunkResult,
+} from "./application/tournament-games.service";

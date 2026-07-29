@@ -38,6 +38,8 @@ import {
 
 /** Leave headroom for cold start, DB, snapshot, and Resend on mode=start (Vercel max 60s). */
 const RUN_TIME_BUDGET_MS = 38_000;
+/** Don't start another player if we are close to timeout. */
+const PLAYER_PROCESSING_SAFETY_MS = 12_000;
 
 export type LeaderboardRefreshKind = "daily" | "hourly";
 
@@ -228,6 +230,7 @@ async function processRunSegment(
 
   for (const userId of remaining) {
     if (Date.now() >= deadline) break;
+    if (deadline - Date.now() < PLAYER_PROCESSING_SAFETY_MS) break;
 
     const result = await syncUserRankWithRetryForHourly(userId, context);
     if (result.ok) {
@@ -241,6 +244,18 @@ async function processRunSegment(
 
     lastCursor = userId;
     processedThisSegment += 1;
+    // Persist progress per player so an invocation timeout cannot strand a stale RUNNING row.
+    await prisma.leaderboardRefreshRun.update({
+      where: { id: runId },
+      data: {
+        totalPlayers: Math.max(run.totalPlayers, allIds.length),
+        successCount,
+        failedCount,
+        henrikRequestCount:
+          run.henrikRequestCount + (getHenrikRequestCount() - henrikAtStart),
+        cursorUserId: lastCursor,
+      },
+    });
     await heartbeatLeaderboardRefreshLock(runId, lockKey);
   }
 
@@ -250,18 +265,6 @@ async function processRunSegment(
   const processed = successCount + failedCount;
   const pending = Math.max(0, totalPlayers - processed);
   const complete = pending === 0;
-
-  if (kind === "daily") {
-    await markLeaderboardCronProgress({
-      runStartedAt: run.startedAt,
-      currentAct,
-      synced: successCount,
-      failed: failedCount,
-      skipped: 0,
-      pending,
-      totalPlayers,
-    }).catch(() => {});
-  }
 
   if (complete) {
     await snapshotTownBoardRanks();
@@ -338,6 +341,18 @@ async function processRunSegment(
       cursorUserId: lastCursor,
     },
   });
+
+  if (kind === "daily") {
+    await markLeaderboardCronProgress({
+      runStartedAt: run.startedAt,
+      currentAct,
+      synced: successCount,
+      failed: failedCount,
+      skipped: 0,
+      pending,
+      totalPlayers,
+    }).catch(() => {});
+  }
 
   return {
     status: "continued",
@@ -531,6 +546,48 @@ export async function runDailyLeaderboardRefresh(
   mode: "start" | "continue",
 ): Promise<LeaderboardRefreshResult> {
   return runLeaderboardRefresh("daily", mode);
+}
+
+/**
+ * Repairs stale daily runs that are fully processed but left RUNNING due to an invocation timeout
+ * between progress/write and completion/finalize steps.
+ */
+export async function reconcileStaleDailyRefreshRun(): Promise<void> {
+  const run = await prisma.leaderboardRefreshRun.findFirst({
+    where: {
+      kind: LeaderboardRefreshRunKind.DAILY,
+      status: LeaderboardRefreshRunStatus.RUNNING,
+    },
+    orderBy: { startedAt: "desc" },
+  });
+  if (!run) return;
+
+  const processed = run.successCount + run.failedCount;
+  if (processed < run.totalPlayers) return;
+
+  const finishedAt = run.finishedAt ?? run.updatedAt ?? new Date();
+  const durationMs = Math.max(0, finishedAt.getTime() - run.startedAt.getTime());
+
+  await prisma.leaderboardRefreshRun.update({
+    where: { id: run.id },
+    data: {
+      status: LeaderboardRefreshRunStatus.COMPLETE,
+      finishedAt,
+      durationMs,
+    },
+  });
+
+  await setLeaderboardLastCompletedRefresh(finishedAt);
+  await clearLeaderboardRefreshLock(LEADERBOARD_DAILY_REFRESH_LOCK_KEY);
+
+  await markLeaderboardCronComplete({
+    runStartedAt: run.startedAt,
+    currentAct: getEnvValorantActKey() ?? "unknown",
+    synced: run.successCount,
+    failed: run.failedCount,
+    skipped: 0,
+    totalPlayers: run.totalPlayers,
+  }).catch(() => {});
 }
 
 export async function listLeaderboardRefreshRuns(

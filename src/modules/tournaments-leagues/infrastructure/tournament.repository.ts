@@ -477,6 +477,7 @@ export class TournamentRepository {
       coCaptainSlots: t.coCaptainSlots,
       autoManageStatus: t.autoManageStatus,
       publicAuction: t.publicAuction,
+      yourGamesEnabled: t.yourGamesEnabled ?? true,
     };
   }
 
