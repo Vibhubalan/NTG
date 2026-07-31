@@ -453,15 +453,20 @@ export default function TournamentDetailView({
           )}
 
           {brackets.length > 0 ? (
-            [brackets[activeStageIndex] ?? brackets[0]].map(({ url, name: stageHeading, bracket }, index) => {
-              const isAuction = tournament.registrationFormat === "AUCTION" || tournament.slug.includes("auc-cup");
-              const displayBracket = bracket;
+            (() => {
+              const currentItem = brackets[activeStageIndex] ?? brackets[0];
+              const { url, name: stageHeading, bracket: displayBracket } = currentItem;
+              const isAuction =
+                tournament.registrationFormat === "AUCTION" ||
+                tournament.slug.includes("auc-cup");
 
-              const displayName = stageHeading
-                ? `${tournament.name} — ${stageHeading}`
-                : brackets.length > 1
-                  ? `${tournament.name} — Stage ${index + 1}`
-                  : tournament.name;
+              const bracketLabel =
+                stageHeading ||
+                (brackets.length > 1 ? `Bracket ${activeStageIndex + 1}` : null);
+
+              const displayName = bracketLabel
+                ? `${tournament.name} — ${bracketLabel}`
+                : tournament.name;
 
               const tournamentTeamsList =
                 tournament.teams && tournament.teams.length > 0
@@ -475,7 +480,7 @@ export default function TournamentDetailView({
                       bracket={displayBracket}
                       accentHex={meta.hex}
                       tournamentName={displayName}
-                      stageName={stageHeading}
+                      stageName={bracketLabel}
                       fallbackTeams={tournamentTeamsList}
                       format={
                         displayBracket.tournamentType
@@ -496,7 +501,7 @@ export default function TournamentDetailView({
                   )}
                 </div>
               );
-            })
+            })()
           ) : generatedFallback ? (
             <TournamentBracket
               bracket={generatedFallback}

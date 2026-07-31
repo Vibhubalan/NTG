@@ -9,25 +9,39 @@ import {
 import type { LoungeCommerceHomeData } from "./domain/types";
 
 export async function getLoungeCommerceHomeData(): Promise<LoungeCommerceHomeData> {
-  const [playstationFeatured, playstationAll, pcAll, hostOfferings, sponsorLogos] =
-    await Promise.all([
-      listFeaturedGamepassPlans("PLAYSTATION"),
-      listActiveGamepassPlans("PLAYSTATION"),
-      listActiveGamepassPlans("PC"),
-      listActiveHostOfferings(),
-      listActiveSponsorLogos(),
-    ]);
+  try {
+    const [playstationFeatured, playstationAll, pcAll, hostOfferings, sponsorLogos] =
+      await Promise.all([
+        listFeaturedGamepassPlans("PLAYSTATION"),
+        listActiveGamepassPlans("PLAYSTATION"),
+        listActiveGamepassPlans("PC"),
+        listActiveHostOfferings(),
+        listActiveSponsorLogos(),
+      ]);
 
-  const featuredIds = new Set(playstationFeatured.map((p) => p.id));
-  const playstationMore = playstationAll.filter((p) => !featuredIds.has(p.id));
+    const featuredIds = new Set(playstationFeatured.map((p) => p.id));
+    const playstationMore = playstationAll.filter((p) => !featuredIds.has(p.id));
 
-  return {
-    playstationFeatured,
-    playstationMore,
-    pcPlans: pcAll,
-    hostOfferings,
-    sponsorLogos,
-  };
+    return {
+      playstationFeatured,
+      playstationMore,
+      pcPlans: pcAll,
+      hostOfferings,
+      sponsorLogos,
+    };
+  } catch (error) {
+    console.warn(
+      "[lounge-commerce] Database connection failed in getLoungeCommerceHomeData:",
+      error,
+    );
+    return {
+      playstationFeatured: [],
+      playstationMore: [],
+      pcPlans: [],
+      hostOfferings: [],
+      sponsorLogos: [],
+    };
+  }
 }
 
 export {

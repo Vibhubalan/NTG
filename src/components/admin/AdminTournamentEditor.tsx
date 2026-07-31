@@ -324,6 +324,9 @@ export default function AdminTournamentEditor({
   const [savedStatus, setSavedStatus] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [newTeamName, setNewTeamName] = useState("");
+  const [editingTeamId, setEditingTeamId] = useState<string | null>(null);
+  const [editingTeamName, setEditingTeamName] = useState<string>("");
+  const [renamingTeam, setRenamingTeam] = useState(false);
   const [newPlayerNames, setNewPlayerNames] = useState<Record<string, string>>({});
   const [poolPick, setPoolPick] = useState<Record<string, string>>({});
   const [memberSearch, setMemberSearch] = useState("");
@@ -721,6 +724,33 @@ export default function AdminTournamentEditor({
         refreshLists();
       },
     });
+  }
+
+  async function handleRenameTeam(teamId: string) {
+    const trimmed = editingTeamName.trim();
+    if (!trimmed) return;
+    setRenamingTeam(true);
+    try {
+      const res = await fetch(`/api/admin/tournaments/${form.slug}/teams/${teamId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: trimmed }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setMessage(data.error ?? "Failed to rename team.");
+        return;
+      }
+      setMessage(`Team renamed to "${trimmed}".`);
+      setEditingTeamId(null);
+      setEditingTeamName("");
+      refreshLists();
+      router.refresh();
+    } catch {
+      setMessage("Failed to rename team.");
+    } finally {
+      setRenamingTeam(false);
+    }
   }
 
   function requestRemovePlayer(teamId: string, playerId: string, playerName: string) {
@@ -2215,24 +2245,72 @@ export default function AdminTournamentEditor({
                   <div className="grid gap-4 md:grid-cols-2">
                     {tournamentTeams.map((team) => (
                       <div key={team.id} className="rounded-xl border border-white/[0.06] bg-[#0c1424]/40 p-4.5 space-y-4">
-                        <div className="flex items-center justify-between border-b border-white/[0.04] pb-2">
-                          <div className="flex items-center gap-3 min-w-0">
-                            {team.logoUrl ? (
-                              // eslint-disable-next-line @next/next/no-img-element
-                              <img src={team.logoUrl} alt="" className="h-8 w-8 rounded-lg object-cover" />
-                            ) : null}
-                            <p className="font-bold text-white text-sm truncate">{team.name}</p>
-                          </div>
-                          <button
-                            type="button"
-                            onClick={() => requestRemoveTeam(team.id, team.name)}
-                            className="inline-flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wider text-red-400 hover:text-red-300 transition-colors"
-                          >
-                            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                            </svg>
-                            Remove Team
-                          </button>
+                        <div className="flex items-center justify-between border-b border-white/[0.04] pb-2 gap-2">
+                          {editingTeamId === team.id ? (
+                            <div className="flex items-center gap-2 flex-1">
+                              <input
+                                type="text"
+                                className={inputClass}
+                                value={editingTeamName}
+                                onChange={(e) => setEditingTeamName(e.target.value)}
+                                placeholder="Enter new team name"
+                                autoFocus
+                                onKeyDown={(e) => {
+                                  if (e.key === "Enter") handleRenameTeam(team.id);
+                                  if (e.key === "Escape") setEditingTeamId(null);
+                                }}
+                              />
+                              <button
+                                type="button"
+                                onClick={() => handleRenameTeam(team.id)}
+                                disabled={renamingTeam || !editingTeamName.trim()}
+                                className="rounded-xl bg-[#22c55e] px-3 py-1.5 text-xs font-bold text-black hover:bg-[#16a34a] disabled:opacity-50 transition-colors shrink-0"
+                              >
+                                {renamingTeam ? "Saving..." : "Save"}
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => setEditingTeamId(null)}
+                                className="rounded-xl border border-white/15 px-2.5 py-1.5 text-xs font-medium text-white/60 hover:bg-white/10 transition-colors shrink-0"
+                              >
+                                Cancel
+                              </button>
+                            </div>
+                          ) : (
+                            <div className="flex items-center gap-2.5 min-w-0">
+                              {team.logoUrl ? (
+                                // eslint-disable-next-line @next/next/no-img-element
+                                <img src={team.logoUrl} alt="" className="h-8 w-8 rounded-lg object-cover" />
+                              ) : null}
+                              <p className="font-bold text-white text-sm truncate">{team.name}</p>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setEditingTeamId(team.id);
+                                  setEditingTeamName(team.name);
+                                }}
+                                className="text-white/40 hover:text-emerald-400 transition-colors p-1"
+                                title="Rename Team"
+                              >
+                                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                                </svg>
+                              </button>
+                            </div>
+                          )}
+
+                          {editingTeamId !== team.id ? (
+                            <button
+                              type="button"
+                              onClick={() => requestRemoveTeam(team.id, team.name)}
+                              className="inline-flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wider text-red-400 hover:text-red-300 transition-colors shrink-0"
+                            >
+                              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                              </svg>
+                              Remove Team
+                            </button>
+                          ) : null}
                         </div>
 
                         {/* Roster: leadership + drafted players */}

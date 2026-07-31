@@ -34,6 +34,7 @@ export type TournamentGamePlayerView = {
   id: string;
   puuid: string;
   userId: string | null;
+  userName: string | null;
   teamId: string | null;
   riotGameName: string;
   riotTagLine: string;
@@ -459,6 +460,7 @@ function toGameView(
       bodyshots: number;
       legshots: number;
       user?: {
+        name?: string | null;
         leaderboard?: Array<{ rankTier: string | null }>;
         registrations?: Array<{ snapshotRankTier: string | null }>;
       } | null;
@@ -473,6 +475,7 @@ function toGameView(
       id: p.id,
       puuid: p.puuid,
       userId: p.userId,
+      userName: p.user?.name ?? null,
       teamId: p.teamId,
       riotGameName: p.riotGameName,
       riotTagLine: p.riotTagLine,

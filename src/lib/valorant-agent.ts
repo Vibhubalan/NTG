@@ -96,6 +96,53 @@ export function getAgentIconUrl(agentName: string | null | undefined): string | 
 /**
  * Returns agent background color / theme tint for visual accents.
  */
+export type AgentRole = "Duelist" | "Initiator" | "Controller" | "Sentinel";
+
+const AGENT_ROLE_MAP: Record<string, AgentRole> = {
+  // Duelist: Jett, Phoenix, Reyna, Raze, Yoru, Neon, Iso, Waylay
+  jett: "Duelist",
+  phoenix: "Duelist",
+  reyna: "Duelist",
+  raze: "Duelist",
+  yoru: "Duelist",
+  neon: "Duelist",
+  iso: "Duelist",
+  waylay: "Duelist",
+
+  // Initiator: Sova, Breach, Skye, KAY/O, Fade, Gekko, Tejo
+  sova: "Initiator",
+  breach: "Initiator",
+  skye: "Initiator",
+  kayo: "Initiator",
+  fade: "Initiator",
+  gekko: "Initiator",
+  tejo: "Initiator",
+
+  // Controller: Brimstone, Viper, Omen, Astra, Harbor, Clove, Miks
+  brimstone: "Controller",
+  viper: "Controller",
+  omen: "Controller",
+  astra: "Controller",
+  harbor: "Controller",
+  clove: "Controller",
+  miks: "Controller",
+
+  // Sentinel: Sage, Cypher, Killjoy, Chamber, Deadlock, Vyse, Veto
+  sage: "Sentinel",
+  cypher: "Sentinel",
+  killjoy: "Sentinel",
+  chamber: "Sentinel",
+  deadlock: "Sentinel",
+  vyse: "Sentinel",
+  veto: "Sentinel",
+};
+
+export function getAgentRole(agentName: string | null | undefined): AgentRole | null {
+  if (!agentName) return null;
+  const key = normalizeAgentKey(agentName);
+  return AGENT_ROLE_MAP[key] ?? null;
+}
+
 export function getAgentColorHex(agentName: string | null | undefined): string {
   const key = normalizeAgentKey(agentName);
   switch (key) {

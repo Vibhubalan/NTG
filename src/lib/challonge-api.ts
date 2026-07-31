@@ -391,6 +391,49 @@ function normalizeResponse(url: string, data: ChallongeResponse): TournamentBrac
   const records = computeMatchRecords(participants, rawMatches);
   const finalStandings = buildFinalStandings(participants, records);
 
+  const isRoundRobin =
+    tournamentType.toLowerCase().includes("round_robin") ||
+    tournamentType.toLowerCase().includes("round robin");
+
+  if ((!groups || groups.length === 0) && isRoundRobin && rounds.length > 0) {
+    const standings: GroupStandingView[] =
+      finalStandings && finalStandings.length > 0
+        ? finalStandings.map((s, idx) => ({
+            rank: s.rank || idx + 1,
+            name: s.name,
+            matchRecord: s.record || "0 - 0 - 0",
+            ptsDiff: 0,
+            pts: 0,
+            tb: 0,
+            setWins: 0,
+            setTies: 0,
+            matchHistory: [],
+          }))
+        : participants.map((p, idx) => {
+            const rec = records.get(p.id) ?? { wins: 0, losses: 0 };
+            return {
+              rank: p.final_rank ?? idx + 1,
+              name: p.name,
+              matchRecord: `${rec.wins} - ${rec.losses} - 0`,
+              ptsDiff: 0,
+              pts: rec.wins * 3,
+              tb: 0,
+              setWins: rec.wins,
+              setTies: 0,
+              matchHistory: [],
+            };
+          });
+
+    groups = [
+      {
+        id: "group-1",
+        name: "Group A",
+        standings,
+        rounds,
+      },
+    ];
+  }
+
   return {
     tournamentName: tournament.name,
     tournamentType,

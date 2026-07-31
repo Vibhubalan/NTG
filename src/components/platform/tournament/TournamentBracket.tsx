@@ -397,10 +397,12 @@ function computeGroupHistoryAndStats(group: GroupView): GroupStandingView[] {
   });
 
   standings.sort((a, b) => {
+    if (b.pts !== a.pts) return b.pts - a.pts;
+    if (b.ptsDiff !== a.ptsDiff) return b.ptsDiff - a.ptsDiff;
     if (a.rank > 0 && b.rank > 0) return a.rank - b.rank;
     if (a.rank > 0) return -1;
     if (b.rank > 0) return 1;
-    return b.pts - a.pts || b.ptsDiff - a.ptsDiff;
+    return 0;
   });
 
   return standings.map((s, idx) => ({ ...s, rank: s.rank > 0 ? s.rank : idx + 1 }));
@@ -456,6 +458,25 @@ function RoundRobinBracketView({
     bracket.groups.some((g) => g.standings.length > 0)
   ) {
     groups = bracket.groups;
+  } else if (bracket.rounds && bracket.rounds.length > 0) {
+    groups = [
+      {
+        id: "group-a",
+        name: "Group A",
+        standings: fallbackList.map((name) => ({
+          rank: 0,
+          name,
+          matchRecord: "0 - 0 - 0",
+          ptsDiff: 0,
+          pts: 0,
+          tb: 0,
+          setWins: 0,
+          setTies: 0,
+          matchHistory: [],
+        })),
+        rounds: bracket.rounds,
+      },
+    ];
   } else if (fallbackList.length >= 6) {
     const generated = generateRoundRobinBracketFromParticipants(
       fallbackList.map((name, idx) => ({ seed: idx + 1, name })),
@@ -534,7 +555,7 @@ function RoundRobinBracketView({
                   : "text-white/45 hover:text-white"
               }`}
             >
-              Matches
+              Score
             </button>
           </div>
         </div>
@@ -1033,8 +1054,17 @@ export default function TournamentBracket({
   format,
   fallbackTeams,
 }: Props) {
+  const isRoundRobinFormat = Boolean(
+    (format && format.toLowerCase().includes("round")) ||
+      (bracket.tournamentType && bracket.tournamentType.toLowerCase().includes("round")) ||
+      (stageName && stageName.toLowerCase().includes("round")),
+  );
+
   const hasGroups = Boolean(bracket.groups && bracket.groups.length > 0);
+  const isRoundRobin = isRoundRobinFormat || hasGroups;
+
   const hasPlayoffRounds =
+    !isRoundRobinFormat &&
     Boolean(bracket.rounds && bracket.rounds.length > 0) &&
     bracket.rounds.some((r) =>
       r.matches.some(
@@ -1051,13 +1081,13 @@ export default function TournamentBracket({
     );
 
   const [activeStage, setActiveStage] = useState<"groups" | "playoffs">(() => {
-    if (hasPlayoffRounds && bracket.rounds.some((r) => r.matches.some((m) => m.state === "complete"))) {
+    if (hasGroups && hasPlayoffRounds && bracket.rounds.some((r) => r.matches.some((m) => m.state === "complete"))) {
       return "playoffs";
     }
-    return hasGroups ? "groups" : "playoffs";
+    return isRoundRobin ? "groups" : "playoffs";
   });
 
-  if (hasGroups && !hasPlayoffRounds) {
+  if (isRoundRobin && !hasPlayoffRounds) {
     return (
       <RoundRobinBracketView
         bracket={bracket}

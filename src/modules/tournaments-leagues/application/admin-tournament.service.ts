@@ -656,14 +656,26 @@ export async function updateTournamentTeam(
   const team = await prisma.tournamentTeam.findUnique({ where: { id: teamId } });
   if (!team) return { ok: false, error: "Team not found." };
 
-  await prisma.tournamentTeam.update({
-    where: { id: teamId },
-    data: {
-      name: input.name?.trim(),
-      seed: input.seed,
-      sortOrder: input.sortOrder,
-    },
+  const newName = input.name?.trim();
+
+  await prisma.$transaction(async (tx) => {
+    await tx.tournamentTeam.update({
+      where: { id: teamId },
+      data: {
+        ...(newName ? { name: newName } : {}),
+        seed: input.seed,
+        sortOrder: input.sortOrder,
+      },
+    });
+
+    if (newName) {
+      await tx.tournamentRegistration.updateMany({
+        where: { teamId },
+        data: { teamName: newName },
+      });
+    }
   });
+
   return { ok: true };
 }
 
