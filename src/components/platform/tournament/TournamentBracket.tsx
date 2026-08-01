@@ -397,11 +397,14 @@ function computeGroupHistoryAndStats(group: GroupView): GroupStandingView[] {
   });
 
   standings.sort((a, b) => {
+    if (a.rank > 0 && b.rank > 0 && a.rank !== b.rank) {
+      return a.rank - b.rank;
+    }
+    if (a.rank > 0 && (!b.rank || b.rank === 0)) return -1;
+    if (b.rank > 0 && (!a.rank || a.rank === 0)) return 1;
     if (b.pts !== a.pts) return b.pts - a.pts;
     if (b.ptsDiff !== a.ptsDiff) return b.ptsDiff - a.ptsDiff;
-    if (a.rank > 0 && b.rank > 0) return a.rank - b.rank;
-    if (a.rank > 0) return -1;
-    if (b.rank > 0) return 1;
+    if (b.setWins !== a.setWins) return b.setWins - a.setWins;
     return 0;
   });
 
