@@ -1,7 +1,8 @@
-/** Pure helpers for team-scoped tournament stats aggregation. */
+/** Pure helpers for tournament stats aggregation. */
 
 export type StatsGamePlayer = {
   riotId: string;
+  userId?: string | null;
   userName?: string | null;
   teamId: string | null;
   agent: string | null;
@@ -18,16 +19,28 @@ export type StatsGame = {
   teamBId: string;
   teamAName: string;
   teamBName: string;
+  startedAt?: string | null;
+  publishedAt?: string | null;
   mvpRiotId: string | null;
   players: StatsGamePlayer[];
 };
 
-export type AggregatedTeamPlayerStats = {
+export type StatsTeamMembership = {
+  teamId: string;
+  kind: "PRIMARY" | "POACH";
+  /** ISO timestamp; POACH games only count at/after this time. */
+  since: string | null;
+};
+
+export type TournamentStatsEligibility = {
+  byUserId: Record<string, StatsTeamMembership[]>;
+  byRiotId: Record<string, StatsTeamMembership[]>;
+};
+
+export type AggregatedPlayerStats = {
   key: string;
   riotId: string;
   userName: string | null;
-  teamId: string | null;
-  teamName: string | null;
   gamesPlayed: number;
   totalKills: number;
   totalDeaths: number;
@@ -40,35 +53,74 @@ export type AggregatedTeamPlayerStats = {
   mvpCount: number;
 };
 
-export function statsPlayerKey(riotId: string, teamId: string | null): string {
-  return `${riotId.toLowerCase()}::${teamId ?? "unknown"}`;
+/** @deprecated Use AggregatedPlayerStats */
+export type AggregatedTeamPlayerStats = AggregatedPlayerStats;
+
+export function statsPlayerKey(riotId: string): string {
+  return riotId.toLowerCase();
 }
 
-export function teamNameForId(
-  game: Pick<StatsGame, "teamAId" | "teamBId" | "teamAName" | "teamBName">,
-  teamId: string | null,
-): string | null {
-  if (!teamId) return null;
-  if (teamId === game.teamAId) return game.teamAName;
-  if (teamId === game.teamBId) return game.teamBName;
-  return null;
+function membershipsForPlayer(
+  player: Pick<StatsGamePlayer, "riotId" | "userId">,
+  eligibility?: TournamentStatsEligibility | null,
+): StatsTeamMembership[] {
+  if (!eligibility) return [];
+  const byUser = player.userId ? eligibility.byUserId[player.userId] ?? [] : [];
+  const byRiot = eligibility.byRiotId[statsPlayerKey(player.riotId)] ?? [];
+  const merged = new Map<string, StatsTeamMembership>();
+  for (const m of [...byUser, ...byRiot]) {
+    const existing = merged.get(m.teamId);
+    if (!existing) {
+      merged.set(m.teamId, m);
+      continue;
+    }
+    if (existing.kind === "POACH" && m.kind === "PRIMARY") {
+      merged.set(m.teamId, m);
+    }
+  }
+  return [...merged.values()];
 }
 
 /**
- * Aggregate published game appearances by riotId + teamId so poached players
- * keep separate rows per team instead of merging all games.
+ * Count a game appearance only if the player was attributed to a team they
+ * officially belong to (PRIMARY roster/registration, or admin POACH).
+ * Poach-team games only count at/after the poach was created.
  */
-export function aggregateTeamScopedPlayerStats(
+export function isStatsAppearanceEligible(
+  player: Pick<StatsGamePlayer, "riotId" | "userId" | "teamId">,
+  game: Pick<StatsGame, "startedAt" | "publishedAt">,
+  eligibility?: TournamentStatsEligibility | null,
+): boolean {
+  if (!player.teamId) return false;
+  const memberships = membershipsForPlayer(player, eligibility);
+  if (memberships.length === 0) return false;
+
+  const membership = memberships.find((m) => m.teamId === player.teamId);
+  if (!membership) return false;
+
+  if (membership.kind === "PRIMARY" || !membership.since) return true;
+
+  const gameTime = game.startedAt ?? game.publishedAt;
+  if (!gameTime) return true;
+  return new Date(gameTime).getTime() >= new Date(membership.since).getTime();
+}
+
+/**
+ * Aggregate published appearances into one row per Riot ID.
+ * Only official team games count (primary + post-poach).
+ */
+export function aggregatePlayerStats(
   games: StatsGame[],
-  opts?: { agentRoleFilter?: (agent: string) => boolean },
-): AggregatedTeamPlayerStats[] {
+  opts?: {
+    agentRoleFilter?: (agent: string) => boolean;
+    eligibility?: TournamentStatsEligibility | null;
+  },
+): AggregatedPlayerStats[] {
   const map = new Map<
     string,
     {
       riotId: string;
       userName: string | null;
-      teamId: string | null;
-      teamName: string | null;
       kills: number;
       deaths: number;
       assists: number;
@@ -84,19 +136,14 @@ export function aggregateTeamScopedPlayerStats(
   for (const game of games) {
     let gameMvpKey: string | null = null;
     if (game.mvpRiotId) {
-      const mvpPlayer = game.players.find(
-        (p) => p.riotId.toLowerCase() === game.mvpRiotId!.toLowerCase() && p.agent,
-      );
-      if (mvpPlayer) {
-        gameMvpKey = statsPlayerKey(mvpPlayer.riotId, mvpPlayer.teamId);
-      }
+      gameMvpKey = statsPlayerKey(game.mvpRiotId);
     }
     if (!gameMvpKey && game.players.length > 0) {
       let maxAcs = -1;
       for (const p of game.players) {
         if (p.acs > maxAcs && p.riotId && p.agent) {
           maxAcs = p.acs;
-          gameMvpKey = statsPlayerKey(p.riotId, p.teamId);
+          gameMvpKey = statsPlayerKey(p.riotId);
         }
       }
     }
@@ -104,15 +151,14 @@ export function aggregateTeamScopedPlayerStats(
     for (const p of game.players) {
       if (!p.agent) continue;
       if (opts?.agentRoleFilter && !opts.agentRoleFilter(p.agent)) continue;
+      if (!isStatsAppearanceEligible(p, game, opts?.eligibility)) continue;
 
-      const key = statsPlayerKey(p.riotId, p.teamId);
+      const key = statsPlayerKey(p.riotId);
       let entry = map.get(key);
       if (!entry) {
         entry = {
           riotId: p.riotId,
           userName: p.userName ?? null,
-          teamId: p.teamId,
-          teamName: teamNameForId(game, p.teamId),
           kills: 0,
           deaths: 0,
           assists: 0,
@@ -124,8 +170,6 @@ export function aggregateTeamScopedPlayerStats(
           mvpCount: 0,
         };
         map.set(key, entry);
-      } else if (!entry.teamName) {
-        entry.teamName = teamNameForId(game, p.teamId);
       }
       if (!entry.userName && p.userName) entry.userName = p.userName;
 
@@ -144,7 +188,7 @@ export function aggregateTeamScopedPlayerStats(
     }
   }
 
-  const result: AggregatedTeamPlayerStats[] = [];
+  const result: AggregatedPlayerStats[] = [];
   for (const [key, e] of map.entries()) {
     const g = e.games;
     const mostPlayedAgent =
@@ -153,8 +197,6 @@ export function aggregateTeamScopedPlayerStats(
       key,
       riotId: e.riotId,
       userName: e.userName,
-      teamId: e.teamId,
-      teamName: e.teamName,
       gamesPlayed: g,
       totalKills: e.kills,
       totalDeaths: e.deaths,
@@ -169,3 +211,6 @@ export function aggregateTeamScopedPlayerStats(
   }
   return result;
 }
+
+/** @deprecated Use aggregatePlayerStats */
+export const aggregateTeamScopedPlayerStats = aggregatePlayerStats;

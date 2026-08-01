@@ -13,6 +13,7 @@ import TournamentTeamsList from "@/components/platform/tournament/TournamentTeam
 import TournamentGamesSection, {
   type PublicGame,
 } from "@/components/platform/tournament/TournamentGamesSection";
+import type { TournamentStatsEligibility } from "@/lib/tournament-stats";
 import TournamentStatsSection from "@/components/platform/tournament/TournamentStatsSection";
 import { resolveChampion } from "@/lib/tournament-champion";
 import { gameMetaFor, formatRegistrationLabel, buildTournamentScheduleCardView } from "@/lib/tournament-display";
@@ -46,6 +47,8 @@ type Props = {
   showMatchesTab?: boolean;
   /** SSR-published custom games for the Matches tab. */
   publishedGames?: PublicGame[];
+  /** Official primary/poach memberships for Stats filtering. */
+  statsEligibility?: TournamentStatsEligibility;
 };
 
 export default function TournamentDetailView({
@@ -58,6 +61,7 @@ export default function TournamentDetailView({
   auctionEnded,
   showMatchesTab: showMatchesTabProp,
   publishedGames,
+  statsEligibility,
 }: Props) {
   const [activeTab, setActiveTab] = useState<"overview" | "brackets" | "matches" | "stats">("overview");
   const [activeStageIndex, setActiveStageIndex] = useState<number>(0);
@@ -426,7 +430,10 @@ export default function TournamentDetailView({
         </section>
       ) : activeTab === "stats" && showMatchesTab ? (
         <section className="space-y-6">
-          <TournamentStatsSection games={publishedGames ?? []} />
+          <TournamentStatsSection
+            games={publishedGames ?? []}
+            eligibility={statsEligibility}
+          />
         </section>
       ) : (
         <section className="space-y-8">

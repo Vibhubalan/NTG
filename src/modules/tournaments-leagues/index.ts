@@ -83,6 +83,7 @@ export {
 export {
   listTournamentGamesAdmin,
   listPublishedTournamentGames,
+  listTournamentStatsEligibility,
   scanTournamentGamesChunk,
   publishTournamentGames,
   setTournamentGameStatus,
@@ -90,4 +91,6 @@ export {
   type TournamentGameView,
   type TournamentGamePlayerView,
   type ScanChunkResult,
+  type TournamentStatsEligibility,
+  type StatsTeamMembership,
 } from "./application/tournament-games.service";

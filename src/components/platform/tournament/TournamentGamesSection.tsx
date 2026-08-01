@@ -9,6 +9,7 @@ import { partitionPlayersByCupTeam } from "@/lib/tournament-games";
 export type PublicGamePlayer = {
   id: string;
   riotId: string;
+  userId?: string | null;
   userName?: string | null;
   side: "Red" | "Blue";
   agent: string | null;
@@ -26,6 +27,7 @@ export type PublicGame = {
   id: string;
   mapName: string | null;
   startedAt: string | null;
+  publishedAt?: string | null;
   gameLengthSec: number | null;
   teamAName: string;
   teamBName: string;
@@ -505,14 +507,9 @@ export default function TournamentGamesSection({ slug, initialGames }: Props) {
                                                   {tag}
                                                 </span>
                                               ) : null}
-                                              {p.userName ? (
-                                                <span className="shrink-0 text-xs font-medium text-emerald-400">
-                                                  {p.userName}
-                                                </span>
-                                              ) : null}
                                               {isMvp ? (
-                                                <span className="rounded bg-emerald-400/20 px-1.5 py-0.5 text-[9px] font-black uppercase text-emerald-300 ring-1 ring-emerald-400/30">
-                                                  MVP
+                                                <span className="inline-flex items-center gap-0.5 rounded bg-amber-400/20 px-1.5 py-0.5 text-[9px] font-black uppercase text-amber-300 ring-1 ring-amber-400/40 shadow-[0_0_10px_rgba(245,158,11,0.25)]">
+                                                  👑 MVP
                                                 </span>
                                               ) : null}
                                             </div>

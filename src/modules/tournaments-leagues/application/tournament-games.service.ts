@@ -14,6 +14,10 @@ import {
   type MatchLobbyPlayer,
   type RosterPlayerIdentity,
 } from "@/lib/tournament-games";
+import type {
+  StatsTeamMembership,
+  TournamentStatsEligibility,
+} from "@/lib/tournament-stats";
 import {
   parseRiotId,
   resolveRiotAccount,
@@ -871,4 +875,121 @@ export async function deleteTournamentGame(opts: {
 
   await prisma.tournamentGame.delete({ where: { id: game.id } });
   return { ok: true };
+}
+
+export type { TournamentStatsEligibility, StatsTeamMembership } from "@/lib/tournament-stats";
+
+function pushStatsMembership(
+  list: StatsTeamMembership[],
+  membership: StatsTeamMembership,
+) {
+  const existing = list.find((m) => m.teamId === membership.teamId);
+  if (!existing) {
+    list.push(membership);
+    return;
+  }
+  if (existing.kind === "POACH" && membership.kind === "PRIMARY") {
+    existing.kind = "PRIMARY";
+    existing.since = null;
+  }
+}
+
+function addStatsEligibilityIdentity(
+  eligibility: TournamentStatsEligibility,
+  opts: {
+    userId?: string | null;
+    riotId?: string | null;
+    membership: StatsTeamMembership;
+  },
+) {
+  if (opts.userId) {
+    const bucket = eligibility.byUserId[opts.userId] ?? [];
+    pushStatsMembership(bucket, opts.membership);
+    eligibility.byUserId[opts.userId] = bucket;
+  }
+  const riotKey = opts.riotId?.trim().toLowerCase();
+  if (riotKey) {
+    const bucket = eligibility.byRiotId[riotKey] ?? [];
+    pushStatsMembership(bucket, { ...opts.membership });
+    eligibility.byRiotId[riotKey] = bucket;
+  }
+}
+
+/** Official team memberships used to filter public Stats (primary + admin poach). */
+export async function listTournamentStatsEligibility(
+  slug: string,
+): Promise<TournamentStatsEligibility> {
+  const empty: TournamentStatsEligibility = { byUserId: {}, byRiotId: {} };
+  const tournament = await prisma.tournament.findFirst({
+    where: slugWhere(slug),
+    include: {
+      tournamentTeams: {
+        include: {
+          players: {
+            include: {
+              user: { select: { riotGameName: true, riotTagLine: true } },
+              registration: { select: { snapshotRiotId: true } },
+            },
+          },
+        },
+      },
+      registrations: {
+        where: { teamId: { not: null } },
+        select: {
+          userId: true,
+          teamId: true,
+          snapshotRiotId: true,
+          user: { select: { riotGameName: true, riotTagLine: true } },
+        },
+      },
+    },
+  });
+  if (!tournament) return empty;
+
+  const eligibility: TournamentStatsEligibility = { byUserId: {}, byRiotId: {} };
+
+  for (const team of tournament.tournamentTeams) {
+    for (const player of team.players) {
+      const fromUser =
+        player.user?.riotGameName && player.user?.riotTagLine
+          ? `${player.user.riotGameName}#${player.user.riotTagLine}`
+          : null;
+      const fromRow =
+        player.riotGameName && player.riotTagLine
+          ? `${player.riotGameName}#${player.riotTagLine}`
+          : null;
+      const fromReg = player.registration?.snapshotRiotId ?? null;
+      const riotId = fromUser ?? fromRow ?? fromReg;
+      const kind = player.membershipKind === "POACH" ? "POACH" : "PRIMARY";
+      addStatsEligibilityIdentity(eligibility, {
+        userId: player.userId,
+        riotId,
+        membership: {
+          teamId: team.id,
+          kind,
+          since: kind === "POACH" ? player.createdAt.toISOString() : null,
+        },
+      });
+    }
+  }
+
+  for (const reg of tournament.registrations) {
+    if (!reg.teamId) continue;
+    const fromUser =
+      reg.user?.riotGameName && reg.user?.riotTagLine
+        ? `${reg.user.riotGameName}#${reg.user.riotTagLine}`
+        : null;
+    const riotId = fromUser ?? reg.snapshotRiotId ?? null;
+    addStatsEligibilityIdentity(eligibility, {
+      userId: reg.userId,
+      riotId,
+      membership: {
+        teamId: reg.teamId,
+        kind: "PRIMARY",
+        since: null,
+      },
+    });
+  }
+
+  return eligibility;
 }

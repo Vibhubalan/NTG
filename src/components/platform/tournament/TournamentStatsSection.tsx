@@ -3,12 +3,13 @@
 import { useMemo, useState } from "react";
 import { getAgentIconUrl, getAgentRole, type AgentRole } from "@/lib/valorant-agent";
 import {
-  aggregateTeamScopedPlayerStats,
-  type AggregatedTeamPlayerStats,
+  aggregatePlayerStats,
+  type AggregatedPlayerStats,
+  type TournamentStatsEligibility,
 } from "@/lib/tournament-stats";
 import type { PublicGame } from "./TournamentGamesSection";
 
-type AggregatedPlayer = AggregatedTeamPlayerStats;
+type AggregatedPlayer = AggregatedPlayerStats;
 
 type SortField =
   | "totalKills"
@@ -46,22 +47,24 @@ function fieldValue(p: AggregatedPlayer, field: SortField): number {
 
 type Props = {
   games: PublicGame[];
+  eligibility?: TournamentStatsEligibility;
 };
 
-export default function TournamentStatsSection({ games }: Props) {
+export default function TournamentStatsSection({ games, eligibility }: Props) {
   const [sortBy, setSortBy] = useState<SortField>("totalKills");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
   const [selectedRole, setSelectedRole] = useState<AgentRole | "ALL">("ALL");
   const [searchQuery, setSearchQuery] = useState("");
 
   const filteredPlayers = useMemo(() => {
-    return aggregateTeamScopedPlayerStats(games, {
+    return aggregatePlayerStats(games, {
       agentRoleFilter:
         selectedRole === "ALL"
           ? undefined
           : (agent) => getAgentRole(agent) === selectedRole,
+      eligibility,
     });
-  }, [games, selectedRole]);
+  }, [games, selectedRole, eligibility]);
 
   // Default sorting chain: Chosen field -> Kills -> ACS -> GamesPlayed
   const sorted = useMemo(() => {
@@ -97,8 +100,7 @@ export default function TournamentStatsSection({ games }: Props) {
     return sorted.filter(
       (p) =>
         p.riotId.toLowerCase().includes(q) ||
-        (p.userName && p.userName.toLowerCase().includes(q)) ||
-        (p.teamName && p.teamName.toLowerCase().includes(q)),
+        (p.userName && p.userName.toLowerCase().includes(q)),
     );
   }, [sorted, searchQuery]);
 
@@ -181,56 +183,56 @@ export default function TournamentStatsSection({ games }: Props) {
         </div>
       </div>
 
-      <div className="overflow-x-auto rounded-2xl border border-white/10 bg-[#080d16] shadow-2xl">
-        <table className="w-full min-w-[950px] text-base">
+      <div className="w-full rounded-2xl border border-white/10 bg-[#080d16] shadow-2xl">
+        <table className="w-full table-fixed text-sm sm:text-base">
           <thead>
-            <tr className="border-b border-white/10 bg-black/50 text-xs sm:text-sm font-black uppercase tracking-wider text-white/60">
-              <th className="px-5 py-4 text-left w-12">#</th>
-              <th className="px-5 py-4 text-left">Player</th>
+            <tr className="border-b border-white/10 bg-black/50 text-[10px] sm:text-xs font-black uppercase tracking-wider text-white/60">
+              <th className="w-[4%] px-2 py-3 sm:px-4 sm:py-4 text-left">#</th>
+              <th className="w-[28%] px-2 py-3 sm:px-4 sm:py-4 text-left">Player</th>
               <th
-                className="px-5 py-4 text-center cursor-pointer hover:text-white select-none transition-colors"
+                className="w-[6%] px-1 py-3 sm:px-3 sm:py-4 text-center cursor-pointer hover:text-white select-none transition-colors"
                 title="Toggle high→low / low→high"
                 onClick={() => toggleSort("gamesPlayed")}
               >
                 GP{sortIcon("gamesPlayed")}
               </th>
               <th
-                className="px-5 py-4 text-center cursor-pointer hover:text-white select-none transition-colors"
+                className="w-[7%] px-1 py-3 sm:px-3 sm:py-4 text-center cursor-pointer hover:text-white select-none transition-colors"
                 title="Toggle high→low / low→high"
                 onClick={() => toggleSort("avgAcs")}
               >
                 ACS{sortIcon("avgAcs")}
               </th>
               <th
-                className="px-5 py-4 text-center cursor-pointer hover:text-white select-none transition-colors"
+                className="w-[14%] px-1 py-3 sm:px-3 sm:py-4 text-center cursor-pointer hover:text-white select-none transition-colors"
                 title="Click to sort by Kills (high→low / low→high)"
                 onClick={() => toggleSort("totalKills")}
               >
                 K / D / A{sortIcon("totalKills")}
               </th>
               <th
-                className="px-5 py-4 text-center cursor-pointer hover:text-white select-none transition-colors"
+                className="w-[7%] px-1 py-3 sm:px-3 sm:py-4 text-center cursor-pointer hover:text-white select-none transition-colors"
                 title="Toggle high→low / low→high"
                 onClick={() => toggleSort("kd")}
               >
                 K/D{sortIcon("kd")}
               </th>
               <th
-                className="px-5 py-4 text-center cursor-pointer hover:text-white select-none transition-colors"
+                className="w-[7%] px-1 py-3 sm:px-3 sm:py-4 text-center cursor-pointer hover:text-white select-none transition-colors"
                 title="Toggle high→low / low→high"
                 onClick={() => toggleSort("avgAdr")}
               >
                 ADR{sortIcon("avgAdr")}
               </th>
               <th
-                className="px-5 py-4 text-center cursor-pointer hover:text-white select-none transition-colors"
+                className="w-[7%] px-1 py-3 sm:px-3 sm:py-4 text-center cursor-pointer hover:text-white select-none transition-colors"
                 title="Toggle high→low / low→high"
                 onClick={() => toggleSort("avgHsPercent")}
               >
                 HS%{sortIcon("avgHsPercent")}
               </th>
               <th
-                className="px-5 py-4 text-center cursor-pointer hover:text-white select-none transition-colors"
+                className="w-[20%] px-1 py-3 sm:px-3 sm:py-4 text-center cursor-pointer hover:text-white select-none transition-colors"
                 title="Click to cycle Agent Role filter (All → Duelist → Initiator → Controller → Sentinel)"
                 onClick={cycleRoleFilter}
               >
@@ -261,84 +263,97 @@ export default function TournamentStatsSection({ games }: Props) {
                 const isTop3 = idx < 3;
                 const mvps = p.mvpCount;
 
+                // Progressive Golden Highlighting based on MVP count
+                let rowBgClass = "border-b border-white/[0.04] transition-colors hover:bg-white/[0.04]";
+                let mvpBadgeClass = "";
+                let nameColorClass = "text-white font-bold";
+
+                if (mvps >= 3) {
+                  rowBgClass = "border-b border-amber-300/60 bg-gradient-to-r from-amber-400/[0.28] via-yellow-400/[0.12] to-transparent shadow-[0_0_25px_rgba(251,191,36,0.25),inset_0_0_30px_rgba(245,158,11,0.15)] transition-all hover:from-amber-400/[0.35]";
+                  mvpBadgeClass = "inline-flex items-center gap-1.5 rounded-md bg-gradient-to-r from-amber-300 via-yellow-400 to-amber-500 px-2.5 py-0.5 text-[11px] font-black uppercase text-black border border-amber-100 shadow-[0_0_20px_rgba(251,191,36,0.7)] animate-pulse tracking-wider";
+                  nameColorClass = "text-amber-200 font-black tracking-wide drop-shadow-[0_0_10px_rgba(251,191,36,0.5)]";
+                } else if (mvps === 2) {
+                  rowBgClass = "border-b border-amber-400/40 bg-gradient-to-r from-amber-400/[0.18] via-yellow-500/[0.06] to-transparent shadow-[inset_0_0_20px_rgba(245,158,11,0.1)] transition-all hover:from-amber-400/[0.24]";
+                  mvpBadgeClass = "inline-flex items-center gap-1 rounded-md bg-gradient-to-r from-amber-400/30 via-yellow-400/20 to-amber-500/30 px-2 py-0.5 text-[10px] font-black uppercase text-amber-200 border border-amber-300/50 shadow-[0_0_15px_rgba(245,158,11,0.35)] tracking-wide";
+                  nameColorClass = "text-amber-100 font-extrabold drop-shadow-sm";
+                } else if (mvps === 1) {
+                  rowBgClass = "border-b border-amber-500/25 bg-gradient-to-r from-amber-500/[0.10] via-amber-500/[0.02] to-transparent transition-all hover:from-amber-500/[0.15]";
+                  mvpBadgeClass = "inline-flex items-center gap-1 rounded bg-amber-500/20 px-1.5 py-0.5 text-[10px] font-black uppercase text-amber-300 border border-amber-400/30 shadow-[0_0_10px_rgba(245,158,11,0.2)]";
+                  nameColorClass = "text-amber-100 font-bold";
+                } else if (isTop3) {
+                  rowBgClass = "border-b border-white/[0.04] bg-gradient-to-r from-emerald-500/[0.08] via-transparent to-transparent transition-colors hover:bg-white/[0.04]";
+                }
+
                 return (
                   <tr
                     key={p.key}
-                    className={`border-b border-white/[0.04] transition-colors hover:bg-white/[0.04] ${
-                      isTop3
-                        ? "bg-gradient-to-r from-emerald-500/[0.08] via-transparent to-transparent"
-                        : ""
-                    }`}
+                    className={rowBgClass}
                   >
-                    <td className="px-5 py-4 text-center">
+                    <td className="px-2 py-3 sm:px-4 sm:py-4 text-center">
                       <span
                         className={`font-mono text-sm sm:text-base font-extrabold ${
-                          idx === 0
-                            ? "text-yellow-400"
-                            : idx === 1
-                              ? "text-gray-300"
-                              : idx === 2
-                                ? "text-amber-500"
-                                : "text-white/40"
+                          mvps >= 3
+                            ? "text-amber-200 drop-shadow-[0_0_10px_rgba(251,191,36,0.6)]"
+                            : mvps === 2
+                              ? "text-amber-300 drop-shadow-sm"
+                              : mvps === 1
+                                ? "text-amber-400"
+                                : idx === 0
+                                  ? "text-yellow-400"
+                                  : idx === 1
+                                    ? "text-gray-300"
+                                    : idx === 2
+                                      ? "text-amber-500"
+                                      : "text-white/40"
                         }`}
                       >
                         {idx + 1}
                       </span>
                     </td>
 
-                    <td className="px-5 py-4">
-                      <div className="flex items-center gap-3.5">
+                    <td className="px-2 py-3 sm:px-4 sm:py-4">
+                      <div className="flex items-center gap-2 sm:gap-3 min-w-0">
                         <div className="shrink-0">
                           {agentIcon ? (
                             <img
                               src={agentIcon}
                               alt={p.mostPlayedAgent ?? "Agent"}
-                              className="h-11 w-11 sm:h-12 sm:w-12 object-contain mix-blend-screen filter drop-shadow-md"
+                              className="h-9 w-9 sm:h-11 sm:w-11 object-contain mix-blend-screen filter drop-shadow-md"
                             />
                           ) : (
-                            <div className="flex h-11 w-11 sm:h-12 sm:w-12 items-center justify-center rounded-xl bg-white/10 text-xs font-bold text-white/50">
+                            <div className="flex h-9 w-9 sm:h-11 sm:w-11 items-center justify-center rounded-xl bg-white/10 text-xs font-bold text-white/50">
                               {name.slice(0, 2)}
                             </div>
                           )}
                         </div>
 
-                        <div className="min-w-0">
-                          <div className="flex items-center gap-2 flex-wrap">
-                            <span className="font-bold text-base sm:text-lg text-white truncate block">
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center gap-2 min-w-0">
+                            <span className={`text-sm sm:text-base truncate ${nameColorClass}`}>
                               {name}
                             </span>
                             {mvps > 0 && (
-                              <span className="inline-flex items-center gap-1 rounded bg-amber-400/10 px-1.5 py-0.5 text-[10px] font-black uppercase text-amber-300 border border-amber-400/20">
+                              <span className={`shrink-0 ${mvpBadgeClass}`}>
                                 👑 {mvps}x MVP
                               </span>
                             )}
                           </div>
-                          <div className="flex items-center gap-1.5 text-xs text-white/40 flex-wrap">
-                            {tag ? <span>#{tag}</span> : null}
-                            {p.userName ? (
-                              <span className="text-emerald-400/90 font-medium">
-                                {p.userName}
-                              </span>
-                            ) : null}
-                            {p.teamName ? (
-                              <span className="rounded bg-white/10 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-white/70">
-                                {p.teamName}
-                              </span>
-                            ) : null}
-                          </div>
+                          {tag ? (
+                            <div className="text-xs text-white/40">#{tag}</div>
+                          ) : null}
                         </div>
                       </div>
                     </td>
 
-                    <td className="px-5 py-4 text-center text-white/80 font-mono text-sm sm:text-base font-medium">
+                    <td className="px-1 py-3 sm:px-3 sm:py-4 text-center text-white/80 font-mono text-xs sm:text-sm font-medium">
                       {p.gamesPlayed}
                     </td>
 
-                    <td className="px-5 py-4 text-center font-mono text-base sm:text-lg font-black text-white">
+                    <td className="px-1 py-3 sm:px-3 sm:py-4 text-center font-mono text-sm sm:text-base font-black text-white">
                       {p.avgAcs}
                     </td>
 
-                    <td className="px-5 py-4 text-center font-mono text-base sm:text-lg font-bold">
+                    <td className="px-1 py-3 sm:px-3 sm:py-4 text-center font-mono text-xs sm:text-sm font-bold whitespace-nowrap">
                       <span className="text-emerald-300 font-black">{p.totalKills}</span>
                       <span className="text-white/30"> / </span>
                       <span className="text-rose-300">{p.totalDeaths}</span>
@@ -346,22 +361,22 @@ export default function TournamentStatsSection({ games }: Props) {
                       <span className="text-white/60">{p.totalAssists}</span>
                     </td>
 
-                    <td className="px-5 py-4 text-center font-mono text-sm sm:text-base font-bold">
+                    <td className="px-1 py-3 sm:px-3 sm:py-4 text-center font-mono text-xs sm:text-sm font-bold">
                       <span className={Number(kd) >= 1.0 ? "text-emerald-300" : "text-rose-300"}>
                         {kd}
                       </span>
                     </td>
 
-                    <td className="px-5 py-4 text-center font-mono text-sm sm:text-base text-white/90 font-medium">
+                    <td className="px-1 py-3 sm:px-3 sm:py-4 text-center font-mono text-xs sm:text-sm text-white/90 font-medium">
                       {p.avgAdr}
                     </td>
 
-                    <td className="px-5 py-4 text-center font-mono text-sm sm:text-base text-white/90 font-medium">
+                    <td className="px-1 py-3 sm:px-3 sm:py-4 text-center font-mono text-xs sm:text-sm text-white/90 font-medium">
                       {p.avgHsPercent}%
                     </td>
 
-                    <td className="px-5 py-4">
-                      <div className="flex items-center justify-center gap-1.5">
+                    <td className="px-1 py-3 sm:px-3 sm:py-4">
+                      <div className="mx-auto grid w-max grid-cols-4 gap-1 sm:gap-1.5">
                         {Object.entries(p.agentCounts)
                           .sort((a, b) => b[1] - a[1])
                           .map(([agent]) => {
@@ -372,12 +387,12 @@ export default function TournamentStatsSection({ games }: Props) {
                                 src={icon}
                                 alt={agent}
                                 title={agent}
-                                className="h-8 w-8 sm:h-9 sm:w-9 object-contain mix-blend-screen filter drop-shadow-md"
+                                className="h-7 w-7 sm:h-8 sm:w-8 object-contain mix-blend-screen filter drop-shadow-md"
                               />
                             ) : (
                               <span
                                 key={agent}
-                                className="flex h-8 w-8 items-center justify-center rounded-full bg-white/10 text-[9px] font-bold text-white/50"
+                                className="flex h-7 w-7 sm:h-8 sm:w-8 items-center justify-center rounded-full bg-white/10 text-[9px] font-bold text-white/50"
                                 title={agent}
                               >
                                 {agent.slice(0, 2)}

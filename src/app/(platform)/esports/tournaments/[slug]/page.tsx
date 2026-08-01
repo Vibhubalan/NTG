@@ -9,6 +9,7 @@ import {
   getRegistrationEligibility,
   getValorantRegistrationProfileCard,
   listPublishedTournamentGames,
+  listTournamentStatsEligibility,
 } from "@tournaments-leagues/index";
 import { tryAuctionLink } from "@/lib/auction-link";
 import { resolveEffectivePublicAuction } from "@tournaments-leagues/domain/auction-hero-phase";
@@ -34,8 +35,14 @@ export default async function TournamentDetailPage({ params }: Props) {
     bracketUrls: tournament.bracketUrls,
   });
 
-  const [brackets, admin, registrationPreview, registrationProfileCard, publishedGames] =
-    await Promise.all([
+  const [
+    brackets,
+    admin,
+    registrationPreview,
+    registrationProfileCard,
+    publishedGames,
+    statsEligibility,
+  ] = await Promise.all([
       bracketItems.length
         ? Promise.all(
             bracketItems.map(async (item) => ({
@@ -52,6 +59,7 @@ export default async function TournamentDetailPage({ params }: Props) {
         ? getValorantRegistrationProfileCard(slug, userId)
         : Promise.resolve(null),
       listPublishedTournamentGames(slug),
+      listTournamentStatsEligibility(slug),
     ]);
 
   const publishedList = publishedGames.ok ? publishedGames.games : [];
@@ -95,6 +103,7 @@ export default async function TournamentDetailPage({ params }: Props) {
         auctionEnded={auctionEnded}
         showMatchesTab={showMatchesTab}
         publishedGames={publishedList}
+        statsEligibility={statsEligibility}
       />
       {admin.ok ? (
         <div className="mt-16 border-t border-white/[0.06] pt-8 text-center">
