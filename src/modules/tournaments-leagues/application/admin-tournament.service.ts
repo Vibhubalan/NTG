@@ -705,6 +705,7 @@ export async function createTeamPlayer(
     riotTagLine?: string;
     registrationId?: string;
     userId?: string;
+    membershipKind?: "PRIMARY" | "POACH";
   },
 ): Promise<{ ok: true; id: string } | { ok: false; error: string }> {
   const team = await prisma.tournamentTeam.findUnique({
@@ -712,6 +713,104 @@ export async function createTeamPlayer(
     include: { players: { orderBy: { sortOrder: "desc" }, take: 1 } },
   });
   if (!team) return { ok: false, error: "Team not found." };
+
+  const membershipKind = input.membershipKind === "POACH" ? "POACH" : "PRIMARY";
+
+  if (membershipKind === "POACH") {
+    if (!input.registrationId && !input.userId) {
+      return { ok: false, error: "Poach requires a registration or user." };
+    }
+
+    let userId: string | null = input.userId ?? null;
+    let displayName = input.displayName?.trim() || "Player";
+    let riotGameName: string | null = input.riotGameName?.trim() || null;
+    let riotTagLine: string | null = input.riotTagLine?.trim() || null;
+    let valorantRoles: unknown = undefined;
+    let peakPremierRank: string | null = null;
+    let poachedFromTeamId: string | null = null;
+
+    if (input.registrationId) {
+      const reg = await prisma.tournamentRegistration.findUnique({
+        where: { id: input.registrationId },
+        include: { user: true },
+      });
+      if (!reg || reg.tournamentId !== team.tournamentId) {
+        return { ok: false, error: "Registration not found for this cup." };
+      }
+      if (!reg.teamId) {
+        return { ok: false, error: "Player must already be on a team before poaching." };
+      }
+      if (reg.teamId === teamId) {
+        return { ok: false, error: "Cannot poach a player onto their primary team." };
+      }
+
+      userId = reg.userId;
+      displayName = reg.snapshotDisplayName ?? reg.user.name ?? displayName;
+      riotGameName = reg.user.riotGameName ?? riotGameName;
+      riotTagLine = reg.user.riotTagLine ?? riotTagLine;
+      valorantRoles = reg.snapshotValorantRoles ?? undefined;
+      peakPremierRank = reg.snapshotCs2PeakPremier;
+      poachedFromTeamId = reg.teamId;
+    } else if (userId) {
+      const primaryMembership = await prisma.tournamentTeamPlayer.findFirst({
+        where: {
+          userId,
+          membershipKind: "PRIMARY",
+          team: { tournamentId: team.tournamentId },
+        },
+      });
+      const primaryReg = await prisma.tournamentRegistration.findFirst({
+        where: { tournamentId: team.tournamentId, userId },
+      });
+      const fromTeamId = primaryMembership?.teamId ?? primaryReg?.teamId ?? null;
+      if (!fromTeamId) {
+        return { ok: false, error: "Player must already be on a team before poaching." };
+      }
+      if (fromTeamId === teamId) {
+        return { ok: false, error: "Cannot poach a player onto their primary team." };
+      }
+      poachedFromTeamId = fromTeamId;
+
+      const user = await prisma.user.findUnique({ where: { id: userId } });
+      if (user) {
+        displayName = user.name ?? displayName;
+        riotGameName = user.riotGameName ?? riotGameName;
+        riotTagLine = user.riotTagLine ?? riotTagLine;
+      }
+    }
+
+    if (userId) {
+      const existingOnTeam = await prisma.tournamentTeamPlayer.findFirst({
+        where: { teamId, userId },
+      });
+      if (existingOnTeam) {
+        return { ok: false, error: "Player already on this team." };
+      }
+    }
+
+    const sortOrder = (team.players[0]?.sortOrder ?? -1) + 1;
+    const player = await prisma.tournamentTeamPlayer.create({
+      data: {
+        teamId,
+        userId,
+        registrationId: null,
+        displayName,
+        riotGameName,
+        riotTagLine,
+        valorantRoles: valorantRoles as never,
+        peakPremierRank,
+        membershipKind: "POACH",
+        poachedFromTeamId,
+        sortOrder,
+      },
+    });
+
+    await prisma.tournament.update({
+      where: { id: team.tournamentId },
+      data: { updatedAt: new Date() },
+    });
+    return { ok: true, id: player.id };
+  }
 
   if (input.registrationId) {
     const reg = await prisma.tournamentRegistration.findUnique({
@@ -729,7 +828,10 @@ export async function createTeamPlayer(
     }
 
     const existingOnTeam = await prisma.tournamentTeamPlayer.findFirst({
-      where: { teamId, registrationId: reg.id },
+      where: {
+        teamId,
+        OR: [{ registrationId: reg.id }, ...(reg.userId ? [{ userId: reg.userId }] : [])],
+      },
     });
     if (existingOnTeam) {
       return { ok: false, error: "Player already on this team." };
@@ -747,6 +849,7 @@ export async function createTeamPlayer(
           riotTagLine: reg.user.riotTagLine,
           valorantRoles: reg.snapshotValorantRoles ?? undefined,
           peakPremierRank: reg.snapshotCs2PeakPremier,
+          membershipKind: "PRIMARY",
           sortOrder,
         },
       });
@@ -764,6 +867,15 @@ export async function createTeamPlayer(
     return { ok: true, id: player.id };
   }
 
+  if (input.userId) {
+    const existingOnTeam = await prisma.tournamentTeamPlayer.findFirst({
+      where: { teamId, userId: input.userId },
+    });
+    if (existingOnTeam) {
+      return { ok: false, error: "Player already on this team." };
+    }
+  }
+
   const sortOrder = (team.players[0]?.sortOrder ?? -1) + 1;
   const player = await prisma.tournamentTeamPlayer.create({
     data: {
@@ -772,6 +884,7 @@ export async function createTeamPlayer(
       displayName: input.displayName.trim(),
       riotGameName: input.riotGameName?.trim() || null,
       riotTagLine: input.riotTagLine?.trim() || null,
+      membershipKind: "PRIMARY",
       sortOrder,
     },
   });
@@ -810,7 +923,7 @@ export async function deleteTeamPlayer(
   if (!player) return { ok: false, error: "Player not found." };
 
   await prisma.$transaction(async (tx) => {
-    if (player.registrationId) {
+    if (player.registrationId && player.membershipKind !== "POACH") {
       await tx.tournamentRegistration.update({
         where: { id: player.registrationId },
         data: { teamId: null },

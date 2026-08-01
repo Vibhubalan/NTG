@@ -67,6 +67,7 @@ export async function POST(req: Request, { params }: Props) {
     riotTagLine?: string;
     registrationId?: string;
     userId?: string;
+    membershipKind?: "PRIMARY" | "POACH";
   };
   try {
     body = await req.json();
@@ -74,8 +75,12 @@ export async function POST(req: Request, { params }: Props) {
     return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
   }
 
-  if (!body.registrationId && !body.displayName?.trim()) {
+  const isPoach = body.membershipKind === "POACH";
+  if (!body.registrationId && !body.userId && !body.displayName?.trim()) {
     return NextResponse.json({ error: "Player name is required." }, { status: 400 });
+  }
+  if (isPoach && !body.registrationId && !body.userId) {
+    return NextResponse.json({ error: "Poach requires a registration or user." }, { status: 400 });
   }
 
   const result = await createTeamPlayer(teamId, {
@@ -84,6 +89,7 @@ export async function POST(req: Request, { params }: Props) {
     riotTagLine: body.riotTagLine,
     registrationId: body.registrationId,
     userId: body.userId,
+    membershipKind: body.membershipKind,
   });
   if (!result.ok) {
     return NextResponse.json({ error: result.error }, { status: 400 });

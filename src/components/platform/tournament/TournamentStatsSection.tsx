@@ -2,24 +2,22 @@
 
 import { useMemo, useState } from "react";
 import { getAgentIconUrl, getAgentRole, type AgentRole } from "@/lib/valorant-agent";
+import {
+  aggregateTeamScopedPlayerStats,
+  type AggregatedTeamPlayerStats,
+} from "@/lib/tournament-stats";
 import type { PublicGame } from "./TournamentGamesSection";
 
-type AggregatedPlayer = {
-  riotId: string;
-  userName?: string | null;
-  teamId: string | null;
-  gamesPlayed: number;
-  totalKills: number;
-  totalDeaths: number;
-  totalAssists: number;
-  avgAcs: number;
-  avgAdr: number;
-  avgHsPercent: number;
-  mostPlayedAgent: string | null;
-  agentCounts: Record<string, number>;
-};
+type AggregatedPlayer = AggregatedTeamPlayerStats;
 
-type SortField = "totalKills" | "avgAcs" | "gamesPlayed" | "kd" | "avgAdr" | "avgHsPercent";
+type SortField =
+  | "totalKills"
+  | "avgAcs"
+  | "gamesPlayed"
+  | "kd"
+  | "avgAdr"
+  | "avgHsPercent"
+  | "mvpCount";
 type SortDir = "asc" | "desc";
 
 function parseRiotName(riotId: string) {
@@ -29,6 +27,8 @@ function parseRiotName(riotId: string) {
 
 function fieldValue(p: AggregatedPlayer, field: SortField): number {
   switch (field) {
+    case "mvpCount":
+      return p.mvpCount;
     case "totalKills":
       return p.totalKills;
     case "avgAcs":
@@ -55,92 +55,25 @@ export default function TournamentStatsSection({ games }: Props) {
   const [searchQuery, setSearchQuery] = useState("");
 
   const filteredPlayers = useMemo(() => {
-    const map = new Map<
-      string,
-      {
-        riotId: string;
-        userName?: string | null;
-        teamId: string | null;
-        kills: number;
-        deaths: number;
-        assists: number;
-        acsSum: number;
-        adrSum: number;
-        hsSum: number;
-        agentCounts: Record<string, number>;
-        games: number;
-      }
-    >();
-
-    for (const game of games) {
-      for (const p of game.players) {
-        if (!p.agent) continue;
-        const agentRole = getAgentRole(p.agent);
-
-        // Filter stats per selected agent role
-        if (selectedRole !== "ALL" && agentRole !== selectedRole) {
-          continue;
-        }
-
-        const key = p.riotId.toLowerCase();
-        let entry = map.get(key);
-        if (!entry) {
-          entry = {
-            riotId: p.riotId,
-            userName: p.userName ?? null,
-            teamId: p.teamId,
-            kills: 0,
-            deaths: 0,
-            assists: 0,
-            acsSum: 0,
-            adrSum: 0,
-            hsSum: 0,
-            agentCounts: {},
-            games: 0,
-          };
-          map.set(key, entry);
-        }
-        entry.kills += p.kills;
-        entry.deaths += p.deaths;
-        entry.assists += p.assists;
-        entry.acsSum += p.acs;
-        entry.adrSum += p.adr;
-        entry.hsSum += p.hsPercent;
-        entry.games += 1;
-        entry.agentCounts[p.agent] = (entry.agentCounts[p.agent] ?? 0) + 1;
-      }
-    }
-
-    const result: AggregatedPlayer[] = [];
-    for (const e of map.values()) {
-      const g = e.games;
-      const mostPlayedAgent =
-        Object.entries(e.agentCounts).sort((a, b) => b[1] - a[1])[0]?.[0] ?? null;
-      result.push({
-        riotId: e.riotId,
-        userName: e.userName,
-        teamId: e.teamId,
-        gamesPlayed: g,
-        totalKills: e.kills,
-        totalDeaths: e.deaths,
-        totalAssists: e.assists,
-        avgAcs: g > 0 ? Math.round(e.acsSum / g) : 0,
-        avgAdr: g > 0 ? Math.round((e.adrSum / g) * 10) / 10 : 0,
-        avgHsPercent: g > 0 ? Math.round((e.hsSum / g) * 10) / 10 : 0,
-        mostPlayedAgent,
-        agentCounts: e.agentCounts,
-      });
-    }
-    return result;
+    return aggregateTeamScopedPlayerStats(games, {
+      agentRoleFilter:
+        selectedRole === "ALL"
+          ? undefined
+          : (agent) => getAgentRole(agent) === selectedRole,
+    });
   }, [games, selectedRole]);
 
-  // Default sorting chain: Kills -> ACS -> GamesPlayed
+  // Default sorting chain: Chosen field -> Kills -> ACS -> GamesPlayed
   const sorted = useMemo(() => {
     const arr = [...filteredPlayers];
     arr.sort((a, b) => {
       const primary = fieldValue(a, sortBy) - fieldValue(b, sortBy);
       if (primary !== 0) return sortDir === "desc" ? -primary : primary;
 
+      if (sortBy !== "mvpCount") {
+        const mvp = a.mvpCount - b.mvpCount;
+        if (mvp !== 0) return -mvp;
+      }
       if (sortBy !== "totalKills") {
         const kills = a.totalKills - b.totalKills;
         if (kills !== 0) return -kills;
@@ -164,13 +97,19 @@ export default function TournamentStatsSection({ games }: Props) {
     return sorted.filter(
       (p) =>
         p.riotId.toLowerCase().includes(q) ||
-        (p.userName && p.userName.toLowerCase().includes(q)),
+        (p.userName && p.userName.toLowerCase().includes(q)) ||
+        (p.teamName && p.teamName.toLowerCase().includes(q)),
     );
   }, [sorted, searchQuery]);
 
   function toggleSort(field: SortField) {
     if (sortBy === field) {
-      setSortDir((d) => (d === "desc" ? "asc" : "desc"));
+      if (sortDir === "desc") {
+        setSortDir("asc");
+      } else {
+        setSortBy("totalKills");
+        setSortDir("desc");
+      }
     } else {
       setSortBy(field);
       setSortDir("desc");
@@ -320,10 +259,11 @@ export default function TournamentStatsSection({ games }: Props) {
                     : p.totalKills.toFixed(2);
                 const agentIcon = getAgentIconUrl(p.mostPlayedAgent);
                 const isTop3 = idx < 3;
+                const mvps = p.mvpCount;
 
                 return (
                   <tr
-                    key={p.riotId}
+                    key={p.key}
                     className={`border-b border-white/[0.04] transition-colors hover:bg-white/[0.04] ${
                       isTop3
                         ? "bg-gradient-to-r from-emerald-500/[0.08] via-transparent to-transparent"
@@ -361,12 +301,29 @@ export default function TournamentStatsSection({ games }: Props) {
                             </div>
                           )}
                         </div>
+
                         <div className="min-w-0">
-                          <span className="font-bold text-base sm:text-lg text-white truncate block">{name}</span>
-                          <div className="flex items-center gap-1.5 text-xs text-white/40">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="font-bold text-base sm:text-lg text-white truncate block">
+                              {name}
+                            </span>
+                            {mvps > 0 && (
+                              <span className="inline-flex items-center gap-1 rounded bg-amber-400/10 px-1.5 py-0.5 text-[10px] font-black uppercase text-amber-300 border border-amber-400/20">
+                                👑 {mvps}x MVP
+                              </span>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-1.5 text-xs text-white/40 flex-wrap">
                             {tag ? <span>#{tag}</span> : null}
                             {p.userName ? (
-                              <span className="text-emerald-400/90 font-medium">{p.userName}</span>
+                              <span className="text-emerald-400/90 font-medium">
+                                {p.userName}
+                              </span>
+                            ) : null}
+                            {p.teamName ? (
+                              <span className="rounded bg-white/10 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-white/70">
+                                {p.teamName}
+                              </span>
                             ) : null}
                           </div>
                         </div>
@@ -415,7 +372,7 @@ export default function TournamentStatsSection({ games }: Props) {
                                 src={icon}
                                 alt={agent}
                                 title={agent}
-                                className="h-8 w-8 sm:h-9 sm:w-9 object-contain mix-blend-screen filter drop-shadow-sm"
+                                className="h-8 w-8 sm:h-9 sm:w-9 object-contain mix-blend-screen filter drop-shadow-md"
                               />
                             ) : (
                               <span
@@ -447,3 +404,4 @@ export default function TournamentStatsSection({ games }: Props) {
     </div>
   );
 }
+

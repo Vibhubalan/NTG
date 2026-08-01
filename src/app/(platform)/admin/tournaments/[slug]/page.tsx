@@ -98,6 +98,11 @@ export default async function AdminTournamentEditPage({ params }: Props) {
         riotGameName: p.riotGameName,
         riotTagLine: p.riotTagLine,
         registrationId: p.registrationId,
+        userId: p.userId,
+        membershipKind: (p.membershipKind === "POACH" ? "POACH" : "PRIMARY") as
+          | "PRIMARY"
+          | "POACH",
+        poachedFromTeamId: p.poachedFromTeamId,
       })),
     })),
     registrations: t.registrations.map((r) => {
@@ -142,6 +147,7 @@ export default async function AdminTournamentEditPage({ params }: Props) {
       cs2PeakPremier: cs2Ranks?.premier ?? r.snapshotCs2PeakPremier,
       cs2FaceitRank: cs2Ranks?.faceit ?? r.snapshotCs2FaceitRank,
       teamId: r.teamId,
+      userId: r.userId,
     };
     }),
     poolPlayers,

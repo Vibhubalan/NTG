@@ -116,6 +116,11 @@ enum TournamentGameSide {
   Blue
 }
 
+enum TournamentTeamMembershipKind {
+  PRIMARY
+  POACH
+}
+
 enum ValorantRole {
   DUELIST
   INITIATOR
@@ -419,6 +424,7 @@ model TournamentTeam {
   createdAt            DateTime                 @default(now())
   updatedAt            DateTime                 @updatedAt
   players              TournamentTeamPlayer[]
+  poachedPlayers       TournamentTeamPlayer[]   @relation("TeamPoaches")
   registrations        TournamentRegistration[]
   gamesAsTeamA         TournamentGame[]         @relation("GameTeamA")
   gamesAsTeamB         TournamentGame[]         @relation("GameTeamB")
@@ -427,23 +433,28 @@ model TournamentTeam {
 }
 
 model TournamentTeamPlayer {
-  id              String                  @id @default(cuid())
-  teamId          String
-  team            TournamentTeam          @relation(fields: [teamId], references: [id], onDelete: Cascade)
-  userId          String?
-  user            User?                   @relation(fields: [userId], references: [id], onDelete: SetNull)
-  registrationId  String?                 @unique
-  registration    TournamentRegistration? @relation(fields: [registrationId], references: [id], onDelete: SetNull)
-  displayName     String
-  riotGameName    String?
-  riotTagLine     String?
-  valorantRoles   Json?
-  peakPremierRank String?
-  sortOrder       Int                     @default(0)
-  createdAt       DateTime                @default(now())
+  id                String                        @id @default(cuid())
+  teamId            String
+  team              TournamentTeam                @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  userId            String?
+  user              User?                         @relation(fields: [userId], references: [id], onDelete: SetNull)
+  registrationId    String?                       @unique
+  registration      TournamentRegistration?       @relation(fields: [registrationId], references: [id], onDelete: SetNull)
+  displayName       String
+  riotGameName      String?
+  riotTagLine       String?
+  valorantRoles     Json?
+  peakPremierRank   String?
+  membershipKind    TournamentTeamMembershipKind  @default(PRIMARY)
+  poachedFromTeamId String?
+  poachedFromTeam   TournamentTeam?               @relation("TeamPoaches", fields: [poachedFromTeamId], references: [id], onDelete: SetNull)
+  sortOrder         Int                           @default(0)
+  createdAt         DateTime                      @default(now())
 
+  @@unique([teamId, userId])
   @@index([teamId, sortOrder])
   @@index([registrationId])
+  @@index([poachedFromTeamId])
 }
 
 model TournamentGame {

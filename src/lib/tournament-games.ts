@@ -97,6 +97,55 @@ export function resolveTeamSideMajority(
   return red >= blue ? "Red" : "Blue";
 }
 
+/**
+ * Attribute a lobby player to a cup team.
+ * When the puuid is on both rosters (primary + poach), prefer in-game side
+ * vs Team A's majority side instead of last-write-wins roster map.
+ */
+export function resolveGamePlayerTeamId(opts: {
+  puuid: string;
+  side: "Red" | "Blue";
+  teamAId: string;
+  teamBId: string;
+  teamAPuuids: ReadonlySet<string>;
+  teamBPuuids: ReadonlySet<string>;
+  teamASide: "Red" | "Blue" | null;
+  rosterTeamId: string | null;
+}): string | null {
+  const onA = opts.teamAPuuids.has(opts.puuid);
+  const onB = opts.teamBPuuids.has(opts.puuid);
+
+  if (onA && onB) {
+    if (opts.teamASide) {
+      return opts.side === opts.teamASide ? opts.teamAId : opts.teamBId;
+    }
+    return opts.rosterTeamId;
+  }
+
+  if (opts.rosterTeamId) return opts.rosterTeamId;
+
+  if (opts.teamASide) {
+    return opts.side === opts.teamASide ? opts.teamAId : opts.teamBId;
+  }
+  if (onA) return opts.teamAId;
+  if (onB) return opts.teamBId;
+  return null;
+}
+
+/** Prefer the roster identity that matches the attributed team when dual-rostered. */
+export function pickRosterIdentityForTeam(
+  puuid: string,
+  teamId: string | null,
+  rosterAByPuuid: ReadonlyMap<string, RosterPlayerIdentity>,
+  rosterBByPuuid: ReadonlyMap<string, RosterPlayerIdentity>,
+): RosterPlayerIdentity | null {
+  const a = rosterAByPuuid.get(puuid) ?? null;
+  const b = rosterBByPuuid.get(puuid) ?? null;
+  if (teamId && a?.teamId === teamId) return a;
+  if (teamId && b?.teamId === teamId) return b;
+  return a ?? b;
+}
+
 /** Which Valorant side most of a cup team's known players were on. */
 export function majoritySideForPlayers(
   players: ReadonlyArray<{ side: "Red" | "Blue" }>,

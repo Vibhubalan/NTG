@@ -7,6 +7,7 @@ import {
   isCommonCustomMatch,
   normalizeGameSide,
   partitionPlayersByCupTeam,
+  resolveGamePlayerTeamId,
   resolveTeamSideMajority,
 } from "@/lib/tournament-games";
 
@@ -87,5 +88,38 @@ describe("tournament-games helpers", () => {
     expect(teamA).toHaveLength(5);
     expect(teamB).toHaveLength(5);
     expect(teamA.some((p) => p.riotId === "sub#alt")).toBe(true);
+  });
+
+  it("attributes dual-roster (primary + poach) players by in-game side", () => {
+    const teamAId = "cup-a";
+    const teamBId = "cup-b";
+    const teamAPuuids = new Set(["poach", "a2", "a3", "a4", "a5"]);
+    const teamBPuuids = new Set(["poach", "b2", "b3", "b4", "b5"]);
+
+    expect(
+      resolveGamePlayerTeamId({
+        puuid: "poach",
+        side: "Blue",
+        teamAId,
+        teamBId,
+        teamAPuuids,
+        teamBPuuids,
+        teamASide: "Red",
+        rosterTeamId: teamBId,
+      }),
+    ).toBe(teamBId);
+
+    expect(
+      resolveGamePlayerTeamId({
+        puuid: "poach",
+        side: "Red",
+        teamAId,
+        teamBId,
+        teamAPuuids,
+        teamBPuuids,
+        teamASide: "Red",
+        rosterTeamId: teamBId,
+      }),
+    ).toBe(teamAId);
   });
 });

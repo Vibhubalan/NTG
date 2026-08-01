@@ -23,6 +23,9 @@ type Team = {
     riotGameName: string | null;
     riotTagLine: string | null;
     registrationId: string | null;
+    userId?: string | null;
+    membershipKind?: "PRIMARY" | "POACH";
+    poachedFromTeamId?: string | null;
   }[];
 };
 
@@ -46,6 +49,7 @@ type RegistrationRow = {
   cs2PeakPremier: string | null;
   cs2FaceitRank: string | null;
   teamId: string | null;
+  userId: string | null;
 };
 
 type PoolPlayer = {
@@ -329,6 +333,8 @@ export default function AdminTournamentEditor({
   const [renamingTeam, setRenamingTeam] = useState(false);
   const [newPlayerNames, setNewPlayerNames] = useState<Record<string, string>>({});
   const [poolPick, setPoolPick] = useState<Record<string, string>>({});
+  const [poachPick, setPoachPick] = useState<Record<string, string>>({});
+  const [poachingTeamId, setPoachingTeamId] = useState<string | null>(null);
   const [memberSearch, setMemberSearch] = useState("");
   const [memberResults, setMemberResults] = useState<
     { id: string; email: string | null; name: string | null; displayName: string | null }[]
@@ -857,6 +863,33 @@ export default function AdminTournamentEditor({
     if (res.ok) {
       setNewPlayerNames((prev) => ({ ...prev, [teamId]: "" }));
       refreshLists();
+    }
+  }
+
+  async function poachPlayer(teamId: string) {
+    const registrationId = poachPick[teamId]?.trim();
+    if (!registrationId) return;
+    setPoachingTeamId(teamId);
+    setMessage(null);
+    try {
+      const res = await fetch(`/api/admin/tournaments/${form.slug}/teams/${teamId}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ registrationId, membershipKind: "POACH" }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setMessage(data.error ?? "Failed to poach player.");
+        return;
+      }
+      setPoachPick((prev) => ({ ...prev, [teamId]: "" }));
+      setMessage("Player poached onto team. Re-scan matches so their games attribute correctly.");
+      refreshLists();
+      router.refresh();
+    } catch {
+      setMessage("Failed to poach player.");
+    } finally {
+      setPoachingTeamId(null);
     }
   }
 
@@ -2313,7 +2346,7 @@ export default function AdminTournamentEditor({
                           ) : null}
                         </div>
 
-                        {/* Roster: leadership + drafted players */}
+                        {/* Roster: leadership + drafted / poached players */}
                         <ul className="space-y-1.5 min-h-[3rem]">
                           {(() => {
                             const matchingRegs = registrations.filter(
@@ -2324,11 +2357,20 @@ export default function AdminTournamentEditor({
                             );
                             const rosterPlayers = matchingRegs.filter((r) => r.participantRole === "PLAYER");
                             const rosterRegistrationIds = new Set(matchingRegs.map((r) => r.id));
+                            const teamNameById = new Map(tournamentTeams.map((t) => [t.id, t.name]));
+                            const poached = team.players.filter((p) => p.membershipKind === "POACH");
                             const drafted = team.players.filter(
-                              (p) => !p.registrationId || !rosterRegistrationIds.has(p.registrationId),
+                              (p) =>
+                                p.membershipKind !== "POACH" &&
+                                (!p.registrationId || !rosterRegistrationIds.has(p.registrationId)),
                             );
 
-                            if (leadership.length === 0 && rosterPlayers.length === 0 && drafted.length === 0) {
+                            if (
+                              leadership.length === 0 &&
+                              rosterPlayers.length === 0 &&
+                              drafted.length === 0 &&
+                              poached.length === 0
+                            ) {
                               return (
                                 <p className="text-xs text-white/30 italic">
                                   {isAuctionFormat
@@ -2398,6 +2440,32 @@ export default function AdminTournamentEditor({
                                     </button>
                                   </li>
                                 ))}
+                                {poached.map((p) => {
+                                  const fromName = p.poachedFromTeamId
+                                    ? teamNameById.get(p.poachedFromTeamId)
+                                    : null;
+                                  return (
+                                    <li
+                                      key={p.id}
+                                      className="flex items-center justify-between rounded-lg bg-amber-500/[0.06] border border-amber-400/15 px-3 py-1.5 text-xs text-white/70"
+                                    >
+                                      <div>
+                                        <span className="font-medium">{p.displayName}</span>
+                                        <span className="ml-2 text-amber-300/90 text-[10px] uppercase">
+                                          Poached
+                                          {fromName ? ` · from ${fromName}` : ""}
+                                        </span>
+                                      </div>
+                                      <button
+                                        type="button"
+                                        onClick={() => requestRemovePlayer(team.id, p.id, p.displayName)}
+                                        className="text-[10px] text-rose-300 hover:text-rose-200"
+                                      >
+                                        Remove
+                                      </button>
+                                    </li>
+                                  );
+                                })}
                               </>
                             );
                           })()}
@@ -2432,6 +2500,51 @@ export default function AdminTournamentEditor({
                             </button>
                           </div>
                         ) : null}
+
+                        {(() => {
+                          const alreadyOnTeamUserIds = new Set(
+                            team.players.map((p) => p.userId).filter(Boolean) as string[],
+                          );
+                          const poachCandidates = registrations.filter((r) => {
+                            if (!r.teamId || r.teamId === team.id) return false;
+                            if (r.userId && alreadyOnTeamUserIds.has(r.userId)) return false;
+                            return true;
+                          });
+                          const teamNameById = new Map(tournamentTeams.map((t) => [t.id, t.name]));
+                          if (poachCandidates.length === 0) return null;
+                          return (
+                            <div className="flex flex-col gap-2 border-t border-white/[0.04] pt-3 sm:flex-row">
+                              <select
+                                className={`${inputClass} flex-1`}
+                                value={poachPick[team.id] ?? ""}
+                                onChange={(e) =>
+                                  setPoachPick((prev) => ({ ...prev, [team.id]: e.target.value }))
+                                }
+                              >
+                                <option value="" className="bg-[#0a1020]">
+                                  Poach player from another team…
+                                </option>
+                                {poachCandidates.map((r) => (
+                                  <option key={r.id} value={r.id} className="bg-[#0a1020]">
+                                    {r.displayName ?? "Player"}
+                                    {r.teamId && teamNameById.get(r.teamId)
+                                      ? ` · ${teamNameById.get(r.teamId)}`
+                                      : ""}
+                                    {r.riotId ? ` · ${r.riotId}` : ""}
+                                  </option>
+                                ))}
+                              </select>
+                              <button
+                                type="button"
+                                onClick={() => poachPlayer(team.id)}
+                                disabled={!poachPick[team.id]?.trim() || poachingTeamId === team.id}
+                                className="shrink-0 rounded-xl bg-amber-500 px-4 py-2.5 text-xs font-bold text-black hover:bg-amber-400 disabled:opacity-50"
+                              >
+                                {poachingTeamId === team.id ? "Poaching…" : "Poach onto team"}
+                              </button>
+                            </div>
+                          );
+                        })()}
                       </div>
                     ))}
                   </div>

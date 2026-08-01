@@ -8,6 +8,8 @@ import {
   computeHsPercent,
   isCommonCustomMatch,
   normalizeGameSide,
+  pickRosterIdentityForTeam,
+  resolveGamePlayerTeamId,
   resolveTeamSideMajority,
   type MatchLobbyPlayer,
   type RosterPlayerIdentity,
@@ -256,7 +258,8 @@ async function resolveTeamRoster(
 
 function mapPlayerRows(
   lobby: MatchLobbyPlayer[],
-  rosterByPuuid: Map<string, RosterPlayerIdentity>,
+  rosterAByPuuid: Map<string, RosterPlayerIdentity>,
+  rosterBByPuuid: Map<string, RosterPlayerIdentity>,
   teamAPuuids: Set<string>,
   teamBPuuids: Set<string>,
   teamAId: string,
@@ -266,17 +269,25 @@ function mapPlayerRows(
   return lobby
     .filter((p) => p.puuid)
     .map((p) => {
-      const roster = rosterByPuuid.get(p.puuid);
       const side = normalizeGameSide(p.team) ?? "Red";
-      let teamId: string | null = roster?.teamId ?? null;
-
-      if (!teamId && teamASide) {
-        teamId = side === teamASide ? teamAId : teamBId;
-      } else if (!teamId && teamAPuuids.has(p.puuid)) {
-        teamId = teamAId;
-      } else if (!teamId && teamBPuuids.has(p.puuid)) {
-        teamId = teamBId;
-      }
+      const rosterFallback =
+        rosterAByPuuid.get(p.puuid) ?? rosterBByPuuid.get(p.puuid) ?? null;
+      const teamId = resolveGamePlayerTeamId({
+        puuid: p.puuid,
+        side,
+        teamAId,
+        teamBId,
+        teamAPuuids,
+        teamBPuuids,
+        teamASide,
+        rosterTeamId: rosterFallback?.teamId ?? null,
+      });
+      const roster = pickRosterIdentityForTeam(
+        p.puuid,
+        teamId,
+        rosterAByPuuid,
+        rosterBByPuuid,
+      );
 
       const stats = p.stats ?? {};
       return {
@@ -307,7 +318,8 @@ async function upsertCandidateGame(opts: {
   teamBId: string;
   teamAPuuids: Set<string>;
   teamBPuuids: Set<string>;
-  rosterByPuuid: Map<string, RosterPlayerIdentity>;
+  rosterAByPuuid: Map<string, RosterPlayerIdentity>;
+  rosterBByPuuid: Map<string, RosterPlayerIdentity>;
   teamAPresent: number;
   teamBPresent: number;
   region: string;
@@ -338,7 +350,8 @@ async function upsertCandidateGame(opts: {
 
   const playerRows = mapPlayerRows(
     lobby,
-    opts.rosterByPuuid,
+    opts.rosterAByPuuid,
+    opts.rosterBByPuuid,
     opts.teamAPuuids,
     opts.teamBPuuids,
     opts.teamAId,
@@ -648,10 +661,10 @@ export async function scanTournamentGamesChunk(opts: {
 
     const teamAPuuids = new Set(rosterA.players.map((p) => p.puuid));
     const teamBPuuids = new Set(rosterB.players.map((p) => p.puuid));
-    const rosterByPuuid = new Map<string, RosterPlayerIdentity>();
-    for (const p of [...rosterA.players, ...rosterB.players]) {
-      rosterByPuuid.set(p.puuid, p);
-    }
+    const rosterAByPuuid = new Map<string, RosterPlayerIdentity>();
+    const rosterBByPuuid = new Map<string, RosterPlayerIdentity>();
+    for (const p of rosterA.players) rosterAByPuuid.set(p.puuid, p);
+    for (const p of rosterB.players) rosterBByPuuid.set(p.puuid, p);
 
     const scanner = rosterA.players[0]!;
     const region = rosterA.region || rosterB.region || "ap";
@@ -734,7 +747,8 @@ export async function scanTournamentGamesChunk(opts: {
           teamBId: opts.teamBId,
           teamAPuuids,
           teamBPuuids,
-          rosterByPuuid,
+          rosterAByPuuid,
+          rosterBByPuuid,
           teamAPresent: overlap.teamAPresent,
           teamBPresent: overlap.teamBPresent,
           region,
