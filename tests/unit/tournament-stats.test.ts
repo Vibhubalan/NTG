@@ -6,8 +6,12 @@ import {
   aggregateRoleStandouts,
   aggregateTeamMapStats,
   fairStandoutScore,
+  flexPriorityScore,
+  FLEX_FALLBACK_TOURNAMENT_GAMES,
   isStatsAppearanceEligible,
   normalizeCompKey,
+  qualifiesFallbackFlex,
+  qualifiesFullFlex,
   statsPlayerKey,
   winningTeamId,
   type StatsGame,
@@ -316,9 +320,10 @@ describe("tournament-stats meta aggregations", () => {
     expect(ascent!.comps.every((c) => c.appearances >= 2)).toBe(true);
   });
 
-  it("detects Flex as players who covered all four roles", () => {
+  it("does not award Flex for only 1 agent per role", () => {
     const standouts = aggregateRoleStandouts(metaGames, metaEligibility);
-    expect(standouts.bestFlex?.riotId).toBe("Flex#001");
+    // Flex#001 covers all 4 roles but only 1 agent each → not Flex under new rules
+    expect(standouts.bestFlex).toBeNull();
     expect(standouts.bestOverall).toBeTruthy();
     expect(standouts.byRole.Initiator).toBeTruthy();
   });
@@ -445,5 +450,172 @@ describe("tournament-stats meta aggregations", () => {
 
     const agents = aggregateAgentStandouts(games, elig);
     expect(agents.find((a) => a.agent === "Jett")?.bestPlayer?.riotId).toBe("Solid#001");
+  });
+});
+
+describe("best flex eligibility", () => {
+  it("requires ≥2 agents in every role for full Flex", () => {
+    expect(
+      qualifiesFullFlex({
+        Jett: 1,
+        Raze: 1,
+        Sova: 1,
+        Fade: 1,
+        Omen: 1,
+        Viper: 1,
+        Cypher: 1,
+        Sage: 1,
+      }),
+    ).toBe(true);
+
+    expect(
+      qualifiesFullFlex({
+        Jett: 2,
+        Sova: 1,
+        Fade: 1,
+        Omen: 1,
+        Viper: 1,
+        Cypher: 1,
+        Sage: 1,
+      }),
+    ).toBe(false); // only 1 duelist agent
+  });
+
+  it("fallback Flex needs ≥2 agents in at least 3 roles", () => {
+    expect(
+      qualifiesFallbackFlex({
+        Sova: 1,
+        Fade: 1,
+        Omen: 1,
+        Viper: 1,
+        Cypher: 1,
+        Sage: 1,
+        // no duelist
+      }),
+    ).toBe(true);
+
+    expect(
+      qualifiesFallbackFlex({
+        Sova: 1,
+        Fade: 1,
+        Omen: 1,
+        Viper: 1,
+        Jett: 1,
+        // only 1 sentinel agent missing, and only 1 duelist → Initiator+Controller = 2 roles only if sentinel missing
+        Cypher: 1,
+      }),
+    ).toBe(false);
+  });
+
+  it("priority score prefers Initiator → Controller → Sentinel → Duelist", () => {
+    const initCtrlSent = flexPriorityScore({
+      Sova: 1,
+      Fade: 1,
+      Omen: 1,
+      Viper: 1,
+      Cypher: 1,
+      Sage: 1,
+    });
+    const ctrlSentDuel = flexPriorityScore({
+      Omen: 1,
+      Viper: 1,
+      Cypher: 1,
+      Sage: 1,
+      Jett: 1,
+      Raze: 1,
+    });
+    expect(initCtrlSent).toBeGreaterThan(ctrlSentDuel);
+  });
+
+  it("picks full-Flex player when present", () => {
+    const elig: TournamentStatsEligibility = {
+      byUserId: {
+        u1: [{ teamId: "team-a", kind: "PRIMARY", since: null }],
+        u2: [{ teamId: "team-a", kind: "PRIMARY", since: null }],
+        u3: [{ teamId: "team-a", kind: "PRIMARY", since: null }],
+        u4: [{ teamId: "team-a", kind: "PRIMARY", since: null }],
+        u5: [{ teamId: "team-a", kind: "PRIMARY", since: null }],
+        u6: [{ teamId: "team-b", kind: "PRIMARY", since: null }],
+      },
+      byRiotId: {},
+    };
+
+    const flexAgents = [
+      "Jett",
+      "Reyna",
+      "Sova",
+      "Fade",
+      "Omen",
+      "Viper",
+      "Cypher",
+      "Sage",
+    ];
+    const flexGames: StatsGame[] = flexAgents.map((agent) => ({
+      teamAId: "team-a",
+      teamBId: "team-b",
+      teamAName: "Alpha",
+      teamBName: "Bravo",
+      teamARounds: 13,
+      teamBRounds: 5,
+      mapName: "Ascent",
+      mvpRiotId: null,
+      players: [
+        player("FullFlex#001", "team-a", agent, 270, "u1"),
+        player("Fill#002", "team-a", "Breach", 200, "u2"),
+        player("Fill#003", "team-a", "Astra", 200, "u3"),
+        player("Fill#004", "team-a", "Killjoy", 200, "u4"),
+        player("Fill#005", "team-a", "Chamber", 200, "u5"),
+        player("Opp#001", "team-b", "Neon", 180, "u6"),
+      ],
+    }));
+
+    const standouts = aggregateRoleStandouts(flexGames, elig);
+    expect(standouts.bestFlex?.riotId).toBe("FullFlex#001");
+    expect(Object.keys(standouts.bestFlex!.agentCounts).length).toBe(8);
+  });
+
+  it("uses 3-of-4 fallback only when cup has ≥35 games and no full Flex", () => {
+    const elig: TournamentStatsEligibility = {
+      byUserId: {
+        u1: [{ teamId: "team-a", kind: "PRIMARY", since: null }],
+        u2: [{ teamId: "team-a", kind: "PRIMARY", since: null }],
+        u3: [{ teamId: "team-a", kind: "PRIMARY", since: null }],
+        u4: [{ teamId: "team-a", kind: "PRIMARY", since: null }],
+        u5: [{ teamId: "team-a", kind: "PRIMARY", since: null }],
+        u6: [{ teamId: "team-b", kind: "PRIMARY", since: null }],
+      },
+      byRiotId: {},
+    };
+
+    // 3-of-4: Initiator, Controller, Sentinel (no Duelist) — priority-aligned
+    const fallbackAgents = ["Sova", "Fade", "Omen", "Viper", "Cypher", "Sage"];
+    const makeGame = (agent: string, i: number): StatsGame => ({
+      teamAId: "team-a",
+      teamBId: "team-b",
+      teamAName: "Alpha",
+      teamBName: "Bravo",
+      teamARounds: 13,
+      teamBRounds: 5,
+      mapName: "Ascent",
+      mvpRiotId: null,
+      players: [
+        player("AlmostFlex#001", "team-a", agent, 265, "u1"),
+        player("Fill#002", "team-a", "Breach", 200, "u2"),
+        player("Fill#003", "team-a", "Astra", 200, "u3"),
+        player("Fill#004", "team-a", "Killjoy", 200, "u4"),
+        player("Fill#005", "team-a", "Chamber", 200, "u5"),
+        player("Opp#001", "team-b", "Neon", 180, "u6"),
+      ],
+    });
+
+    const smallCup = fallbackAgents.map((a, i) => makeGame(a, i));
+    expect(aggregateRoleStandouts(smallCup, elig).bestFlex).toBeNull();
+
+    const bigCup: StatsGame[] = [];
+    for (let i = 0; i < FLEX_FALLBACK_TOURNAMENT_GAMES; i++) {
+      bigCup.push(makeGame(fallbackAgents[i % fallbackAgents.length], i));
+    }
+    const standouts = aggregateRoleStandouts(bigCup, elig);
+    expect(standouts.bestFlex?.riotId).toBe("AlmostFlex#001");
   });
 });

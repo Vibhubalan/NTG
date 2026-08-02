@@ -86,13 +86,23 @@ export default function TournamentGamesSection({ slug, initialGames }: Props) {
   const [sortAsc, setSortAsc] = useState(false);
 
   useEffect(() => {
+    if (Array.isArray(initialGames)) {
+      setGames(initialGames);
+      setLoading(false);
+      setError(null);
+    }
+  }, [initialGames]);
+
+  useEffect(() => {
     if (hasInitialGames) return;
 
     let cancelled = false;
     setLoading(true);
     void (async () => {
       try {
-        const res = await fetch(`/api/tournaments/${slug}/games`);
+        const res = await fetch(`/api/tournaments/${slug}/games`, {
+          cache: "no-store",
+        });
         const parsed = await parseApiJson(res);
         if (cancelled) return;
         if (!parsed.ok) {

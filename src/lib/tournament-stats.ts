@@ -36,6 +36,20 @@ export type StatsGame = {
 export const META_SAMPLE_FLOOR = 2;
 /** Include anyone with ≥1 counted game; fairness is in the score, not a hard GP cutoff. */
 export const STANDOUT_GP_FLOOR = 1;
+/** Best Flex: distinct agents required in a role. */
+export const FLEX_MIN_AGENTS_PER_ROLE = 2;
+/**
+ * If nobody has 2 agents in all 4 roles, allow 3-of-4 Flex once the cup
+ * has at least this many published/custom games in the aggregation set.
+ */
+export const FLEX_FALLBACK_TOURNAMENT_GAMES = 35;
+/** When ranking 3-of-4 Flex candidates, prefer coverage in this order. */
+export const FLEX_ROLE_PRIORITY: AgentRole[] = [
+  "Initiator",
+  "Controller",
+  "Sentinel",
+  "Duelist",
+];
 
 /**
  * Fair standout score: quality × confidence from sample size.
@@ -564,12 +578,20 @@ function toStandout(p: AggregatedPlayerStats): StandoutPlayer {
 /**
  * Rank by fairStandoutScore (ACS × log2(1+GP)), then K/D, then games.
  */
-function rankStandouts(players: AggregatedPlayerStats[]): AggregatedPlayerStats | null {
+function rankStandouts(
+  players: AggregatedPlayerStats[],
+  tieBreak?: (p: AggregatedPlayerStats) => number,
+): AggregatedPlayerStats | null {
   if (players.length === 0) return null;
   const sorted = [...players].sort((a, b) => {
     const scoreA = fairStandoutScore(a.avgAcs, a.gamesPlayed);
     const scoreB = fairStandoutScore(b.avgAcs, b.gamesPlayed);
     if (scoreB !== scoreA) return scoreB - scoreA;
+    if (tieBreak) {
+      const tA = tieBreak(a);
+      const tB = tieBreak(b);
+      if (tB !== tA) return tB - tA;
+    }
     const kdA = a.totalDeaths > 0 ? a.totalKills / a.totalDeaths : a.totalKills;
     const kdB = b.totalDeaths > 0 ? b.totalKills / b.totalDeaths : b.totalKills;
     if (kdB !== kdA) return kdB - kdA;
@@ -579,10 +601,72 @@ function rankStandouts(players: AggregatedPlayerStats[]): AggregatedPlayerStats 
   return sorted[0] ?? null;
 }
 
+/** Distinct agents played per role (from match agentCounts). */
+export function countAgentsPerRole(
+  agentCounts: Record<string, number>,
+): Record<AgentRole, number> {
+  const counts: Record<AgentRole, number> = {
+    Duelist: 0,
+    Initiator: 0,
+    Controller: 0,
+    Sentinel: 0,
+  };
+  for (const agent of Object.keys(agentCounts)) {
+    const role = getAgentRole(agent);
+    if (role) counts[role] += 1;
+  }
+  return counts;
+}
+
+/** Roles that have at least `minAgents` distinct agents. */
+export function rolesMeetingAgentFloor(
+  agentCounts: Record<string, number>,
+  minAgents: number = FLEX_MIN_AGENTS_PER_ROLE,
+): AgentRole[] {
+  const counts = countAgentsPerRole(agentCounts);
+  return (Object.keys(counts) as AgentRole[]).filter((role) => counts[role] >= minAgents);
+}
+
+/** Full Flex: ≥2 distinct agents in every role. */
+export function qualifiesFullFlex(agentCounts: Record<string, number>): boolean {
+  return rolesMeetingAgentFloor(agentCounts).length >= 4;
+}
+
 /**
- * Best overall + best per role + best Flex (played ≥1 agent in each role).
- * Uses fairStandoutScore so sample size and performance both matter.
+ * Fallback Flex: ≥2 distinct agents in at least 3 roles.
+ * Used when nobody qualifies for full Flex and the cup has enough games.
+ */
+export function qualifiesFallbackFlex(agentCounts: Record<string, number>): boolean {
+  return rolesMeetingAgentFloor(agentCounts).length >= 3;
+}
+
+/**
+ * Higher = better coverage of priority roles (Initiator → Controller → Sentinel → Duelist).
+ * Used to prefer flexers who filled higher-priority roles when falling back to 3-of-4.
+ */
+export function flexPriorityScore(agentCounts: Record<string, number>): number {
+  const met = new Set(rolesMeetingAgentFloor(agentCounts));
+  let score = 0;
+  FLEX_ROLE_PRIORITY.forEach((role, index) => {
+    if (met.has(role)) {
+      // Earlier in priority list = larger weight
+      score += 1 << (FLEX_ROLE_PRIORITY.length - 1 - index);
+    }
+  });
+  return score;
+}
+
+/**
+ * Best overall + best per role + best Flex.
+ *
+ * Flex rules:
+ * 1. Prefer players with ≥2 distinct agents in each of the 4 roles.
+ * 2. If none qualify and the tournament has ≥35 games, fall back to players
+ *    with ≥2 agents in at least 3 roles, preferring Initiator → Controller →
+ *    Sentinel → Duelist coverage when ranking.
+ *
  * Role boards count only appearances on that role's agents.
+ * Uses fairStandoutScore so sample size and performance both matter.
  */
 export function aggregateRoleStandouts(
   games: StatsGame[],
@@ -605,15 +689,13 @@ export function aggregateRoleStandouts(
     byRole[role] = best ? toStandout(best) : null;
   }
 
-  const flexCandidates = overall.filter((p) => {
-    const rolesPlayed = new Set<AgentRole>();
-    for (const agent of Object.keys(p.agentCounts)) {
-      const role = getAgentRole(agent);
-      if (role) rolesPlayed.add(role);
-    }
-    return rolesPlayed.size >= 4;
-  });
-  const bestFlexRow = rankStandouts(flexCandidates);
+  let flexCandidates = overall.filter((p) => qualifiesFullFlex(p.agentCounts));
+  if (flexCandidates.length === 0 && games.length >= FLEX_FALLBACK_TOURNAMENT_GAMES) {
+    flexCandidates = overall.filter((p) => qualifiesFallbackFlex(p.agentCounts));
+  }
+  const bestFlexRow = rankStandouts(flexCandidates, (p) =>
+    flexPriorityScore(p.agentCounts),
+  );
 
   return {
     bestOverall: bestOverallRow ? toStandout(bestOverallRow) : null,

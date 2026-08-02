@@ -192,6 +192,7 @@ function StandoutCard({
   player: StandoutPlayer | null;
 }) {
   const config = ROLE_CONFIG[roleKey] ?? ROLE_CONFIG.bestOverall;
+  const showAllAgents = roleKey === "bestFlex";
 
   if (!player) {
     return (
@@ -212,6 +213,9 @@ function StandoutCard({
     return { name: n ?? player.riotId, tag: t ?? "" };
   })();
   const icon = getAgentIconUrl(player.mostPlayedAgent);
+  const agentsPlayed = Object.entries(player.agentCounts ?? {})
+    .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+    .map(([agent, count]) => ({ agent, count }));
 
   return (
     <div
@@ -220,32 +224,65 @@ function StandoutCard({
       {/* Subtle top accent line */}
       <div className="absolute top-0 left-0 right-0 h-[2px] bg-gradient-to-r from-transparent via-white/20 to-transparent group-hover:via-white/40 transition-all" />
 
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between gap-2">
         <span className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[10px] font-black uppercase tracking-wider ring-1 ring-inset ${config.badgeBg}`}>
           <span>{config.icon}</span>
           <span>{config.title}</span>
         </span>
-        {player.mostPlayedAgent && (
+        {!showAllAgents && player.mostPlayedAgent ? (
           <span className="text-[10px] font-semibold text-white/40 uppercase tracking-widest">
             {player.mostPlayedAgent}
           </span>
-        )}
+        ) : showAllAgents ? (
+          <span className="text-[10px] font-semibold text-white/40 uppercase tracking-widest">
+            {agentsPlayed.length} agents
+          </span>
+        ) : null}
       </div>
 
       <div className="mt-4 flex items-center gap-3.5">
-        <div className="relative flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-black/40 p-1.5 ring-1 ring-white/15 group-hover:ring-white/30 transition-all shadow-lg">
-          {icon ? (
-            <img
-              src={icon}
-              alt={player.mostPlayedAgent ?? ""}
-              className="h-full w-full object-contain mix-blend-screen drop-shadow-[0_4px_8px_rgba(0,0,0,0.6)] group-hover:scale-110 transition-transform duration-300"
-            />
-          ) : (
-            <div className="flex h-full w-full items-center justify-center rounded-xl bg-white/10 text-sm font-bold text-white/60">
-              {name.slice(0, 2).toUpperCase()}
-            </div>
-          )}
-        </div>
+        {showAllAgents && agentsPlayed.length > 1 ? (
+          <div className="grid max-w-[7.5rem] shrink-0 grid-cols-3 gap-1 rounded-2xl bg-black/40 p-1.5 ring-1 ring-white/15">
+            {agentsPlayed.map(({ agent, count }) => {
+              const agentIcon = getAgentIconUrl(agent);
+              return agentIcon ? (
+                <div
+                  key={agent}
+                  className="relative flex h-8 w-8 items-center justify-center"
+                  title={`${agent} · ${count}g`}
+                >
+                  <img
+                    src={agentIcon}
+                    alt={agent}
+                    className="h-full w-full object-contain mix-blend-screen drop-shadow-md"
+                  />
+                </div>
+              ) : (
+                <span
+                  key={agent}
+                  title={`${agent} · ${count}g`}
+                  className="flex h-8 w-8 items-center justify-center rounded-md bg-white/10 text-[8px] font-bold text-white/50"
+                >
+                  {agent.slice(0, 2)}
+                </span>
+              );
+            })}
+          </div>
+        ) : (
+          <div className="relative flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-black/40 p-1.5 ring-1 ring-white/15 group-hover:ring-white/30 transition-all shadow-lg">
+            {icon ? (
+              <img
+                src={icon}
+                alt={player.mostPlayedAgent ?? ""}
+                className="h-full w-full object-contain mix-blend-screen drop-shadow-[0_4px_8px_rgba(0,0,0,0.6)] group-hover:scale-110 transition-transform duration-300"
+              />
+            ) : (
+              <div className="flex h-full w-full items-center justify-center rounded-xl bg-white/10 text-sm font-bold text-white/60">
+                {name.slice(0, 2).toUpperCase()}
+              </div>
+            )}
+          </div>
+        )}
 
         <div className="min-w-0 flex-1">
           <h4 className="truncate font-display text-base font-extrabold text-white tracking-tight group-hover:text-emerald-300 transition-colors">
