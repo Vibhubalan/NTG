@@ -288,7 +288,7 @@ export default function AdminTournamentEditor({
   const [form, setForm] = useState<TournamentData>(initialFormState);
   const [listVersion, setListVersion] = useState(0);
   const registrations = initial.registrations;
-  const tournamentTeams = initial.tournamentTeams;
+  const [tournamentTeams, setTournamentTeams] = useState(initial.tournamentTeams);
   const poolPlayers = initial.poolPlayers;
   const [activeTab, setActiveTab] = useState<
     "general" | "auction" | "media" | "prizes" | "standings" | "registrations" | "teams" | "matches"
@@ -335,6 +335,10 @@ export default function AdminTournamentEditor({
   const [poolPick, setPoolPick] = useState<Record<string, string>>({});
   const [poachPick, setPoachPick] = useState<Record<string, string>>({});
   const [poachingTeamId, setPoachingTeamId] = useState<string | null>(null);
+  /** Per-team roster action panel: add from pool vs poach. */
+  const [rosterActionMode, setRosterActionMode] = useState<
+    Record<string, "add" | "poach" | null>
+  >({});
   const [memberSearch, setMemberSearch] = useState("");
   const [memberResults, setMemberResults] = useState<
     { id: string; email: string | null; name: string | null; displayName: string | null }[]
@@ -395,6 +399,10 @@ export default function AdminTournamentEditor({
     setSelectedMvp(user ? { id: user.id, label: user.name } : null);
     setMvpSearch(user ? user.name : (role?.teamLabel ?? ""));
   }, [listVersion, initial.placements]);
+
+  useEffect(() => {
+    setTournamentTeams(initial.tournamentTeams);
+  }, [initial.tournamentTeams]);
 
   function applySavedCupFields(fields: CupFields) {
     setForm((current) => {
@@ -840,52 +848,86 @@ export default function AdminTournamentEditor({
   async function addPlayer(teamId: string) {
     const poolId = poolPick[teamId]?.trim();
     const name = newPlayerNames[teamId]?.trim();
+    const playersUrl = `/api/admin/tournaments/${form.slug}/teams/${teamId}/players`;
 
     if (poolId) {
-      const res = await fetch(`/api/admin/tournaments/${form.slug}/teams/${teamId}`, {
+      const res = await fetch(playersUrl, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ registrationId: poolId }),
       });
+      const data = await res.json().catch(() => ({}));
       if (res.ok) {
         setPoolPick((prev) => ({ ...prev, [teamId]: "" }));
-        refreshLists();
+        if (data.player) {
+          setTournamentTeams((prev) =>
+            prev.map((t) =>
+              t.id === teamId ? { ...t, players: [...t.players, data.player] } : t,
+            ),
+          );
+        } else {
+          refreshLists();
+        }
+      } else {
+        setMessage(data.error ?? `Failed to add player (${res.status}).`);
       }
       return;
     }
 
     if (!name) return;
-    const res = await fetch(`/api/admin/tournaments/${form.slug}/teams/${teamId}`, {
+    const res = await fetch(playersUrl, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ displayName: name }),
     });
+    const data = await res.json().catch(() => ({}));
     if (res.ok) {
       setNewPlayerNames((prev) => ({ ...prev, [teamId]: "" }));
-      refreshLists();
+      if (data.player) {
+        setTournamentTeams((prev) =>
+          prev.map((t) =>
+            t.id === teamId ? { ...t, players: [...t.players, data.player] } : t,
+          ),
+        );
+      } else {
+        refreshLists();
+      }
+    } else {
+      setMessage(data.error ?? `Failed to add player (${res.status}).`);
     }
   }
 
   async function poachPlayer(teamId: string) {
-    const registrationId = poachPick[teamId]?.trim();
-    if (!registrationId) return;
+    const pick = poachPick[teamId]?.trim();
+    if (!pick) return;
     setPoachingTeamId(teamId);
     setMessage(null);
     try {
-      const res = await fetch(`/api/admin/tournaments/${form.slug}/teams/${teamId}`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ registrationId, membershipKind: "POACH" }),
-      });
+      const body = pick.startsWith("user:")
+        ? { userId: pick.slice("user:".length), membershipKind: "POACH" as const }
+        : { registrationId: pick, membershipKind: "POACH" as const };
+      const res = await fetch(
+        `/api/admin/tournaments/${form.slug}/teams/${teamId}/players`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+        },
+      );
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
-        setMessage(data.error ?? "Failed to poach player.");
+        setMessage(data.error ?? `Failed to poach player (${res.status}).`);
         return;
       }
       setPoachPick((prev) => ({ ...prev, [teamId]: "" }));
-      setMessage("Player poached onto team. Re-scan matches so their games attribute correctly.");
-      refreshLists();
-      router.refresh();
+      if (data.player) {
+        setTournamentTeams((prev) =>
+          prev.map((t) =>
+            t.id === teamId ? { ...t, players: [...t.players, data.player] } : t,
+          ),
+        );
+      }
+      setMessage("Player poached onto team.");
     } catch {
       setMessage("Failed to poach player.");
     } finally {
@@ -2451,9 +2493,9 @@ export default function AdminTournamentEditor({
                                     >
                                       <div>
                                         <span className="font-medium">{p.displayName}</span>
-                                        <span className="ml-2 text-amber-300/90 text-[10px] uppercase">
+                                        <span className="ml-2 text-amber-300/90 text-[10px] uppercase tracking-wider">
                                           Poached
-                                          {fromName ? ` · from ${fromName}` : ""}
+                                          {fromName ? ` · Poached: ${fromName}` : ""}
                                         </span>
                                       </div>
                                       <button
@@ -2471,77 +2513,209 @@ export default function AdminTournamentEditor({
                           })()}
                         </ul>
 
-                        {isAuctionFormat && poolPlayers.length > 0 ? (
-                          <div className="flex flex-col gap-2 border-t border-white/[0.04] pt-3 sm:flex-row">
-                            <select
-                              className={`${inputClass} flex-1`}
-                              value={poolPick[team.id] ?? ""}
-                              onChange={(e) =>
-                                setPoolPick((prev) => ({ ...prev, [team.id]: e.target.value }))
-                              }
-                            >
-                              <option value="" className="bg-[#0a1020]">
-                                Add from player pool…
-                              </option>
-                              {poolPlayers.map((p) => (
-                                <option key={p.id} value={p.id} className="bg-[#0a1020]">
-                                  {p.displayName}
-                                  {p.steamId64 ? ` · Steam` : p.riotId ? ` · ${p.riotId}` : ""}
-                                </option>
-                              ))}
-                            </select>
-                            <button
-                              type="button"
-                              onClick={() => addPlayer(team.id)}
-                              disabled={!poolPick[team.id]?.trim()}
-                              className="shrink-0 rounded-xl bg-indigo-600 px-4 py-2.5 text-xs font-bold text-white hover:bg-indigo-500 disabled:opacity-50"
-                            >
-                              Add to team
-                            </button>
-                          </div>
-                        ) : null}
-
                         {(() => {
+                          const mode = rosterActionMode[team.id] ?? null;
+                          const canAdd = isAuctionFormat && poolPlayers.length > 0;
                           const alreadyOnTeamUserIds = new Set(
                             team.players.map((p) => p.userId).filter(Boolean) as string[],
                           );
-                          const poachCandidates = registrations.filter((r) => {
-                            if (!r.teamId || r.teamId === team.id) return false;
-                            if (r.userId && alreadyOnTeamUserIds.has(r.userId)) return false;
-                            return true;
-                          });
-                          const teamNameById = new Map(tournamentTeams.map((t) => [t.id, t.name]));
-                          if (poachCandidates.length === 0) return null;
+                          const teamNameById = new Map(
+                            tournamentTeams.map((t) => [t.id, t.name]),
+                          );
+                          type PoachOption = { value: string; label: string };
+                          const poachCandidates: PoachOption[] = [];
+                          const seen = new Set<string>();
+
+                          for (const r of registrations) {
+                            if (!r.teamId || r.teamId === team.id) continue;
+                            if (r.userId && alreadyOnTeamUserIds.has(r.userId)) continue;
+                            const value = r.userId ? `user:${r.userId}` : r.id;
+                            if (seen.has(value)) continue;
+                            seen.add(value);
+                            if (r.userId) seen.add(r.id);
+                            poachCandidates.push({
+                              value,
+                              label: [
+                                r.displayName ?? "Player",
+                                teamNameById.get(r.teamId) ?? null,
+                                r.riotId ?? null,
+                              ]
+                                .filter(Boolean)
+                                .join(" · "),
+                            });
+                          }
+
+                          for (const other of tournamentTeams) {
+                            if (other.id === team.id) continue;
+                            for (const p of other.players) {
+                              if (p.membershipKind === "POACH") continue;
+                              if (p.userId && alreadyOnTeamUserIds.has(p.userId)) continue;
+                              const riot =
+                                p.riotGameName && p.riotTagLine
+                                  ? `${p.riotGameName}#${p.riotTagLine}`
+                                  : null;
+                              // Prefer userId so poach resolves live PRIMARY roster (auction-safe).
+                              if (p.userId) {
+                                const value = `user:${p.userId}`;
+                                if (seen.has(value)) continue;
+                                seen.add(value);
+                                if (p.registrationId) seen.add(p.registrationId);
+                                poachCandidates.push({
+                                  value,
+                                  label: [p.displayName, other.name, riot]
+                                    .filter(Boolean)
+                                    .join(" · "),
+                                });
+                                continue;
+                              }
+                              if (p.registrationId) {
+                                if (seen.has(p.registrationId)) continue;
+                                seen.add(p.registrationId);
+                                poachCandidates.push({
+                                  value: p.registrationId,
+                                  label: [p.displayName, other.name, riot]
+                                    .filter(Boolean)
+                                    .join(" · "),
+                                });
+                              }
+                            }
+                          }
+
+                          function setMode(next: "add" | "poach" | null) {
+                            setRosterActionMode((prev) => ({
+                              ...prev,
+                              [team.id]: prev[team.id] === next ? null : next,
+                            }));
+                            if (next !== "add") {
+                              setPoolPick((prev) => ({ ...prev, [team.id]: "" }));
+                            }
+                            if (next !== "poach") {
+                              setPoachPick((prev) => ({ ...prev, [team.id]: "" }));
+                            }
+                          }
+
                           return (
-                            <div className="flex flex-col gap-2 border-t border-white/[0.04] pt-3 sm:flex-row">
-                              <select
-                                className={`${inputClass} flex-1`}
-                                value={poachPick[team.id] ?? ""}
-                                onChange={(e) =>
-                                  setPoachPick((prev) => ({ ...prev, [team.id]: e.target.value }))
-                                }
-                              >
-                                <option value="" className="bg-[#0a1020]">
-                                  Poach player from another team…
-                                </option>
-                                {poachCandidates.map((r) => (
-                                  <option key={r.id} value={r.id} className="bg-[#0a1020]">
-                                    {r.displayName ?? "Player"}
-                                    {r.teamId && teamNameById.get(r.teamId)
-                                      ? ` · ${teamNameById.get(r.teamId)}`
-                                      : ""}
-                                    {r.riotId ? ` · ${r.riotId}` : ""}
-                                  </option>
-                                ))}
-                              </select>
-                              <button
-                                type="button"
-                                onClick={() => poachPlayer(team.id)}
-                                disabled={!poachPick[team.id]?.trim() || poachingTeamId === team.id}
-                                className="shrink-0 rounded-xl bg-amber-500 px-4 py-2.5 text-xs font-bold text-black hover:bg-amber-400 disabled:opacity-50"
-                              >
-                                {poachingTeamId === team.id ? "Poaching…" : "Poach onto team"}
-                              </button>
+                            <div className="space-y-3 border-t border-white/[0.04] pt-3">
+                              <div className="grid grid-cols-2 gap-2">
+                                <button
+                                  type="button"
+                                  onClick={() => setMode("add")}
+                                  disabled={!canAdd}
+                                  title={
+                                    canAdd
+                                      ? "Add a player from the unassigned pool"
+                                      : "Add is available when there are unassigned pool players"
+                                  }
+                                  className={`rounded-xl px-3 py-2.5 text-xs font-bold uppercase tracking-wider transition-colors disabled:cursor-not-allowed disabled:opacity-40 ${
+                                    mode === "add"
+                                      ? "bg-indigo-500 text-white ring-1 ring-indigo-300/50"
+                                      : "border border-indigo-400/30 bg-indigo-500/10 text-indigo-200 hover:bg-indigo-500/20"
+                                  }`}
+                                >
+                                  Add to team
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => setMode("poach")}
+                                  className={`rounded-xl px-3 py-2.5 text-xs font-bold uppercase tracking-wider transition-colors ${
+                                    mode === "poach"
+                                      ? "bg-amber-400 text-black ring-1 ring-amber-200/60"
+                                      : "border border-amber-400/30 bg-amber-500/10 text-amber-200 hover:bg-amber-500/20"
+                                  }`}
+                                >
+                                  Poach
+                                </button>
+                              </div>
+
+                              {mode === "add" && canAdd ? (
+                                <div className="flex flex-col gap-2 rounded-xl border border-indigo-400/20 bg-indigo-500/[0.06] p-3 sm:flex-row sm:items-center">
+                                  <select
+                                    className={`${inputClass} flex-1`}
+                                    value={poolPick[team.id] ?? ""}
+                                    onChange={(e) =>
+                                      setPoolPick((prev) => ({
+                                        ...prev,
+                                        [team.id]: e.target.value,
+                                      }))
+                                    }
+                                  >
+                                    <option value="" className="bg-[#0a1020]">
+                                      Choose pool player…
+                                    </option>
+                                    {poolPlayers.map((p) => (
+                                      <option
+                                        key={p.id}
+                                        value={p.id}
+                                        className="bg-[#0a1020]"
+                                      >
+                                        {p.displayName}
+                                        {p.steamId64
+                                          ? " · Steam"
+                                          : p.riotId
+                                            ? ` · ${p.riotId}`
+                                            : ""}
+                                      </option>
+                                    ))}
+                                  </select>
+                                  <button
+                                    type="button"
+                                    onClick={() => addPlayer(team.id)}
+                                    disabled={!poolPick[team.id]?.trim()}
+                                    className="shrink-0 rounded-xl bg-indigo-500 px-4 py-2.5 text-xs font-bold text-white hover:bg-indigo-400 disabled:opacity-50"
+                                  >
+                                    Confirm add
+                                  </button>
+                                </div>
+                              ) : null}
+
+                              {mode === "poach" ? (
+                                <div className="space-y-2 rounded-xl border border-amber-400/20 bg-amber-500/[0.06] p-3">
+                                  <p className="text-[10px] text-amber-200/70">
+                                    Extra roster slot — can poach multiple players from other teams.
+                                  </p>
+                                  <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+                                    <select
+                                      className={`${inputClass} flex-1`}
+                                      value={poachPick[team.id] ?? ""}
+                                      onChange={(e) =>
+                                        setPoachPick((prev) => ({
+                                          ...prev,
+                                          [team.id]: e.target.value,
+                                        }))
+                                      }
+                                    >
+                                      <option value="" className="bg-[#0a1020]">
+                                        {poachCandidates.length === 0
+                                          ? "No players available to poach…"
+                                          : "Choose player to poach…"}
+                                      </option>
+                                      {poachCandidates.map((c) => (
+                                        <option
+                                          key={c.value}
+                                          value={c.value}
+                                          className="bg-[#0a1020]"
+                                        >
+                                          {c.label}
+                                        </option>
+                                      ))}
+                                    </select>
+                                    <button
+                                      type="button"
+                                      onClick={() => poachPlayer(team.id)}
+                                      disabled={
+                                        !poachPick[team.id]?.trim() ||
+                                        poachingTeamId === team.id ||
+                                        poachCandidates.length === 0
+                                      }
+                                      className="shrink-0 rounded-xl bg-amber-400 px-4 py-2.5 text-xs font-bold text-black hover:bg-amber-300 disabled:opacity-50"
+                                    >
+                                      {poachingTeamId === team.id
+                                        ? "Poaching…"
+                                        : "Confirm poach"}
+                                    </button>
+                                  </div>
+                                </div>
+                              ) : null}
                             </div>
                           );
                         })()}

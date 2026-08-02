@@ -248,8 +248,8 @@ export default function TournamentDetailView({
   }, [publishedGames, tournament.slug]);
 
   return (
-    <article className="pb-24">
-      <div className="relative mb-12 flex min-h-[24rem] flex-col justify-end overflow-hidden rounded-[2rem] border border-white/[0.08] p-8 shadow-2xl sm:min-h-[30rem] sm:p-12">
+    <article className="min-w-0 max-w-full overflow-x-clip pb-24">
+      <div className="relative mb-8 flex min-h-[18rem] flex-col justify-end overflow-hidden rounded-[1.5rem] border border-white/[0.08] p-5 shadow-2xl sm:mb-12 sm:min-h-[30rem] sm:rounded-[2rem] sm:p-8 md:p-12">
         <div className="absolute inset-0 z-0">
           <Image
             src={posterSrc}
@@ -262,20 +262,20 @@ export default function TournamentDetailView({
         </div>
         <div className="absolute inset-0 z-0 bg-gradient-to-t from-[#050505] via-[#050505]/60 to-transparent" />
 
-        <div className="relative z-10 flex flex-col gap-6 sm:flex-row sm:items-end sm:justify-between">
-          <div className="flex flex-col items-start gap-4">
+        <div className="relative z-10 flex min-w-0 flex-col gap-4 sm:flex-row sm:items-end sm:justify-between sm:gap-6">
+          <div className="flex min-w-0 flex-col items-start gap-3 sm:gap-4">
             <span
-              className="flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl bg-[#050505]/90 ring-1 ring-white/10 backdrop-blur-md"
+              className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-[#050505]/90 ring-1 ring-white/10 backdrop-blur-md sm:h-16 sm:w-16"
               style={{ color: meta.hex, boxShadow: `0 0 50px -10px ${meta.hex}80` }}
             >
-              <BrandIcon path={meta.iconPath} title={tournament.name} className="h-8 w-8 drop-shadow-md" />
+              <BrandIcon path={meta.iconPath} title={tournament.name} className="h-6 w-6 drop-shadow-md sm:h-8 sm:w-8" />
             </span>
-            <div className="flex flex-col items-start">
+            <div className="flex min-w-0 flex-col items-start">
               <StatusBadge status={tournament.status} />
-              <h1 className="mt-3 font-display text-4xl font-black uppercase tracking-tight text-white drop-shadow-lg sm:text-5xl md:text-6xl">
+              <h1 className="mt-2 break-words font-display text-3xl font-black tracking-tight text-white uppercase drop-shadow-lg sm:mt-3 sm:text-5xl md:text-6xl">
                 {tournament.name}
               </h1>
-              <div className="mt-4 flex flex-wrap items-center gap-3 text-sm font-medium uppercase tracking-[0.2em] text-white/60">
+              <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] font-medium tracking-[0.14em] text-white/60 uppercase sm:mt-4 sm:text-sm sm:tracking-[0.2em]">
                 <span>{meta.label}</span>
                 {tournament.registrationFormat && (
                   <>
@@ -295,12 +295,16 @@ export default function TournamentDetailView({
         </div>
       </div>
 
-      <div className="mb-10 flex items-center border-b border-white/[0.08] pb-4">
-        <div className="flex flex-wrap items-center gap-2 rounded-2xl bg-white/[0.03] p-1.5 border border-white/[0.06] w-fit max-w-full">
+      <div className="mb-8 min-w-0 border-b border-white/[0.08] pb-4 sm:mb-10">
+        <div
+          className={`grid w-full gap-1 rounded-2xl border border-white/[0.06] bg-white/[0.03] p-1 sm:flex sm:w-fit sm:flex-wrap sm:items-center sm:gap-1.5 sm:p-1.5 ${
+            showMatchesTab ? "grid-cols-4" : "grid-cols-2"
+          }`}
+        >
           <button
             type="button"
             onClick={() => setActiveTab("overview")}
-            className={`rounded-xl px-6 py-2.5 text-xs font-bold uppercase tracking-[0.2em] transition-all ${
+            className={`rounded-xl px-1 py-2.5 text-center text-[9px] font-bold tracking-[0.08em] uppercase transition-all sm:px-6 sm:text-xs sm:tracking-[0.2em] ${
               activeTab === "overview"
                 ? "bg-white text-black shadow-lg"
                 : "text-white/50 hover:text-white"
@@ -311,20 +315,20 @@ export default function TournamentDetailView({
           <button
             type="button"
             onClick={() => setActiveTab("brackets")}
-            className={`rounded-xl px-6 py-2.5 text-xs font-bold uppercase tracking-[0.2em] transition-all flex items-center gap-2 ${
+            className={`rounded-xl px-1 py-2.5 text-center text-[9px] font-bold tracking-[0.08em] uppercase transition-all sm:px-6 sm:text-xs sm:tracking-[0.2em] ${
               activeTab === "brackets"
                 ? "bg-[#22c55e] text-[#070a12] shadow-lg shadow-emerald-500/20"
                 : "text-white/50 hover:text-white"
             }`}
           >
-            <span>Brackets</span>
+            Brackets
           </button>
           {showMatchesTab ? (
             <>
               <button
                 type="button"
                 onClick={() => setActiveTab("matches")}
-                className={`rounded-xl px-6 py-2.5 text-xs font-bold uppercase tracking-[0.2em] transition-all ${
+                className={`rounded-xl px-1 py-2.5 text-center text-[9px] font-bold tracking-[0.08em] uppercase transition-all sm:px-6 sm:text-xs sm:tracking-[0.2em] ${
                   activeTab === "matches"
                     ? "bg-amber-400 text-[#070a12] shadow-lg shadow-amber-500/20"
                     : "text-white/50 hover:text-white"
@@ -335,7 +339,7 @@ export default function TournamentDetailView({
               <button
                 type="button"
                 onClick={() => setActiveTab("stats")}
-                className={`rounded-xl px-6 py-2.5 text-xs font-bold uppercase tracking-[0.2em] transition-all ${
+                className={`rounded-xl px-1 py-2.5 text-center text-[9px] font-bold tracking-[0.08em] uppercase transition-all sm:px-6 sm:text-xs sm:tracking-[0.2em] ${
                   activeTab === "stats"
                     ? "bg-cyan-400 text-[#070a12] shadow-lg shadow-cyan-500/20"
                     : "text-white/50 hover:text-white"
@@ -349,23 +353,23 @@ export default function TournamentDetailView({
       </div>
 
       {activeTab === "overview" ? (
-        <div className={`grid gap-12 lg:items-start ${isCompleted ? "lg:grid-cols-1" : "lg:grid-cols-[1fr_24rem]"}`}>
-          <div className="order-1 space-y-16 lg:col-start-1 lg:row-start-1">
+        <div className={`grid min-w-0 gap-10 sm:gap-12 lg:items-start ${isCompleted ? "lg:grid-cols-1" : "lg:grid-cols-[1fr_24rem]"}`}>
+          <div className="order-1 min-w-0 space-y-12 sm:space-y-16 lg:col-start-1 lg:row-start-1">
             {showResultsBlock ? (
-              <section className="space-y-8">
-                <div className="flex items-center gap-4">
-                  <div className="h-px w-10 bg-gradient-to-r from-transparent to-amber-300/70" />
-                  <div className="flex items-center gap-3">
-                    <span className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-amber-300/25 bg-amber-400/10 text-amber-200 shadow-[0_0_20px_rgba(251,191,36,0.12)]">
-                      <svg className="h-4 w-4" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
+              <section className="min-w-0 space-y-6 sm:space-y-8">
+                <div className="flex min-w-0 items-center gap-2 sm:gap-4">
+                  <div className="hidden h-px w-10 shrink-0 bg-gradient-to-r from-transparent to-amber-300/70 sm:block" />
+                  <div className="flex min-w-0 items-center gap-2 sm:gap-3">
+                    <span className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-amber-300/25 bg-amber-400/10 text-amber-200 shadow-[0_0_20px_rgba(251,191,36,0.12)] sm:h-8 sm:w-8">
+                      <svg className="h-3.5 w-3.5 sm:h-4 sm:w-4" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
                         <path d="M12 2l2.4 7.4H22l-6 4.6 2.3 7-6.3-4.6L5.7 21l2.3-7-6-4.6h7.6L12 2z" />
                       </svg>
                     </span>
-                    <h2 className="font-display text-2xl font-black uppercase tracking-[0.18em] text-transparent bg-clip-text bg-gradient-to-r from-white via-amber-100 to-white/70 sm:text-3xl">
+                    <h2 className="min-w-0 font-display text-xl font-black tracking-[0.1em] text-transparent uppercase bg-clip-text bg-gradient-to-r from-white via-amber-100 to-white/70 sm:text-3xl sm:tracking-[0.18em]">
                       Final Results
                     </h2>
                   </div>
-                  <div className="h-px flex-1 bg-gradient-to-r from-amber-300/40 to-transparent" />
+                  <div className="h-px min-w-0 flex-1 bg-gradient-to-r from-amber-300/40 to-transparent" />
                 </div>
 
                 {showChampion && championData ? (
@@ -413,62 +417,71 @@ export default function TournamentDetailView({
           </div>
 
           {!isCompleted && (
-            <aside className="order-2 space-y-8 lg:col-start-2 lg:row-start-1 lg:row-span-2">
+            <aside className="order-2 min-w-0 space-y-8 lg:col-start-2 lg:row-span-2 lg:row-start-1">
               <TournamentScheduleCard schedule={scheduleCard} />
 
             {auctionHref ? (
-              <div className="group relative overflow-hidden rounded-[1.25rem] p-[1px] transition-all duration-300 hover:shadow-[0_0_30px_rgba(6,182,212,0.35)] shadow-xl">
+              <div className="group relative min-w-0 overflow-hidden rounded-[1.25rem] p-[1px] shadow-xl transition-all duration-300 hover:shadow-[0_0_30px_rgba(6,182,212,0.35)]">
                 <div className="absolute inset-0 bg-gradient-to-r from-cyan-500 via-indigo-500 to-purple-600 opacity-90 transition-all duration-300 group-hover:opacity-100" />
                 
                 <a
                   href={auctionHref}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="relative block w-full rounded-[19px] bg-[#0c0c0e]/95 px-6 py-4.5 text-center text-xs font-bold uppercase tracking-[0.25em] text-white transition-all duration-300 group-hover:bg-[#0c0c0e]/75"
+                  className="relative block w-full rounded-[19px] bg-[#0c0c0e]/95 px-4 py-4 text-center text-[11px] font-bold tracking-[0.14em] text-white uppercase transition-all duration-300 group-hover:bg-[#0c0c0e]/75 sm:px-6 sm:py-4.5 sm:text-xs sm:tracking-[0.25em]"
                 >
                   <span className="relative z-10 flex items-center justify-center gap-2.5">
-                    <span className="h-2 w-2 rounded-full bg-cyan-400" />
+                    <span className="h-2 w-2 shrink-0 rounded-full bg-cyan-400" />
                     Enter Live Auction
                   </span>
                 </a>
               </div>
             ) : auctionEnded ? (
               <div className="rounded-[1.25rem] border border-white/[0.06] bg-[#0c0c0e]/40 p-4 text-center">
-                <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-white/30">
+                <span className="text-[10px] font-bold tracking-[0.2em] text-white/30 uppercase">
                   Auction Ended
                 </span>
               </div>
             ) : null}
 
             {(tournament.prizePool || tournament.prizeNotes) && (
-              <div className="rounded-[1.5rem] border border-white/[0.08] bg-[#0A0A0A]/80 p-8 shadow-2xl backdrop-blur-xl">
-                <p className="text-[10px] font-medium uppercase tracking-[0.3em] text-white/40">Prizepool</p>
+              <div className="min-w-0 rounded-[1.5rem] border border-white/[0.08] bg-[#0A0A0A]/80 p-5 shadow-2xl backdrop-blur-xl sm:p-8">
+                <p className="text-[10px] font-medium tracking-[0.2em] text-white/40 uppercase sm:tracking-[0.3em]">
+                  Prizepool
+                </p>
                 {tournament.prizePool ? (
-                  <p className="mt-2 font-display text-4xl font-black tracking-tight text-white drop-shadow-md">
+                  <p className="mt-2 break-words font-display text-3xl font-black tracking-tight text-white drop-shadow-md sm:text-4xl">
                     ₹{Number(tournament.prizePool).toLocaleString("en-IN")}
                   </p>
                 ) : null}
                 {tournament.prizeNotes ? (
-                  <p className="mt-3 text-sm font-medium leading-relaxed text-white/50">
+                  <p className="mt-3 text-sm leading-relaxed font-medium break-words text-white/50">
                     {tournament.prizeNotes}
                   </p>
                 ) : null}
 
                 {prizeSplit.length > 0 ? (
                   <div className="mt-6 border-t border-white/[0.06] pt-6">
-                    <p className="mb-3 text-[10px] font-bold uppercase tracking-[0.2em] text-white/30">
+                    <p className="mb-3 text-[10px] font-bold tracking-[0.2em] text-white/30 uppercase">
                       Prize Split
                     </p>
                     <div className="space-y-3">
                       {prizeSplit.map((row, i) => (
-                        <div key={row.place} className="flex items-center justify-between">
-                          <span className={`flex items-center gap-2 text-sm font-medium ${splitColors[i] ?? "text-white/70"}`}>
-                            <span className={`flex h-5 w-5 items-center justify-center rounded text-[10px] font-bold ${splitBadgeColors[i] ?? "bg-white/10 text-white/70"}`}>
+                        <div
+                          key={row.place}
+                          className="flex min-w-0 items-center justify-between gap-3"
+                        >
+                          <span
+                            className={`flex min-w-0 items-center gap-2 text-sm font-medium ${splitColors[i] ?? "text-white/70"}`}
+                          >
+                            <span
+                              className={`flex h-5 w-5 shrink-0 items-center justify-center rounded text-[10px] font-bold ${splitBadgeColors[i] ?? "bg-white/10 text-white/70"}`}
+                            >
                               {row.place}
                             </span>
-                            {row.label}
+                            <span className="truncate">{row.label}</span>
                           </span>
-                          <span className="font-display font-bold text-white/90">
+                          <span className="shrink-0 font-display font-bold text-white/90">
                             ₹{row.amount.toLocaleString("en-IN")}
                           </span>
                         </div>
@@ -482,7 +495,7 @@ export default function TournamentDetailView({
           )}
 
           {showTeams ? (
-            <div className="order-3 lg:col-start-1 lg:row-start-2">
+            <div className="order-3 min-w-0 lg:col-start-1 lg:row-start-2">
               <TournamentTeamsList
                 teams={tournament.teams}
                 teamDetails={tournament.teamDetails}

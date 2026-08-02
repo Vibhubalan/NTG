@@ -194,21 +194,21 @@ export default function TournamentChampionSection({
       : null;
 
   return (
-    <section className="relative rounded-[2.5rem] border border-white/10 bg-[#06080f]/95 p-6 shadow-[0_40px_100px_-50px_rgba(0,0,0,0.9)] sm:p-10 lg:p-12">
+    <section className="relative min-w-0 overflow-x-clip rounded-[1.75rem] border border-white/10 bg-[#06080f]/95 p-4 shadow-[0_40px_100px_-50px_rgba(0,0,0,0.9)] sm:rounded-[2.5rem] sm:p-10 lg:p-12">
       <div className="pointer-events-none absolute -left-[15%] -top-[35%] h-[70%] w-[55%] rounded-full bg-amber-500/15 blur-[130px]" />
       <div className="pointer-events-none absolute -bottom-[35%] -right-[15%] h-[70%] w-[55%] rounded-full bg-violet-600/15 blur-[130px]" />
 
-      <div className="relative z-10 flex flex-col items-center px-2 text-center sm:px-6">
-        <p className="text-[10px] font-black uppercase tracking-[0.28em] text-amber-300/80 sm:text-xs">
+      <div className="relative z-10 flex min-w-0 flex-col items-center px-1 text-center sm:px-6">
+        <p className="text-[10px] font-black tracking-[0.16em] text-amber-300/80 uppercase sm:text-xs sm:tracking-[0.28em]">
           Tournament Champions
         </p>
 
-        <h2 className="mt-3 max-w-6xl break-words font-display text-[clamp(2rem,8vw,5rem)] font-black uppercase leading-[0.92] tracking-tight text-transparent bg-clip-text bg-gradient-to-b from-amber-100 via-white to-amber-200/75">
+        <h2 className="mt-3 max-w-full break-words font-display text-[clamp(1.75rem,8vw,5rem)] font-black uppercase leading-[0.92] tracking-tight text-transparent bg-clip-text bg-gradient-to-b from-amber-100 via-white to-amber-200/75">
           {championTeam.name}
         </h2>
 
         {runnerUpTeam ? (
-          <p className="mt-4 text-[10px] font-medium uppercase tracking-[0.18em] text-white/40">
+          <p className="mt-4 max-w-full break-words px-1 text-[10px] font-medium tracking-[0.12em] text-white/40 uppercase sm:tracking-[0.18em]">
             Runner up · {runnerUpTeam.name}
           </p>
         ) : null}

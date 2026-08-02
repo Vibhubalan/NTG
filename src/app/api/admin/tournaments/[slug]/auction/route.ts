@@ -2,6 +2,7 @@ import { guardResponse, isAuthedAdmin, requireAdmin } from "@/lib/auth-guard";
 import { serverEnv } from "@core/config/env.server";
 import { prisma } from "@core/database/client";
 import { auctionToken } from "@/lib/auction-link";
+import { getAuctionSessionFinalized } from "@/lib/auction-session";
 import { NextResponse } from "next/server";
 
 export const dynamic = "force-dynamic";
@@ -46,11 +47,8 @@ export async function POST(req: Request, { params }: Props) {
     return NextResponse.json({ error: "This cup is not an auction draft." }, { status: 400 });
   }
 
-  const [existingSession] = await prisma.$queryRawUnsafe<{ finalized: boolean }[]>(
-    "SELECT finalized FROM auction_sessions WHERE tournament_id = $1 LIMIT 1",
-    tournament.id
-  );
-  if (existingSession?.finalized && !bypassSavedLock) {
+  const sessionFinalized = await getAuctionSessionFinalized(tournament.id).catch(() => null);
+  if (sessionFinalized === true && !bypassSavedLock) {
     return NextResponse.json(
       { error: "This auction has already been saved. Enable the bypass option if you really need to reset it." },
       { status: 409 },

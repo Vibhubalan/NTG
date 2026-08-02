@@ -52,11 +52,13 @@ function MetaCollapsible({
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-2">
               <span className={`h-2 w-2 shrink-0 rounded-full ${accentDotClass}`} />
-              <h3 className="font-display text-base font-black uppercase tracking-[0.2em] text-white">
+              <h3 className="font-display text-sm font-black tracking-[0.12em] text-white uppercase sm:text-base sm:tracking-[0.2em]">
                 {title}
               </h3>
             </div>
-            <p className="mt-1 text-xs text-white/50">{description}</p>
+            <p className="mt-1 text-[11px] leading-relaxed text-white/50 sm:text-xs">
+              {description}
+            </p>
           </div>
           <span
             className={`mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-white/10 bg-black/30 text-white/60 transition-transform duration-200 ${

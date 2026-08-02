@@ -106,11 +106,14 @@ function buildTeamDetailsFromData(
     logoUrl: string | null;
     players: Array<{
       id: string;
+      userId?: string | null;
       displayName: string;
       riotGameName: string | null;
       riotTagLine: string | null;
       peakPremierRank: string | null;
       valorantRoles: unknown;
+      membershipKind?: "PRIMARY" | "POACH" | null;
+      poachedFromTeam?: { id: string; name: string } | null;
       registration: RegistrationPlayerRow | null;
     }>;
     registrations: RegistrationPlayerRow[];
@@ -123,19 +126,36 @@ function buildTeamDetailsFromData(
     let rosterPlayers: TournamentTeamPlayerView[] =
       team.players.length > 0
         ? team.players.map((p) => {
-            if (p.registration) {
+            const isPoach = p.membershipKind === "POACH";
+            const poachMeta = {
+              membershipKind: (isPoach ? "POACH" : "PRIMARY") as "PRIMARY" | "POACH",
+              poachedFromTeamName: isPoach
+                ? (p.poachedFromTeam?.name ?? null)
+                : null,
+            };
+            if (p.registration && !isPoach) {
               claimedRegIds.add(p.registration.id);
-              return mapRegistrationToPlayerView(p.registration);
+              return {
+                ...mapRegistrationToPlayerView(p.registration),
+                id: p.id,
+                ...poachMeta,
+              };
             }
             return {
               id: p.id,
+              userId: p.userId ?? p.registration?.userId ?? null,
               displayName: p.displayName,
               riotId:
                 p.riotGameName && p.riotTagLine
                   ? `${p.riotGameName}#${p.riotTagLine}`
-                  : null,
+                  : (p.registration?.snapshotRiotId ?? null),
               cs2PeakPremier: p.peakPremierRank,
               valorantRoles: parseValorantRoles(p.valorantRoles),
+              participantRole: isPoach
+                ? undefined
+                : ((p.registration?.participantRole as TournamentTeamPlayerView["participantRole"]) ??
+                  "PLAYER"),
+              ...poachMeta,
             };
           })
         : sortRegsByRole(team.registrations).map((r) => {
@@ -357,6 +377,7 @@ export class TournamentRepository {
               orderBy: { sortOrder: "asc" },
               include: {
                 registration: { select: registrationPlayerSelect },
+                poachedFromTeam: { select: { id: true, name: true } },
               },
             },
             registrations: {

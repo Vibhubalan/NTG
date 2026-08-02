@@ -329,36 +329,39 @@ export default function TournamentGamesSection({ slug, initialGames }: Props) {
                   <div className="absolute left-0 top-0 bottom-0 w-2.5 rounded-l-2xl bg-emerald-400/55 shadow-[0_0_12px_rgba(16,185,129,0.5)] transition-all duration-300" />
 
                   {/* Tile Content Layout */}
-                  <div className="relative z-10 grid h-[110px] sm:h-[130px] grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center px-6 sm:px-10">
+                  <div className="relative z-10 grid h-[100px] grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-1.5 px-3 sm:h-[130px] sm:gap-0 sm:px-10">
                     {/* Left Side: Winner/Loser (Team A) */}
                     <div className="min-w-0">
                       <h3
-                        className={`font-display text-lg sm:text-2xl font-black uppercase tracking-tight drop-shadow-md truncate max-w-full ${teamANameClass}`}
+                        className={`max-w-full truncate font-display text-sm font-black tracking-tight uppercase drop-shadow-md sm:text-2xl ${teamANameClass}`}
                       >
                         {g.teamAName}
                       </h3>
                     </div>
 
                     {/* Center: Match Score & Map Meta */}
-                    <div className="flex flex-col items-center justify-center text-center min-w-[180px]">
+                    <div className="flex min-w-0 shrink-0 flex-col items-center justify-center px-0.5 text-center sm:min-w-[140px]">
                       {/* Map Badge */}
-                      <div className="mb-1.5">
-                        <span className="rounded-full bg-emerald-400/15 px-3.5 py-0.5 text-[10px] sm:text-[11px] font-black uppercase tracking-widest text-emerald-300 ring-1 ring-emerald-400/30 shadow-md">
+                      <div className="mb-1 max-w-[6.5rem] sm:mb-1.5 sm:max-w-none">
+                        <span className="block truncate rounded-full bg-emerald-400/15 px-2 py-0.5 text-[9px] font-black tracking-wider text-emerald-300 uppercase shadow-md ring-1 ring-emerald-400/30 sm:px-3.5 sm:text-[11px] sm:tracking-widest">
                           {g.mapName ?? "VALORANT MATCH"}
                         </span>
                       </div>
 
                       {/* Score Display */}
-                      <div className="flex items-center gap-3 sm:gap-4 font-mono font-black text-2xl sm:text-4xl tracking-tight drop-shadow-lg">
+                      <div className="flex items-center gap-2 font-mono text-xl font-black tracking-tight drop-shadow-lg sm:gap-4 sm:text-4xl">
                         <span className={teamARoundsClass}>{g.teamARounds}</span>
-                        <span className="text-white/25 text-xl sm:text-3xl">-</span>
+                        <span className="text-lg text-white/25 sm:text-3xl">-</span>
                         <span className={teamBRoundsClass}>{g.teamBRounds}</span>
                       </div>
 
                       {/* MVP Meta */}
                       {g.mvpRiotId ? (
-                        <div className="mt-1 text-[10px] sm:text-xs font-bold uppercase tracking-wider text-white/60">
-                          MVP <strong className="text-white">{parseRiotName(g.mvpRiotId).name}</strong>
+                        <div className="mt-0.5 max-w-[7rem] truncate text-[9px] font-bold tracking-wider text-white/60 uppercase sm:mt-1 sm:max-w-none sm:text-xs">
+                          MVP{" "}
+                          <strong className="text-white">
+                            {parseRiotName(g.mvpRiotId).name}
+                          </strong>
                         </div>
                       ) : null}
                     </div>
@@ -366,7 +369,7 @@ export default function TournamentGamesSection({ slug, initialGames }: Props) {
                     {/* Right Side: Winner/Loser (Team B) */}
                     <div className="min-w-0 text-right">
                       <h3
-                        className={`font-display text-lg sm:text-2xl font-black uppercase tracking-tight drop-shadow-md truncate max-w-full ${teamBNameClass}`}
+                        className={`max-w-full truncate font-display text-sm font-black tracking-tight uppercase drop-shadow-md sm:text-2xl ${teamBNameClass}`}
                       >
                         {g.teamBName}
                       </h3>

@@ -51,18 +51,18 @@ export default function TournamentFinalResults({
   return (
     <section>
       {showHeading ? (
-        <div className="mb-6 flex items-center gap-3">
-          <div className="h-px w-8 bg-gradient-to-r from-transparent to-[var(--color-brand)]" />
-          <h2 className="font-display text-2xl font-bold uppercase tracking-widest text-white">
+        <div className="mb-6 flex min-w-0 items-center gap-3">
+          <div className="hidden h-px w-8 shrink-0 bg-gradient-to-r from-transparent to-[var(--color-brand)] sm:block" />
+          <h2 className="min-w-0 font-display text-xl font-bold tracking-widest text-white uppercase sm:text-2xl">
             Final Results
           </h2>
-          <div className="h-px flex-1 bg-gradient-to-r from-[var(--color-brand)] to-transparent opacity-30" />
+          <div className="h-px min-w-0 flex-1 bg-gradient-to-r from-[var(--color-brand)] to-transparent opacity-30" />
         </div>
       ) : null}
 
       {standings.length > 0 ? (
         <div
-          className={`grid gap-4 ${
+          className={`grid min-w-0 gap-4 ${
             standings.length === 4
               ? "grid-cols-1 sm:grid-cols-2 lg:grid-cols-4"
               : standings.length === 2
@@ -77,19 +77,19 @@ export default function TournamentFinalResults({
             return (
               <div
                 key={`rank-${standing.rank}-${standing.name}`}
-                className={`overflow-hidden rounded-[1.25rem] border bg-[#0A0A0A]/80 p-5 backdrop-blur-sm ${style.border}`}
+                className={`min-w-0 overflow-hidden rounded-[1.25rem] border bg-[#0A0A0A]/80 p-4 backdrop-blur-sm sm:p-5 ${style.border}`}
               >
-                <div className="flex items-center gap-3">
+                <div className="flex min-w-0 flex-wrap items-center gap-2 sm:gap-3">
                   <span
-                    className={`inline-flex rounded-md px-2 py-1 text-[10px] font-black tracking-[0.2em] ring-1 ring-inset ${style.badge}`}
+                    className={`inline-flex shrink-0 rounded-md px-2 py-1 text-[10px] font-black tracking-[0.16em] ring-1 ring-inset sm:tracking-[0.2em] ${style.badge}`}
                   >
                     {style.badgeText}
                   </span>
-                  <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-white/40">
+                  <span className="text-[10px] font-bold tracking-[0.16em] text-white/40 uppercase sm:tracking-[0.2em]">
                     {style.label}
                   </span>
                 </div>
-                <p className="mt-4 font-display text-xl font-black italic tracking-tight text-white sm:text-2xl">
+                <p className="mt-4 break-words font-display text-xl font-black italic tracking-tight text-white sm:text-2xl">
                   {standing.name}
                 </p>
                 <p className="mt-2 font-display text-sm font-semibold tabular-nums text-white/45">

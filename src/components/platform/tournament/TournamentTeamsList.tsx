@@ -17,13 +17,24 @@ const ROLE_BADGE: Record<string, { label: string; color: string }> = {
   CAPTAIN: { label: "Captain", color: "#f6c177" },
   CO_CAPTAIN: { label: "Co-Captain", color: "#a78bfa" },
   PLAYER: { label: "Player", color: "#5eead4" },
+  POACH: { label: "Poached", color: "#fbbf24" },
 };
 
-const ROLE_ORDER: Record<string, number> = { CAPTAIN: 0, CO_CAPTAIN: 1, PLAYER: 2 };
+const ROLE_ORDER: Record<string, number> = {
+  CAPTAIN: 0,
+  CO_CAPTAIN: 1,
+  PLAYER: 2,
+  POACH: 3,
+};
+
+function playerRoleKey(player: TournamentTeamPlayerView): string {
+  if (player.membershipKind === "POACH") return "POACH";
+  return player.participantRole ?? "PLAYER";
+}
 
 function sortByRole(players: TournamentTeamPlayerView[]): TournamentTeamPlayerView[] {
   return [...players].sort(
-    (a, b) => (ROLE_ORDER[a.participantRole ?? "PLAYER"] ?? 2) - (ROLE_ORDER[b.participantRole ?? "PLAYER"] ?? 2),
+    (a, b) => (ROLE_ORDER[playerRoleKey(a)] ?? 2) - (ROLE_ORDER[playerRoleKey(b)] ?? 2),
   );
 }
 
@@ -84,16 +95,26 @@ function TeamPreviewScreen({
 
         <ul className="mx-auto max-w-lg space-y-2.5">
           {sortByRole(team.players).map((player) => {
-            const role = player.participantRole ?? "PLAYER";
+            const role = playerRoleKey(player);
             const badge = ROLE_BADGE[role] ?? ROLE_BADGE.PLAYER;
             const secondary = isFifa ? player.olympusId : player.riotId;
+            const isPoach = player.membershipKind === "POACH";
             return (
               <li
                 key={player.id}
-                className="flex items-center justify-between gap-3 rounded-2xl border border-white/[0.07] bg-white/[0.025] px-4 py-3.5"
+                className={`flex items-center justify-between gap-3 rounded-2xl border px-4 py-3.5 ${
+                  isPoach
+                    ? "border-amber-400/20 bg-amber-500/[0.06]"
+                    : "border-white/[0.07] bg-white/[0.025]"
+                }`}
               >
                 <div className="min-w-0">
                   <p className="font-display text-[15px] font-semibold text-white truncate">{player.displayName}</p>
+                  {isPoach && player.poachedFromTeamName ? (
+                    <p className="mt-0.5 truncate text-xs font-semibold uppercase tracking-wider text-amber-300/90">
+                      Poached: {player.poachedFromTeamName}
+                    </p>
+                  ) : null}
                   {secondary ? (
                     <p className="mt-0.5 truncate text-xs text-white/45">{secondary}</p>
                   ) : null}
@@ -137,29 +158,29 @@ export default function TournamentTeamsList({
   const isDuoTeamCup = game === "EA_FC26";
 
   return (
-    <section>
-      <div className="mb-6 flex items-center gap-3">
-        <div className="h-px w-8 bg-gradient-to-r from-transparent to-cyan-400" />
-        <h2 className="font-display text-2xl font-bold uppercase tracking-widest text-white">
+    <section className="min-w-0">
+      <div className="mb-6 flex min-w-0 items-center gap-3">
+        <div className="h-px w-6 shrink-0 bg-gradient-to-r from-transparent to-cyan-400 sm:w-8" />
+        <h2 className="font-display text-xl font-bold tracking-widest text-white uppercase sm:text-2xl">
           Teams
         </h2>
-        <div className="h-px flex-1 bg-gradient-to-r from-cyan-400 to-transparent opacity-30" />
+        <div className="h-px min-w-0 flex-1 bg-gradient-to-r from-cyan-400 to-transparent opacity-30" />
       </div>
 
       {rows.length > 0 ? (
-        <ul className="grid gap-3 sm:grid-cols-2">
+        <ul className="grid min-w-0 gap-3 sm:grid-cols-2">
           {rows.map((team, index) => {
             const hasPlayers = team.players.length > 0;
             const canPreview = hasPlayers;
             const captainName = team.players.find((p) => p.participantRole === "CAPTAIN")?.displayName;
 
             return (
-              <li key={team.id}>
+              <li key={team.id} className="min-w-0">
                 <button
                   type="button"
                   onClick={() => canPreview && setPreviewTeam(team)}
                   disabled={!canPreview}
-                  className={`flex w-full items-center gap-4 rounded-[1.15rem] border border-white/[0.06] bg-[#0A0A0A]/70 px-5 py-4 text-left backdrop-blur-sm transition-colors ${
+                  className={`flex w-full min-w-0 items-center gap-3 rounded-[1.15rem] border border-white/[0.06] bg-[#0A0A0A]/70 px-4 py-3.5 text-left backdrop-blur-sm transition-colors sm:gap-4 sm:px-5 sm:py-4 ${
                     canPreview
                       ? "cursor-pointer hover:border-white/[0.12] hover:bg-[#0A0A0A]/85 active:scale-[0.99]"
                       : "cursor-default"

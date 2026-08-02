@@ -89,6 +89,10 @@ export type TournamentTeamPlayerView = {
   riotPlayerCardWide?: string | null;
   valorantRoles?: string[] | null;
   participantRole?: "CAPTAIN" | "CO_CAPTAIN" | "PLAYER";
+  /** Admin poach onto this team (7th+ player). */
+  membershipKind?: "PRIMARY" | "POACH";
+  /** Source team name when membershipKind is POACH. */
+  poachedFromTeamName?: string | null;
 };
 
 export type TournamentTeamView = {

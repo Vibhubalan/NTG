@@ -20,9 +20,9 @@ export default function PlatformShell({ children }: { children: React.ReactNode 
         <div className="absolute inset-0 bg-[linear-gradient(transparent_50%,rgba(0,0,0,0.25)_50%)] bg-[length:100%_4px] opacity-20" />
       </div>
 
-      <div className="mx-auto flex w-full max-w-6xl flex-1 flex-col px-5 pb-20 pt-40 sm:px-6">
+      <div className="mx-auto flex w-full max-w-6xl min-w-0 flex-1 flex-col overflow-x-clip px-4 pb-20 pt-40 sm:px-6">
         <PlatformBreadcrumb />
-        <div id="main-content" className="flex-1">{children}</div>
+        <div id="main-content" className="min-w-0 flex-1">{children}</div>
       </div>
       
       <div className="mt-auto">

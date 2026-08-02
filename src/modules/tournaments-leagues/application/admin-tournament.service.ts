@@ -707,7 +707,23 @@ export async function createTeamPlayer(
     userId?: string;
     membershipKind?: "PRIMARY" | "POACH";
   },
-): Promise<{ ok: true; id: string } | { ok: false; error: string }> {
+): Promise<
+  | {
+      ok: true;
+      id: string;
+      player?: {
+        id: string;
+        displayName: string;
+        riotGameName: string | null;
+        riotTagLine: string | null;
+        registrationId: string | null;
+        userId: string | null;
+        membershipKind: "PRIMARY" | "POACH";
+        poachedFromTeamId: string | null;
+      };
+    }
+  | { ok: false; error: string }
+> {
   const team = await prisma.tournamentTeam.findUnique({
     where: { id: teamId },
     include: { players: { orderBy: { sortOrder: "desc" }, take: 1 } },
@@ -728,88 +744,136 @@ export async function createTeamPlayer(
     let valorantRoles: unknown = undefined;
     let peakPremierRank: string | null = null;
     let poachedFromTeamId: string | null = null;
+    let regTeamIdHint: string | null = null;
 
     if (input.registrationId) {
       const reg = await prisma.tournamentRegistration.findUnique({
         where: { id: input.registrationId },
-        include: { user: true },
+        include: { user: { select: { name: true, riotGameName: true, riotTagLine: true } } },
       });
       if (!reg || reg.tournamentId !== team.tournamentId) {
         return { ok: false, error: "Registration not found for this cup." };
       }
-      if (!reg.teamId) {
-        return { ok: false, error: "Player must already be on a team before poaching." };
-      }
-      if (reg.teamId === teamId) {
-        return { ok: false, error: "Cannot poach a player onto their primary team." };
-      }
-
       userId = reg.userId;
       displayName = reg.snapshotDisplayName ?? reg.user.name ?? displayName;
       riotGameName = reg.user.riotGameName ?? riotGameName;
       riotTagLine = reg.user.riotTagLine ?? riotTagLine;
       valorantRoles = reg.snapshotValorantRoles ?? undefined;
       peakPremierRank = reg.snapshotCs2PeakPremier;
-      poachedFromTeamId = reg.teamId;
-    } else if (userId) {
-      const primaryMembership = await prisma.tournamentTeamPlayer.findFirst({
-        where: {
-          userId,
-          membershipKind: "PRIMARY",
-          team: { tournamentId: team.tournamentId },
-        },
-      });
-      const primaryReg = await prisma.tournamentRegistration.findFirst({
-        where: { tournamentId: team.tournamentId, userId },
-      });
-      const fromTeamId = primaryMembership?.teamId ?? primaryReg?.teamId ?? null;
-      if (!fromTeamId) {
-        return { ok: false, error: "Player must already be on a team before poaching." };
-      }
-      if (fromTeamId === teamId) {
-        return { ok: false, error: "Cannot poach a player onto their primary team." };
-      }
-      poachedFromTeamId = fromTeamId;
-
-      const user = await prisma.user.findUnique({ where: { id: userId } });
-      if (user) {
-        displayName = user.name ?? displayName;
-        riotGameName = user.riotGameName ?? riotGameName;
-        riotTagLine = user.riotTagLine ?? riotTagLine;
-      }
+      regTeamIdHint = reg.teamId;
     }
 
-    if (userId) {
-      const existingOnTeam = await prisma.tournamentTeamPlayer.findFirst({
-        where: { teamId, userId },
-      });
-      if (existingOnTeam) {
-        return { ok: false, error: "Player already on this team." };
-      }
+    const [livePrimary, existingOnTeam, userRow, regTeamOk] = await Promise.all([
+      userId
+        ? prisma.tournamentTeamPlayer.findFirst({
+            where: {
+              userId,
+              membershipKind: "PRIMARY",
+              team: { tournamentId: team.tournamentId },
+            },
+            select: { teamId: true },
+          })
+        : Promise.resolve(null),
+      userId
+        ? prisma.tournamentTeamPlayer.findFirst({
+            where: { teamId, userId },
+            select: { id: true },
+          })
+        : Promise.resolve(null),
+      userId && !input.registrationId
+        ? prisma.user.findUnique({
+            where: { id: userId },
+            select: { name: true, riotGameName: true, riotTagLine: true },
+          })
+        : Promise.resolve(null),
+      !userId || input.registrationId
+        ? regTeamIdHint
+          ? prisma.tournamentTeam.findFirst({
+              where: { id: regTeamIdHint, tournamentId: team.tournamentId },
+              select: { id: true },
+            })
+          : Promise.resolve(null)
+        : prisma.tournamentRegistration
+            .findFirst({
+              where: { tournamentId: team.tournamentId, userId },
+              select: { teamId: true },
+            })
+            .then(async (reg) => {
+              if (!reg?.teamId) return null;
+              return prisma.tournamentTeam.findFirst({
+                where: { id: reg.teamId, tournamentId: team.tournamentId },
+                select: { id: true },
+              });
+            }),
+    ]);
+
+    if (existingOnTeam) {
+      return { ok: false, error: "Player already on this team." };
+    }
+
+    if (userRow) {
+      displayName = userRow.name ?? displayName;
+      riotGameName = userRow.riotGameName ?? riotGameName;
+      riotTagLine = userRow.riotTagLine ?? riotTagLine;
+    }
+
+    poachedFromTeamId = livePrimary?.teamId ?? regTeamOk?.id ?? null;
+    if (!poachedFromTeamId) {
+      return {
+        ok: false,
+        error:
+          "Player must already be on a team before poaching. Their registration may be linked to a removed auction team.",
+      };
+    }
+    if (poachedFromTeamId === teamId) {
+      return { ok: false, error: "Cannot poach a player onto their primary team." };
     }
 
     const sortOrder = (team.players[0]?.sortOrder ?? -1) + 1;
-    const player = await prisma.tournamentTeamPlayer.create({
-      data: {
-        teamId,
-        userId,
-        registrationId: null,
-        displayName,
-        riotGameName,
-        riotTagLine,
-        valorantRoles: valorantRoles as never,
-        peakPremierRank,
-        membershipKind: "POACH",
-        poachedFromTeamId,
-        sortOrder,
-      },
-    });
-
-    await prisma.tournament.update({
-      where: { id: team.tournamentId },
-      data: { updatedAt: new Date() },
-    });
-    return { ok: true, id: player.id };
+    try {
+      const player = await prisma.tournamentTeamPlayer.create({
+        data: {
+          teamId,
+          userId,
+          registrationId: null,
+          displayName,
+          riotGameName,
+          riotTagLine,
+          valorantRoles: valorantRoles as never,
+          peakPremierRank,
+          membershipKind: "POACH",
+          poachedFromTeamId,
+          sortOrder,
+        },
+      });
+      return {
+        ok: true,
+        id: player.id,
+        player: {
+          id: player.id,
+          displayName: player.displayName,
+          riotGameName: player.riotGameName,
+          riotTagLine: player.riotTagLine,
+          registrationId: player.registrationId,
+          userId: player.userId,
+          membershipKind: "POACH" as const,
+          poachedFromTeamId: player.poachedFromTeamId,
+        },
+      };
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Unknown database error";
+      if (message.includes("Unique constraint") || message.includes("unique")) {
+        return { ok: false, error: "Player already on this team." };
+      }
+      if (message.includes("Foreign key") || message.includes("foreign key")) {
+        return {
+          ok: false,
+          error:
+            "Poach failed: source team no longer exists (likely an old auction session). Re-link the player to a current team, then try again.",
+        };
+      }
+      return { ok: false, error: `Poach failed: ${message}` };
+    }
   }
 
   if (input.registrationId) {
@@ -864,7 +928,20 @@ export async function createTeamPlayer(
       where: { id: team.tournamentId },
       data: { updatedAt: new Date() },
     });
-    return { ok: true, id: player.id };
+    return {
+      ok: true,
+      id: player.id,
+      player: {
+        id: player.id,
+        displayName: player.displayName,
+        riotGameName: player.riotGameName,
+        riotTagLine: player.riotTagLine,
+        registrationId: player.registrationId,
+        userId: player.userId,
+        membershipKind: "PRIMARY" as const,
+        poachedFromTeamId: player.poachedFromTeamId,
+      },
+    };
   }
 
   if (input.userId) {
@@ -892,7 +969,20 @@ export async function createTeamPlayer(
     where: { id: team.tournamentId },
     data: { updatedAt: new Date() },
   });
-  return { ok: true, id: player.id };
+  return {
+    ok: true,
+    id: player.id,
+    player: {
+      id: player.id,
+      displayName: player.displayName,
+      riotGameName: player.riotGameName,
+      riotTagLine: player.riotTagLine,
+      registrationId: player.registrationId,
+      userId: player.userId,
+      membershipKind: "PRIMARY" as const,
+      poachedFromTeamId: player.poachedFromTeamId,
+    },
+  };
 }
 
 export async function updateTeamPlayer(

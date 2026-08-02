@@ -9,9 +9,9 @@ import {
 import { serverEnv } from "@core/config/env.server";
 import { displayCs2Ranks, displayValorantRegistration } from "@auth-membership/domain/game-profile";
 import type { PrizeSplitRow } from "@core/contracts";
-import { prisma } from "@core/database/client";
 import { getSession } from "@core/auth/session";
 import { tryAuctionLink } from "@/lib/auction-link";
+import { getAuctionSessionFinalized } from "@/lib/auction-session";
 import { normalizeBracketUrlItems } from "@/lib/challonge";
 import { resolveEffectivePublicAuction } from "@tournaments-leagues/domain/auction-hero-phase";
 
@@ -38,13 +38,8 @@ export default async function AdminTournamentEditPage({ params }: Props) {
   ]);
   if (!t) notFound();
 
-  const [auctionRow] = await prisma
-    .$queryRawUnsafe<{ finalized: boolean }[]>(
-      "SELECT finalized FROM auction_sessions WHERE tournament_id = $1 LIMIT 1",
-      t.id,
-    )
-    .catch(() => []);
-  const auctionFinalized = auctionRow?.finalized === true;
+  const auctionFinalized =
+    (await getAuctionSessionFinalized(t.id).catch(() => null)) === true;
 
   const initial = {
     slug: t.slug,
