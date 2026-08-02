@@ -3,7 +3,9 @@ import {
   computeAcs,
   computeAdr,
   computeHsPercent,
+  countFirstKillDeaths,
   countTeamPresence,
+  extractKillEventsFromMatchPayload,
   isCommonCustomMatch,
   normalizeGameSide,
   partitionPlayersByCupTeam,
@@ -52,6 +54,49 @@ describe("tournament-games helpers", () => {
     expect(computeHsPercent(17, 28, 3)).toBe(35.42);
     expect(computeAcs(100, 0)).toBe(0);
     expect(computeHsPercent(0, 0, 0)).toBe(0);
+  });
+
+  it("counts first kills and first deaths from earliest kill per round", () => {
+    const counts = countFirstKillDeaths([
+      {
+        round: 0,
+        kill_time_in_round: 4000,
+        killer_puuid: "a",
+        victim_puuid: "b",
+      },
+      {
+        round: 0,
+        kill_time_in_round: 1200,
+        killer_puuid: "c",
+        victim_puuid: "d",
+      },
+      {
+        round: 1,
+        kill_time_in_round: 800,
+        killer_puuid: "a",
+        victim_puuid: "d",
+      },
+    ]);
+    expect(counts.get("c")).toEqual({ firstKills: 1, firstDeaths: 0 });
+    expect(counts.get("d")).toEqual({ firstKills: 0, firstDeaths: 2 });
+    expect(counts.get("a")).toEqual({ firstKills: 1, firstDeaths: 0 });
+    expect(counts.get("b")).toBeUndefined();
+  });
+
+  it("extracts kills from Henrik payload envelope", () => {
+    const kills = extractKillEventsFromMatchPayload({
+      data: {
+        kills: [
+          {
+            round: 2,
+            kill_time_in_round: 500,
+            killer_puuid: "x",
+            victim_puuid: "y",
+          },
+        ],
+      },
+    });
+    expect(countFirstKillDeaths(kills).get("x")?.firstKills).toBe(1);
   });
 
   it("normalizes sides and majority side for a roster", () => {

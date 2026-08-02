@@ -74,6 +74,113 @@ export function computeHsPercent(
   return Math.round((headshots / shots) * 10000) / 100;
 }
 
+/** Henrik v2 kill event (top-level `data.kills` or nested round kill_events). */
+export type HenrikKillEvent = {
+  round?: number;
+  kill_time_in_round?: number;
+  killer_puuid?: string;
+  victim_puuid?: string;
+};
+
+export type FirstKillDeathCounts = {
+  firstKills: number;
+  firstDeaths: number;
+};
+
+/**
+ * Pull kill events from a stored Henrik match payload.
+ * Accepts either the API envelope `{ data: {...} }` or the inner `data` object.
+ */
+export function extractKillEventsFromMatchPayload(payload: unknown): HenrikKillEvent[] {
+  if (!payload || typeof payload !== "object") return [];
+  const root = payload as Record<string, unknown>;
+  const data =
+    root.data && typeof root.data === "object"
+      ? (root.data as Record<string, unknown>)
+      : root;
+
+  if (Array.isArray(data.kills)) {
+    return data.kills as HenrikKillEvent[];
+  }
+
+  const rounds = Array.isArray(data.rounds) ? data.rounds : [];
+  const kills: HenrikKillEvent[] = [];
+  for (const raw of rounds) {
+    if (!raw || typeof raw !== "object") continue;
+    const round = raw as Record<string, unknown>;
+    const roundNum =
+      typeof round.round === "number"
+        ? round.round
+        : typeof round.round_num === "number"
+          ? round.round_num
+          : null;
+    const playerStats = Array.isArray(round.player_stats) ? round.player_stats : [];
+    for (const psRaw of playerStats) {
+      if (!psRaw || typeof psRaw !== "object") continue;
+      const ps = psRaw as Record<string, unknown>;
+      const events = Array.isArray(ps.kill_events) ? ps.kill_events : [];
+      for (const evRaw of events) {
+        if (!evRaw || typeof evRaw !== "object") continue;
+        const ev = evRaw as Record<string, unknown>;
+        kills.push({
+          round:
+            typeof ev.round === "number"
+              ? ev.round
+              : roundNum ?? undefined,
+          kill_time_in_round:
+            typeof ev.kill_time_in_round === "number"
+              ? ev.kill_time_in_round
+              : undefined,
+          killer_puuid:
+            typeof ev.killer_puuid === "string"
+              ? ev.killer_puuid
+              : typeof ps.player_puuid === "string"
+                ? ps.player_puuid
+                : undefined,
+          victim_puuid:
+            typeof ev.victim_puuid === "string" ? ev.victim_puuid : undefined,
+        });
+      }
+    }
+  }
+  return kills;
+}
+
+/**
+ * First kill / first death per round: earliest kill_time_in_round in each round.
+ * Returns counts keyed by puuid.
+ */
+export function countFirstKillDeaths(
+  kills: ReadonlyArray<HenrikKillEvent> | null | undefined,
+): Map<string, FirstKillDeathCounts> {
+  const byRound = new Map<number, HenrikKillEvent[]>();
+  for (const k of kills ?? []) {
+    if (typeof k.round !== "number") continue;
+    if (!k.killer_puuid || !k.victim_puuid) continue;
+    const list = byRound.get(k.round) ?? [];
+    list.push(k);
+    byRound.set(k.round, list);
+  }
+
+  const result = new Map<string, FirstKillDeathCounts>();
+  const bump = (puuid: string, field: keyof FirstKillDeathCounts) => {
+    const cur = result.get(puuid) ?? { firstKills: 0, firstDeaths: 0 };
+    cur[field] += 1;
+    result.set(puuid, cur);
+  };
+
+  for (const events of byRound.values()) {
+    events.sort(
+      (a, b) => (a.kill_time_in_round ?? 0) - (b.kill_time_in_round ?? 0),
+    );
+    const first = events[0];
+    if (!first?.killer_puuid || !first.victim_puuid) continue;
+    bump(first.killer_puuid, "firstKills");
+    bump(first.victim_puuid, "firstDeaths");
+  }
+  return result;
+}
+
 export function normalizeGameSide(raw: string | null | undefined): "Red" | "Blue" | null {
   const v = raw?.trim().toLowerCase();
   if (v === "red") return "Red";

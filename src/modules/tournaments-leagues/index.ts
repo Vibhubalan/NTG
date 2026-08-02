@@ -88,6 +88,7 @@ export {
   publishTournamentGames,
   setTournamentGameStatus,
   deleteTournamentGame,
+  backfillTournamentGameFirstKillDeaths,
   type TournamentGameView,
   type TournamentGamePlayerView,
   type ScanChunkResult,

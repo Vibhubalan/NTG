@@ -6,6 +6,8 @@ import {
   computeAcs,
   computeAdr,
   computeHsPercent,
+  countFirstKillDeaths,
+  extractKillEventsFromMatchPayload,
   isCommonCustomMatch,
   normalizeGameSide,
   pickRosterIdentityForTeam,
@@ -55,6 +57,8 @@ export type TournamentGamePlayerView = {
   acs: number;
   adr: number;
   hsPercent: number;
+  firstKills: number;
+  firstDeaths: number;
   rankTier: string | null;
 };
 
@@ -108,6 +112,13 @@ type HenrikMatchDetail = {
       red?: { rounds_won?: number };
       blue?: { rounds_won?: number };
     };
+    kills?: Array<{
+      round?: number;
+      kill_time_in_round?: number;
+      killer_puuid?: string;
+      victim_puuid?: string;
+    }>;
+    rounds?: unknown[];
   };
 };
 
@@ -269,6 +280,7 @@ function mapPlayerRows(
   teamAId: string,
   teamBId: string,
   teamASide: "Red" | "Blue" | null,
+  firstKillDeathByPuuid: Map<string, { firstKills: number; firstDeaths: number }>,
 ) {
   return lobby
     .filter((p) => p.puuid)
@@ -294,6 +306,7 @@ function mapPlayerRows(
       );
 
       const stats = p.stats ?? {};
+      const fkFd = firstKillDeathByPuuid.get(p.puuid);
       return {
         puuid: p.puuid,
         userId: roster?.userId ?? null,
@@ -310,6 +323,8 @@ function mapPlayerRows(
         headshots: stats.headshots ?? 0,
         bodyshots: stats.bodyshots ?? 0,
         legshots: stats.legshots ?? 0,
+        firstKills: fkFd?.firstKills ?? 0,
+        firstDeaths: fkFd?.firstDeaths ?? 0,
       };
     });
 }
@@ -361,6 +376,7 @@ async function upsertCandidateGame(opts: {
     opts.teamAId,
     opts.teamBId,
     teamASide,
+    countFirstKillDeaths(extractKillEventsFromMatchPayload(opts.detail)),
   );
 
   const existing = await prisma.tournamentGame.findUnique({
@@ -476,6 +492,8 @@ function toGameView(
       headshots: number;
       bodyshots: number;
       legshots: number;
+      firstKills: number;
+      firstDeaths: number;
       user?: {
         name?: string | null;
         leaderboard?: Array<{ rankTier: string | null }>;
@@ -507,6 +525,8 @@ function toGameView(
       acs: computeAcs(p.score, totalRounds),
       adr: computeAdr(p.damage, totalRounds),
       hsPercent: computeHsPercent(p.headshots, p.bodyshots, p.legshots),
+      firstKills: p.firstKills ?? 0,
+      firstDeaths: p.firstDeaths ?? 0,
       rankTier: lb ?? snap ?? null,
     };
   });
@@ -992,4 +1012,66 @@ export async function listTournamentStatsEligibility(
   }
 
   return eligibility;
+}
+
+/**
+ * Recompute firstKills / firstDeaths from stored Henrik payloadJson.
+ * Safe to re-run; does not delete games or change K/D/ACS aggregates.
+ */
+export async function backfillTournamentGameFirstKillDeaths(opts?: {
+  tournamentSlug?: string;
+  limit?: number;
+}): Promise<{ ok: true; updatedPlayers: number; gamesProcessed: number; skipped: number }> {
+  const games = await prisma.tournamentGame.findMany({
+    where: {
+      payloadJson: { not: Prisma.DbNull },
+      ...(opts?.tournamentSlug
+        ? { tournament: slugWhere(opts.tournamentSlug) }
+        : {}),
+    },
+    select: {
+      id: true,
+      payloadJson: true,
+      players: { select: { id: true, puuid: true } },
+    },
+    take: opts?.limit,
+    orderBy: { scannedAt: "desc" },
+  });
+
+  let updatedPlayers = 0;
+  let skipped = 0;
+
+  for (const game of games) {
+    const counts = countFirstKillDeaths(
+      extractKillEventsFromMatchPayload(game.payloadJson),
+    );
+    if (counts.size === 0) {
+      skipped += 1;
+      continue;
+    }
+
+    await Promise.all(
+      game.players.map(async (player) => {
+        const fkFd = counts.get(player.puuid) ?? {
+          firstKills: 0,
+          firstDeaths: 0,
+        };
+        await prisma.tournamentGamePlayer.update({
+          where: { id: player.id },
+          data: {
+            firstKills: fkFd.firstKills,
+            firstDeaths: fkFd.firstDeaths,
+          },
+        });
+        updatedPlayers += 1;
+      }),
+    );
+  }
+
+  return {
+    ok: true,
+    updatedPlayers,
+    gamesProcessed: games.length,
+    skipped,
+  };
 }

@@ -19,7 +19,9 @@ type SortField =
   | "gamesPlayed"
   | "kd"
   | "avgHsPercent"
-  | "mvpCount";
+  | "mvpCount"
+  | "totalFirstKills"
+  | "totalFirstDeaths";
 type SortDir = "asc" | "desc";
 
 function parseRiotName(riotId: string) {
@@ -41,6 +43,10 @@ function fieldValue(p: AggregatedPlayer, field: SortField): number {
       return p.totalDeaths > 0 ? p.totalKills / p.totalDeaths : p.totalKills;
     case "avgHsPercent":
       return p.avgHsPercent;
+    case "totalFirstKills":
+      return p.totalFirstKills;
+    case "totalFirstDeaths":
+      return p.totalFirstDeaths;
   }
 }
 
@@ -52,49 +58,22 @@ function playerKd(p: AggregatedPlayer): string {
 
 function rowStyles(idx: number, mvps: number) {
   const isTop3 = idx < 3;
-  let rowBgClass =
-    "border-b border-white/[0.04] transition-colors hover:bg-white/[0.04]";
-  let mvpBadgeClass = "";
-  let nameColorClass = "text-white font-bold";
-
-  if (mvps >= 3) {
-    rowBgClass =
-      "border-b border-amber-300/60 bg-gradient-to-r from-amber-400/[0.28] via-yellow-400/[0.12] to-transparent shadow-[0_0_25px_rgba(251,191,36,0.25),inset_0_0_30px_rgba(245,158,11,0.15)] transition-all hover:from-amber-400/[0.35]";
-    mvpBadgeClass =
-      "inline-flex items-center gap-1.5 rounded-md bg-gradient-to-r from-amber-300 via-yellow-400 to-amber-500 px-2.5 py-0.5 text-[11px] font-black uppercase text-black border border-amber-100 shadow-[0_0_20px_rgba(251,191,36,0.7)] tracking-wider";
-    nameColorClass =
-      "text-amber-200 font-black tracking-wide drop-shadow-[0_0_10px_rgba(251,191,36,0.5)]";
-  } else if (mvps === 2) {
-    rowBgClass =
-      "border-b border-amber-400/40 bg-gradient-to-r from-amber-400/[0.18] via-yellow-500/[0.06] to-transparent shadow-[inset_0_0_20px_rgba(245,158,11,0.1)] transition-all hover:from-amber-400/[0.24]";
-    mvpBadgeClass =
-      "inline-flex items-center gap-1 rounded-md bg-gradient-to-r from-amber-400/30 via-yellow-400/20 to-amber-500/30 px-2 py-0.5 text-[10px] font-black uppercase text-amber-200 border border-amber-300/50 shadow-[0_0_15px_rgba(245,158,11,0.35)] tracking-wide";
-    nameColorClass = "text-amber-100 font-extrabold drop-shadow-sm";
-  } else if (mvps === 1) {
-    rowBgClass =
-      "border-b border-amber-500/25 bg-gradient-to-r from-amber-500/[0.10] via-amber-500/[0.02] to-transparent transition-all hover:from-amber-500/[0.15]";
-    mvpBadgeClass =
-      "inline-flex items-center gap-1 rounded bg-amber-500/20 px-1.5 py-0.5 text-[10px] font-black uppercase text-amber-300 border border-amber-400/30 shadow-[0_0_10px_rgba(245,158,11,0.2)]";
-    nameColorClass = "text-amber-100 font-bold";
-  } else if (isTop3) {
-    rowBgClass =
-      "border-b border-white/[0.04] bg-gradient-to-r from-emerald-500/[0.08] via-transparent to-transparent transition-colors hover:bg-white/[0.04]";
-  }
-
+  const rowBgClass = isTop3
+    ? "border-b border-white/[0.04] bg-gradient-to-r from-emerald-500/[0.08] via-transparent to-transparent transition-colors hover:bg-white/[0.04]"
+    : "border-b border-white/[0.04] transition-colors hover:bg-white/[0.04]";
+  const mvpBadgeClass =
+    mvps > 0
+      ? "inline-flex items-center gap-1 rounded-md border border-amber-300/40 bg-amber-400/15 px-1.5 py-0.5 text-[10px] font-black tracking-wide text-amber-200 uppercase"
+      : "";
+  const nameColorClass = "text-white font-bold";
   const rankClass =
-    mvps >= 3
-      ? "text-amber-200 drop-shadow-[0_0_10px_rgba(251,191,36,0.6)]"
-      : mvps === 2
-        ? "text-amber-300 drop-shadow-sm"
-        : mvps === 1
-          ? "text-amber-400"
-          : idx === 0
-            ? "text-yellow-400"
-            : idx === 1
-              ? "text-gray-300"
-              : idx === 2
-                ? "text-amber-500"
-                : "text-white/40";
+    idx === 0
+      ? "text-yellow-400"
+      : idx === 1
+        ? "text-gray-300"
+        : idx === 2
+          ? "text-amber-500"
+          : "text-white/40";
 
   return { rowBgClass, mvpBadgeClass, nameColorClass, rankClass };
 }
@@ -154,7 +133,8 @@ export default function TournamentStatsSection({ games, eligibility }: Props) {
     return sorted.filter(
       (p) =>
         p.riotId.toLowerCase().includes(q) ||
-        (p.userName && p.userName.toLowerCase().includes(q)),
+        (p.userName && p.userName.toLowerCase().includes(q)) ||
+        p.teamNames.some((name) => name.toLowerCase().includes(q)),
     );
   }, [sorted, searchQuery]);
 
@@ -175,7 +155,9 @@ export default function TournamentStatsSection({ games, eligibility }: Props) {
   function sortIcon(field: SortField) {
     if (sortBy !== field) return null;
     return (
-      <span className="ml-1 text-emerald-300">{sortDir === "asc" ? "▲" : "▼"}</span>
+      <span className="ml-0.5 text-[8px] text-emerald-300" aria-hidden>
+        {sortDir === "asc" ? "▲" : "▼"}
+      </span>
     );
   }
 
@@ -204,32 +186,40 @@ export default function TournamentStatsSection({ games, eligibility }: Props) {
     { field: "totalKills", label: "KDA" },
     { field: "avgAcs", label: "ACS" },
     { field: "kd", label: "K/D" },
+    { field: "totalFirstKills", label: "FK" },
     { field: "gamesPlayed", label: "GP" },
-    { field: "avgHsPercent", label: "HS%" },
   ];
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap items-center gap-2">
-        {(
-          [
-            { id: "players" as const, label: "Players" },
-            { id: "meta" as const, label: "Meta" },
-          ] as const
-        ).map((tab) => (
-          <button
-            key={tab.id}
-            type="button"
-            onClick={() => setSubTab(tab.id)}
-            className={`rounded-full px-4 py-2 text-[11px] font-medium uppercase tracking-[0.18em] transition-all ${
-              subTab === tab.id
-                ? "bg-emerald-400/15 text-emerald-300 ring-1 ring-inset ring-emerald-400/35"
-                : "text-white/45 ring-1 ring-inset ring-white/10 hover:text-white/70"
-            }`}
-          >
-            {tab.label}
-          </button>
-        ))}
+      <div className="flex flex-wrap items-center gap-3">
+        <div
+          role="tablist"
+          aria-label="Stats view"
+          className="inline-flex rounded-xl border border-white/12 bg-[#080d16] p-1 shadow-inner"
+        >
+          {(
+            [
+              { id: "players" as const, label: "Players" },
+              { id: "meta" as const, label: "Meta" },
+            ] as const
+          ).map((tab) => (
+            <button
+              key={tab.id}
+              type="button"
+              role="tab"
+              aria-selected={subTab === tab.id}
+              onClick={() => setSubTab(tab.id)}
+              className={`min-w-[5.5rem] rounded-lg px-4 py-2.5 text-[11px] font-black tracking-[0.14em] uppercase transition-all ${
+                subTab === tab.id
+                  ? "bg-emerald-400 text-[#070a12] shadow-[0_0_16px_rgba(52,211,153,0.35)]"
+                  : "bg-transparent text-white/50 hover:bg-white/[0.06] hover:text-white/80"
+              }`}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
         <span className="text-xs text-white/35">
           {games.length} match{games.length !== 1 ? "es" : ""}
         </span>
@@ -269,7 +259,7 @@ export default function TournamentStatsSection({ games, eligibility }: Props) {
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Search player"
+                placeholder="Search Players or Team Name"
                 className="w-full rounded-xl border border-white/10 bg-[#080d16] py-2.5 pr-4 pl-9 text-xs font-medium text-white placeholder-white/40 shadow-inner transition-all focus:border-emerald-400 focus:outline-none"
               />
               <svg
@@ -287,21 +277,23 @@ export default function TournamentStatsSection({ games, eligibility }: Props) {
               </svg>
             </div>
 
-            {/* Mobile sort chips — equal width grid so nothing clips */}
-            <div className="grid grid-cols-5 gap-1 md:hidden">
+            {/* Mobile sort chips — inset rings so edges aren’t clipped by overflow */}
+            <div className="grid w-full min-w-0 grid-cols-5 gap-1.5 md:hidden">
               {sortChips.map((chip) => (
                 <button
                   key={chip.field}
                   type="button"
                   onClick={() => toggleSort(chip.field)}
-                  className={`rounded-full px-1 py-1.5 text-center text-[9px] font-bold tracking-wider uppercase ring-1 transition-all ${
+                  className={`inline-flex min-w-0 items-center justify-center rounded-lg border px-0.5 py-2 text-center text-[9px] font-black tracking-wide uppercase transition-all ${
                     sortBy === chip.field
-                      ? "bg-emerald-400/15 text-emerald-300 ring-emerald-400/40"
-                      : "text-white/45 ring-white/10"
+                      ? "border-emerald-400/50 bg-emerald-400/15 text-emerald-300"
+                      : "border-white/10 bg-white/[0.03] text-white/50"
                   }`}
                 >
-                  {chip.label}
-                  {sortIcon(chip.field)}
+                  <span className="truncate">
+                    {chip.label}
+                    {sortIcon(chip.field)}
+                  </span>
                 </button>
               ))}
             </div>
@@ -320,15 +312,15 @@ export default function TournamentStatsSection({ games, eligibility }: Props) {
                 const { name, tag } = parseRiotName(p.riotId);
                 const kd = playerKd(p);
                 const agentIcon = getAgentIconUrl(p.mostPlayedAgent);
-                const { rowBgClass, mvpBadgeClass, nameColorClass, rankClass } =
-                  rowStyles(idx, p.mvpCount);
+                const { mvpBadgeClass, nameColorClass } = rowStyles(
+                  idx,
+                  p.mvpCount,
+                );
                 const topAgents = Object.entries(p.agentCounts).sort(
                   (a, b) => b[1] - a[1],
                 );
-                const isMvp = p.mvpCount > 0;
-                const cardSurface = isMvp
-                  ? `${rowBgClass.replace("border-b ", "")} border-white/10`
-                  : idx < 3
+                const cardSurface =
+                  idx < 3
                     ? "border-emerald-400/20 bg-[#0b1420] shadow-[inset_0_1px_0_rgba(52,211,153,0.12)]"
                     : "border-white/[0.08] bg-[#0a0f18]";
 
@@ -340,15 +332,13 @@ export default function TournamentStatsSection({ games, eligibility }: Props) {
                     <div className="flex items-center gap-3">
                       <span
                         className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border font-mono text-sm font-black tabular-nums ${
-                          isMvp
-                            ? `border-amber-300/35 bg-amber-400/15 ${rankClass}`
-                            : idx === 0
-                              ? "border-yellow-400/35 bg-yellow-400/10 text-yellow-300"
-                              : idx === 1
-                                ? "border-white/20 bg-white/10 text-white/85"
-                                : idx === 2
-                                  ? "border-amber-600/35 bg-amber-700/15 text-amber-400"
-                                  : "border-white/10 bg-white/[0.04] text-white/55"
+                          idx === 0
+                            ? "border-yellow-400/35 bg-yellow-400/10 text-yellow-300"
+                            : idx === 1
+                              ? "border-white/20 bg-white/10 text-white/85"
+                              : idx === 2
+                                ? "border-amber-600/35 bg-amber-700/15 text-amber-400"
+                                : "border-white/10 bg-white/[0.04] text-white/55"
                         }`}
                       >
                         {idx + 1}
@@ -371,7 +361,7 @@ export default function TournamentStatsSection({ games, eligibility }: Props) {
                           <span className={`truncate text-[15px] ${nameColorClass}`}>
                             {name}
                           </span>
-                          {isMvp ? (
+                          {p.mvpCount > 0 ? (
                             <span className={`shrink-0 ${mvpBadgeClass}`}>
                               👑 {p.mvpCount}x MVP
                             </span>
@@ -385,7 +375,7 @@ export default function TournamentStatsSection({ games, eligibility }: Props) {
                       </div>
                     </div>
 
-                    <div className="mt-4 grid grid-cols-4 gap-1.5 rounded-xl border border-white/[0.07] bg-black/40 p-3 text-center">
+                    <div className="mt-4 grid grid-cols-3 gap-1.5 rounded-xl border border-white/[0.07] bg-black/40 p-3 text-center sm:grid-cols-6">
                       <div>
                         <p className="text-[9px] font-black tracking-wider text-white/40 uppercase">
                           ACS
@@ -412,6 +402,22 @@ export default function TournamentStatsSection({ games, eligibility }: Props) {
                         </p>
                         <p className="mt-1 font-mono text-sm font-black text-white/85">
                           {p.gamesPlayed}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-[9px] font-black tracking-wider text-white/40 uppercase">
+                          FK
+                        </p>
+                        <p className="mt-1 font-mono text-sm font-black text-cyan-300">
+                          {p.totalFirstKills}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-[9px] font-black tracking-wider text-white/40 uppercase">
+                          FD
+                        </p>
+                        <p className="mt-1 font-mono text-sm font-black text-orange-300/90">
+                          {p.totalFirstDeaths}
                         </p>
                       </div>
                       <div>
@@ -474,7 +480,7 @@ export default function TournamentStatsSection({ games, eligibility }: Props) {
 
           {/* ── Desktop table ── */}
           <div className="hidden overflow-x-auto rounded-2xl border border-white/10 bg-[#080d16] shadow-2xl md:block">
-            <table className="w-full min-w-[720px] text-sm sm:text-base">
+            <table className="w-full min-w-[820px] text-sm sm:text-base">
               <thead>
                 <tr className="border-b border-white/10 bg-black/50 text-xs font-black tracking-wider text-white/60 uppercase">
                   <th className="w-12 px-4 py-4 text-left">#</th>
@@ -505,6 +511,20 @@ export default function TournamentStatsSection({ games, eligibility }: Props) {
                     onClick={() => toggleSort("kd")}
                   >
                     K/D{sortIcon("kd")}
+                  </th>
+                  <th
+                    className="cursor-pointer px-3 py-4 text-center select-none transition-colors hover:text-white"
+                    title="First kills"
+                    onClick={() => toggleSort("totalFirstKills")}
+                  >
+                    FK{sortIcon("totalFirstKills")}
+                  </th>
+                  <th
+                    className="cursor-pointer px-3 py-4 text-center select-none transition-colors hover:text-white"
+                    title="First deaths"
+                    onClick={() => toggleSort("totalFirstDeaths")}
+                  >
+                    FD{sortIcon("totalFirstDeaths")}
                   </th>
                   <th
                     className="cursor-pointer px-3 py-4 text-center select-none transition-colors hover:text-white"
@@ -602,6 +622,12 @@ export default function TournamentStatsSection({ games, eligibility }: Props) {
                             {kd}
                           </span>
                         </td>
+                        <td className="px-3 py-4 text-center font-mono text-sm font-bold text-cyan-300">
+                          {p.totalFirstKills}
+                        </td>
+                        <td className="px-3 py-4 text-center font-mono text-sm font-bold text-orange-300/90">
+                          {p.totalFirstDeaths}
+                        </td>
                         <td className="px-3 py-4 text-center font-mono text-sm font-medium text-white/90">
                           {p.avgHsPercent}%
                         </td>
@@ -637,7 +663,7 @@ export default function TournamentStatsSection({ games, eligibility }: Props) {
                 ) : (
                   <tr>
                     <td
-                      colSpan={8}
+                      colSpan={10}
                       className="px-5 py-10 text-center text-white/40 italic"
                     >
                       {searchQuery

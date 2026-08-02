@@ -19,6 +19,8 @@ export type PublicGamePlayer = {
   acs: number;
   adr: number;
   hsPercent: number;
+  firstKills?: number;
+  firstDeaths?: number;
   rankTier: string | null;
   teamId: string | null;
 };
@@ -47,7 +49,7 @@ type Props = {
   initialGames?: PublicGame[];
 };
 
-type SortField = "acs" | "kills" | "kd" | "adr" | "hsPercent";
+type SortField = "acs" | "kills" | "kd" | "adr" | "hsPercent" | "firstKills" | "firstDeaths";
 
 function formatDuration(sec: number | null): string {
   if (!sec || sec <= 0) return "";
@@ -176,6 +178,14 @@ export default function TournamentGamesSection({ slug, initialGames }: Props) {
         case "hsPercent":
           valA = a.hsPercent;
           valB = b.hsPercent;
+          break;
+        case "firstKills":
+          valA = a.firstKills ?? 0;
+          valB = b.firstKills ?? 0;
+          break;
+        case "firstDeaths":
+          valA = a.firstDeaths ?? 0;
+          valB = b.firstDeaths ?? 0;
           break;
       }
       return sortAsc ? valA - valB : valB - valA;
@@ -428,7 +438,7 @@ export default function TournamentGamesSection({ slug, initialGames }: Props) {
 
                           {/* Table Header & Rows */}
                           <div className="overflow-x-auto">
-                            <table className="w-full min-w-[640px] text-left border-collapse">
+                            <table className="w-full min-w-[720px] text-left border-collapse">
                               <thead>
                                 <tr className="border-b border-white/[0.08] bg-[#0c1421]/90 text-[10px] font-black uppercase tracking-[0.14em] text-white/40">
                                   <th className="py-3 px-4 w-[280px]">Player</th>
@@ -453,6 +463,20 @@ export default function TournamentGamesSection({ slug, initialGames }: Props) {
                                     onClick={() => handleSortHeaderClick("kd")}
                                   >
                                     K/D {sortField === "kd" ? (sortAsc ? "▲" : "▼") : ""}
+                                  </th>
+                                  <th
+                                    className="py-3 px-2 text-center cursor-pointer hover:text-white transition-colors w-[65px]"
+                                    onClick={() => handleSortHeaderClick("firstKills")}
+                                    title="First kills"
+                                  >
+                                    FK {sortField === "firstKills" ? (sortAsc ? "▲" : "▼") : ""}
+                                  </th>
+                                  <th
+                                    className="py-3 px-2 text-center cursor-pointer hover:text-white transition-colors w-[65px]"
+                                    onClick={() => handleSortHeaderClick("firstDeaths")}
+                                    title="First deaths"
+                                  >
+                                    FD {sortField === "firstDeaths" ? (sortAsc ? "▲" : "▼") : ""}
                                   </th>
                                   <th
                                     className="py-3 px-2 text-center cursor-pointer hover:text-white transition-colors w-[85px]"
@@ -542,6 +566,14 @@ export default function TournamentGamesSection({ slug, initialGames }: Props) {
                                         </span>
                                       </td>
 
+                                      <td className="py-2.5 px-2 text-center align-middle font-mono text-sm font-bold text-cyan-300">
+                                        {p.firstKills ?? 0}
+                                      </td>
+
+                                      <td className="py-2.5 px-2 text-center align-middle font-mono text-sm font-bold text-orange-300/90">
+                                        {p.firstDeaths ?? 0}
+                                      </td>
+
                                       <td className="py-2.5 px-2 text-center align-middle font-mono text-sm text-white/80">
                                         {p.adr.toFixed(1)}
                                       </td>
@@ -555,7 +587,7 @@ export default function TournamentGamesSection({ slug, initialGames }: Props) {
 
                                 {team.players.length === 0 ? (
                                   <tr>
-                                    <td colSpan={8} className="px-4 py-6 text-center text-sm text-white/35">
+                                    <td colSpan={10} className="px-4 py-6 text-center text-sm text-white/35">
                                       No player records mapped for this team.
                                     </td>
                                   </tr>

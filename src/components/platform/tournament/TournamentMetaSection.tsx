@@ -286,9 +286,15 @@ export default function TournamentMetaSection({ games, eligibility }: Props) {
     roleStandouts: false,
     agentMasters: false,
   });
+  /** Team cards inside Team Map Performance — closed by default. */
+  const [openTeamIds, setOpenTeamIds] = useState<Record<string, boolean>>({});
 
   const toggleSection = (key: MetaSectionKey) => {
     setOpenSections((prev) => ({ ...prev, [key]: !prev[key] }));
+  };
+
+  const toggleTeam = (teamId: string) => {
+    setOpenTeamIds((prev) => ({ ...prev, [teamId]: !prev[teamId] }));
   };
 
   const teamMaps = useMemo(() => aggregateTeamMapStats(games), [games]);
@@ -349,24 +355,30 @@ export default function TournamentMetaSection({ games, eligibility }: Props) {
         {teamMaps.length === 0 ? (
           <p className="text-sm text-white/40">No team map data available yet.</p>
         ) : (
-          <div className="space-y-6">
+          <div className="space-y-3">
             {teamMaps.map((team) => {
               const totalTeamWins = team.maps.reduce((acc, m) => acc + m.wins, 0);
               const overallWinRate =
                 team.totalMaps > 0 ? Math.round((totalTeamWins / team.totalMaps) * 100) : 0;
+              const teamOpen = openTeamIds[team.teamId] === true;
 
               return (
                 <div
                   key={team.teamId}
-                  className="overflow-hidden rounded-2xl border border-white/10 bg-[#060b13]/90 shadow-2xl backdrop-blur-md transition-all"
+                  className="overflow-hidden rounded-2xl border border-white/10 bg-[#060b13]/90 shadow-2xl backdrop-blur-md"
                 >
-                  <div className="flex flex-wrap items-center justify-between gap-3 border-b border-white/10 bg-white/[0.03] px-5 py-4 sm:px-6">
-                    <div className="flex items-center gap-3">
-                      <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-emerald-500/15 font-display text-sm font-black text-emerald-300 ring-1 ring-emerald-500/30">
+                  <button
+                    type="button"
+                    onClick={() => toggleTeam(team.teamId)}
+                    aria-expanded={teamOpen}
+                    className="flex w-full flex-wrap items-center justify-between gap-3 border-b border-white/10 bg-white/[0.03] px-4 py-4 text-left transition-colors hover:bg-white/[0.05] sm:px-6"
+                  >
+                    <div className="flex min-w-0 items-center gap-3">
+                      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-emerald-500/15 font-display text-sm font-black text-emerald-300 ring-1 ring-emerald-500/30">
                         {team.teamName.slice(0, 2).toUpperCase()}
                       </div>
-                      <div>
-                        <h4 className="font-display text-lg font-bold tracking-tight text-white">
+                      <div className="min-w-0">
+                        <h4 className="truncate font-display text-lg font-bold tracking-tight text-white">
                           {team.teamName}
                         </h4>
                         <p className="font-mono text-[11px] text-white/40">
@@ -375,7 +387,7 @@ export default function TournamentMetaSection({ games, eligibility }: Props) {
                       </div>
                     </div>
 
-                    <div className="flex items-center gap-2">
+                    <div className="flex flex-wrap items-center gap-2">
                       <span className="rounded-full bg-white/5 px-3 py-1 font-mono text-xs font-medium text-white/60 ring-1 ring-white/10">
                         Map Record:{" "}
                         <span className="font-bold text-white">
@@ -393,9 +405,24 @@ export default function TournamentMetaSection({ games, eligibility }: Props) {
                       >
                         {overallWinRate}% Win Rate
                       </span>
+                      <span
+                        className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-white/10 bg-black/30 text-white/60 transition-transform duration-200 ${
+                          teamOpen ? "rotate-180" : ""
+                        }`}
+                        aria-hidden
+                      >
+                        <svg viewBox="0 0 20 20" fill="currentColor" className="h-4 w-4">
+                          <path
+                            fillRule="evenodd"
+                            d="M5.23 7.21a.75.75 0 011.06.02L10 11.17l3.71-3.94a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z"
+                            clipRule="evenodd"
+                          />
+                        </svg>
+                      </span>
                     </div>
-                  </div>
+                  </button>
 
+                  {teamOpen ? (
                   <div className="grid gap-4 p-4 sm:p-6 md:grid-cols-2 xl:grid-cols-3">
                     {team.maps.map((m) => {
                       const mapSplash = getValorantMapSplashUrl(m.mapName);
@@ -473,6 +500,7 @@ export default function TournamentMetaSection({ games, eligibility }: Props) {
                       );
                     })}
                   </div>
+                  ) : null}
                 </div>
               );
             })}
@@ -485,7 +513,7 @@ export default function TournamentMetaSection({ games, eligibility }: Props) {
         open={openSections.roleStandouts}
         onToggle={() => toggleSection("roleStandouts")}
         accentDotClass="bg-amber-400 animate-pulse"
-        title="Role Standouts"
+        title="Best Players by Roles"
         description="Ranked by ACS balanced with games played — small samples are tempered"
       >
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
@@ -503,7 +531,7 @@ export default function TournamentMetaSection({ games, eligibility }: Props) {
         open={openSections.agentMasters}
         onToggle={() => toggleSection("agentMasters")}
         accentDotClass="bg-cyan-400 animate-pulse"
-        title="Agent Masters"
+        title="Best Players by Agents"
         description="Top performer per agent — ACS balanced with games on that agent"
         headerExtra={agentRoleFilters}
       >

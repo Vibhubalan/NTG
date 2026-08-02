@@ -14,6 +14,8 @@ export type StatsGamePlayer = {
   acs: number;
   adr: number;
   hsPercent: number;
+  firstKills?: number;
+  firstDeaths?: number;
 };
 
 export type StatsGame = {
@@ -66,11 +68,15 @@ export type AggregatedPlayerStats = {
   totalKills: number;
   totalDeaths: number;
   totalAssists: number;
+  totalFirstKills: number;
+  totalFirstDeaths: number;
   avgAcs: number;
   avgAdr: number;
   avgHsPercent: number;
   mostPlayedAgent: string | null;
   agentCounts: Record<string, number>;
+  /** Cup team names this player appeared for (for search). */
+  teamNames: string[];
   mvpCount: number;
 };
 
@@ -145,10 +151,13 @@ export function aggregatePlayerStats(
       kills: number;
       deaths: number;
       assists: number;
+      firstKills: number;
+      firstDeaths: number;
       acsSum: number;
       adrSum: number;
       hsSum: number;
       agentCounts: Record<string, number>;
+      teamNames: Set<string>;
       games: number;
       mvpCount: number;
     }
@@ -169,6 +178,11 @@ export function aggregatePlayerStats(
       }
     }
 
+    const teamNameById = new Map<string, string>([
+      [game.teamAId, game.teamAName],
+      [game.teamBId, game.teamBName],
+    ]);
+
     for (const p of game.players) {
       if (!p.agent) continue;
       if (opts?.agentRoleFilter && !opts.agentRoleFilter(p.agent)) continue;
@@ -183,10 +197,13 @@ export function aggregatePlayerStats(
           kills: 0,
           deaths: 0,
           assists: 0,
+          firstKills: 0,
+          firstDeaths: 0,
           acsSum: 0,
           adrSum: 0,
           hsSum: 0,
           agentCounts: {},
+          teamNames: new Set(),
           games: 0,
           mvpCount: 0,
         };
@@ -197,11 +214,17 @@ export function aggregatePlayerStats(
       entry.kills += p.kills;
       entry.deaths += p.deaths;
       entry.assists += p.assists;
+      entry.firstKills += p.firstKills ?? 0;
+      entry.firstDeaths += p.firstDeaths ?? 0;
       entry.acsSum += p.acs;
       entry.adrSum += p.adr;
       entry.hsSum += p.hsPercent;
       entry.games += 1;
       entry.agentCounts[p.agent] = (entry.agentCounts[p.agent] ?? 0) + 1;
+      if (p.teamId) {
+        const teamName = teamNameById.get(p.teamId);
+        if (teamName) entry.teamNames.add(teamName);
+      }
 
       if (gameMvpKey && key === gameMvpKey) {
         entry.mvpCount += 1;
@@ -222,11 +245,14 @@ export function aggregatePlayerStats(
       totalKills: e.kills,
       totalDeaths: e.deaths,
       totalAssists: e.assists,
+      totalFirstKills: e.firstKills,
+      totalFirstDeaths: e.firstDeaths,
       avgAcs: g > 0 ? Math.round(e.acsSum / g) : 0,
       avgAdr: g > 0 ? Math.round((e.adrSum / g) * 10) / 10 : 0,
       avgHsPercent: g > 0 ? Math.round((e.hsSum / g) * 10) / 10 : 0,
       mostPlayedAgent,
       agentCounts: e.agentCounts,
+      teamNames: [...e.teamNames].sort((a, b) => a.localeCompare(b)),
       mvpCount: e.mvpCount,
     });
   }

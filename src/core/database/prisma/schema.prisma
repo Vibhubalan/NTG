@@ -506,6 +506,10 @@ model TournamentGamePlayer {
   headshots    Int                @default(0)
   bodyshots    Int                @default(0)
   legshots     Int                @default(0)
+  /** First kill of a round (derived from Henrik kill timeline). */
+  firstKills   Int                @default(0)
+  /** Died on the first kill of a round. */
+  firstDeaths  Int                @default(0)
 
   @@index([gameId])
   @@index([puuid])
