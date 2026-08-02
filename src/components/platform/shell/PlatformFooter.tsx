@@ -12,10 +12,10 @@ export default function PlatformFooter() {
             Back to lounge
           </Link>
           <Link href="/esports/tournaments" className="text-white/45 transition-colors hover:text-white">
-            Cups
+            Tournaments
           </Link>
           <Link href="/esports/leaderboard" className="text-white/45 transition-colors hover:text-white">
-            Rankings
+            Leaderboards
           </Link>
           <Link href="/privacy" className="text-white/45 transition-colors hover:text-white">
             Privacy

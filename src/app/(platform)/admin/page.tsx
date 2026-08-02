@@ -1,9 +1,7 @@
 import Link from "next/link";
 import AdminLeaderboardSyncPanel from "@/components/admin/AdminLeaderboardSyncPanel";
-import AdminTimeLimitedQaPanel from "@/components/admin/AdminTimeLimitedQaPanel";
 import { isSuperAdminEmail } from "@/lib/superadmin";
 import { getSession } from "@core/auth/session";
-import { isTimeLimitedQaEnabled } from "@time-limited-qa/index";
 import { listTournamentsAdmin } from "@tournaments-leagues/index";
 import { prisma } from "@core/database/client";
 import { serverEnv } from "@core/config/env.server";
@@ -15,7 +13,7 @@ export const dynamic = "force-dynamic";
 const quickLinks = [
   {
     href: "/admin/tournaments",
-    title: "Cups",
+    title: "Tournaments",
     desc: "Create & configure tournaments, prizes, media, registrations, and teams.",
     color: "amber",
     icon: (
@@ -63,7 +61,6 @@ const colorMap: Record<string, { hover: string; arrow: string; icon: string }> =
 export default async function AdminDashboardPage() {
   const session = await getSession();
   const isSuperAdmin = isSuperAdminEmail(session?.user?.email);
-  const qaEnabled = isSuperAdmin ? await isTimeLimitedQaEnabled() : false;
   const tournaments = serverEnv.databaseUrl ? await listTournamentsAdmin() : [];
   const memberCount = serverEnv.databaseUrl
     ? await prisma.user.count({ where: { signupCompleted: true } })
@@ -95,7 +92,7 @@ export default async function AdminDashboardPage() {
               <div>
                 <p className="text-[10px] font-bold uppercase tracking-widest text-emerald-400/90">Live Registration Open</p>
                 <p className="mt-0.5 font-semibold text-white text-lg">{openCup.name}</p>
-                <p className="text-xs text-white/45">Visible on the primary Esports Hub cards</p>
+                <p className="text-xs text-white/45">Visible on the Tournaments page</p>
               </div>
             </div>
             <Link
@@ -114,7 +111,7 @@ export default async function AdminDashboardPage() {
           <div className="flex justify-between items-start">
             <div>
               <p className="text-3xl font-extrabold text-white tracking-tight">{tournaments.length}</p>
-              <p className="mt-1 text-xs font-medium text-white/40 uppercase tracking-wider">Total Cups</p>
+              <p className="mt-1 text-xs font-medium text-white/40 uppercase tracking-wider">Total Tournaments</p>
             </div>
             <div className="rounded-xl bg-amber-500/10 p-2.5 text-amber-400 group-hover:scale-110 transition-transform duration-300">
               <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
@@ -190,8 +187,6 @@ export default async function AdminDashboardPage() {
 
       {/* Leaderboard Sync */}
       <AdminLeaderboardSyncPanel showCronStatus={isSuperAdmin} />
-
-      {isSuperAdmin ? <AdminTimeLimitedQaPanel initialEnabled={qaEnabled} /> : null}
     </div>
   );
 }

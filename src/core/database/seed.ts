@@ -137,61 +137,6 @@ async function seedTournamentsDevOnly(): Promise<void> {
   }
 }
 
-async function seedGalleryDevOnly(): Promise<void> {
-  const igSource = await prisma.gallerySource.upsert({
-    where: { platform_handle: { platform: "instagram", handle: "ntg_lounge" } },
-    create: { platform: "instagram", handle: "ntg_lounge", active: true },
-    update: { active: true },
-  });
-
-  await prisma.gallerySource.upsert({
-    where: { platform_handle: { platform: "youtube", handle: "ntg_lounge" } },
-    create: { platform: "youtube", handle: "ntg_lounge", active: false },
-    update: { active: false },
-  });
-
-  const galleryItems = [
-    {
-      sourceId: igSource.id,
-      externalId: "ig-1",
-      mediaType: "image",
-      embedUrl: "https://www.instagram.com/ntg_lounge/",
-      thumbnailUrl:
-        "https://images.unsplash.com/photo-1542751371-adc38448a05e?w=600&h=600&fit=crop",
-      caption: "VAL CUP I finals night at NTG Lounge",
-      pinned: true,
-    },
-    {
-      sourceId: igSource.id,
-      externalId: "ig-2",
-      mediaType: "image",
-      embedUrl: "https://www.instagram.com/ntg_lounge/",
-      thumbnailUrl:
-        "https://images.unsplash.com/photo-1511512578047-dfb367046420?w=600&h=600&fit=crop",
-      caption: "300Hz arena · Mangaluru",
-      pinned: false,
-    },
-    {
-      sourceId: igSource.id,
-      externalId: "ig-3",
-      mediaType: "reel",
-      embedUrl: "https://www.instagram.com/ntg_lounge/",
-      thumbnailUrl:
-        "https://images.unsplash.com/photo-1493711662062-fa541adb3fc8?w=600&h=600&fit=crop",
-      caption: "CS CUP I — coastal champions",
-      pinned: false,
-    },
-  ];
-
-  for (const item of galleryItems) {
-    await prisma.galleryItem.upsert({
-      where: { sourceId_externalId: { sourceId: item.sourceId, externalId: item.externalId } },
-      create: { ...item, publishedAt: new Date() },
-      update: { ...item, publishedAt: new Date() },
-    });
-  }
-}
-
 async function seedMockLeaderboardDevOnly(): Promise<void> {
   const mockPlayers = [
     {
@@ -354,9 +299,8 @@ async function main() {
   }
 
   await seedTournamentsDevOnly();
-  await seedGalleryDevOnly();
   await seedMockLeaderboardDevOnly();
-  console.log(`Seeded ${tournaments.length} tournaments, gallery, and mock leaderboard.`);
+  console.log(`Seeded ${tournaments.length} tournaments and mock leaderboard.`);
 }
 
 main()

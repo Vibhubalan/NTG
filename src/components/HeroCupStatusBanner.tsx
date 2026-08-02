@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import type { HeroCupPhase } from "@tournaments-leagues/domain/auction-hero-phase";
+import { prefetchTournamentCupApis } from "@/lib/prefetch-tournament-cup";
 
 export type HeroCupStatusClient = {
   slug: string;
@@ -11,7 +12,7 @@ export type HeroCupStatusClient = {
   countdownEndsAt: string | null;
 };
 
-function Countdown({ endsAt, prefix }: { endsAt: string; prefix?: string }) {
+function Countdown({ endsAt }: { endsAt: string }) {
   const [timeLeft, setTimeLeft] = useState<string>("");
 
   useEffect(() => {
@@ -20,7 +21,7 @@ function Countdown({ endsAt, prefix }: { endsAt: string; prefix?: string }) {
     function update() {
       const diff = target - Date.now();
       if (diff <= 0) {
-        setTimeLeft("Soon");
+        setTimeLeft("");
         return;
       }
 
@@ -34,7 +35,6 @@ function Countdown({ endsAt, prefix }: { endsAt: string; prefix?: string }) {
       if (hours > 0 || days > 0) parts.push(`${hours}h`);
       parts.push(`${minutes}m`);
       parts.push(`${seconds}s`);
-
       setTimeLeft(parts.join(" "));
     }
 
@@ -44,77 +44,26 @@ function Countdown({ endsAt, prefix }: { endsAt: string; prefix?: string }) {
   }, [endsAt]);
 
   if (!timeLeft) return null;
-
-  return (
-    <span className="font-mono text-[inherit] opacity-90 whitespace-nowrap">
-      {prefix ? `${prefix} ` : ""}({timeLeft})
-    </span>
-  );
+  return <span className="font-mono text-[10px] text-white/55 sm:text-[11px]">{timeLeft}</span>;
 }
 
-const phaseStyles: Record<
-  HeroCupPhase,
-  { border: string; bg: string; text: string; pulse?: boolean }
-> = {
-  registration_open: {
-    border: "border-[var(--color-brand)]/30",
-    bg: "bg-[var(--color-brand)]/[0.08]",
-    text: "text-[var(--color-brand)]",
-    pulse: true,
-  },
-  auction_soon: {
-    border: "border-[var(--color-magenta)]/30",
-    bg: "bg-[var(--color-magenta)]/[0.08]",
-    text: "text-[var(--color-magenta)]",
-    pulse: true,
-  },
-  auction_live: {
-    border: "border-[var(--color-magenta)]/30",
-    bg: "bg-[var(--color-magenta)]/[0.08]",
-    text: "text-[var(--color-magenta)]",
-    pulse: true,
-  },
-  awaiting_tournament: {
-    border: "border-cyan-400/30",
-    bg: "bg-cyan-500/[0.08]",
-    text: "text-cyan-200",
-  },
-  tournament_live: {
-    border: "border-emerald-400/30",
-    bg: "bg-emerald-500/[0.08]",
-    text: "text-emerald-200",
-    pulse: true,
-  },
-};
-
-function phaseLabel(cup: HeroCupStatusClient): string {
+function labelFor(cup: HeroCupStatusClient): string {
   switch (cup.phase) {
     case "registration_open":
-      return `Registration open: ${cup.name}`;
+      return `Click here to register for ${cup.name}`;
     case "auction_soon":
-      return `Auction opens soon: ${cup.name}`;
+      return `Click here to see when the ${cup.name} auction starts`;
     case "auction_live":
-      return `Auction is live: ${cup.name}`;
+      return `Click here to join the ${cup.name} auction`;
     case "awaiting_tournament":
-      return `Auction completed — ${cup.name}`;
+      return `Click here to see when ${cup.name} starts`;
     case "tournament_live":
-      return `Tournament is live: ${cup.name}`;
+      return `Click here to check the status of ${cup.name}`;
   }
 }
 
-function countdownPrefix(cup: HeroCupStatusClient): string | undefined {
-  switch (cup.phase) {
-    case "registration_open":
-      return "Closes in";
-    case "auction_soon":
-      return "Opens in";
-    case "auction_live":
-      return "Ends in";
-    case "awaiting_tournament":
-      return "Tournament starts in";
-    case "tournament_live":
-      return undefined;
-  }
+function showCountdown(phase: HeroCupPhase) {
+  return phase !== "tournament_live";
 }
 
 export default function HeroCupStatusBanner({
@@ -124,28 +73,39 @@ export default function HeroCupStatusBanner({
   cup: HeroCupStatusClient;
   auctionHref?: string | null;
 }) {
-  const style = phaseStyles[cup.phase];
   const href = auctionHref ?? `/esports/tournaments/${cup.slug}`;
+  const label = labelFor(cup);
 
   return (
     <Link
       href={href}
       target={auctionHref ? "_blank" : undefined}
       rel={auctionHref ? "noopener noreferrer" : undefined}
-      className={`group relative inline-flex max-w-full flex-row items-center gap-1.5 rounded-full border px-3 py-1 text-[8px] font-semibold uppercase tracking-[0.08em] transition-all hover:scale-[1.02] sm:px-6 sm:py-2.5 sm:text-xs sm:gap-2.5 sm:tracking-[0.18em] ${style.border} ${style.bg} ${style.text} hover:brightness-110 shadow-[0_0_20px_-5px_rgba(124,58,237,0.15)]`}
+      aria-label={label}
+      onMouseEnter={() => {
+        if (!auctionHref) prefetchTournamentCupApis(cup.slug);
+      }}
+      onFocus={() => {
+        if (!auctionHref) prefetchTournamentCupApis(cup.slug);
+      }}
+      className="glass group inline-flex max-w-[min(100%,22rem)] cursor-pointer items-center gap-2 rounded-full px-4 py-2 text-[11px] font-medium text-white/80 transition-colors hover:border-[var(--color-brand)]/30 hover:text-white sm:max-w-none sm:gap-2.5 sm:px-5 sm:py-2.5 sm:text-[13px]"
     >
-      <span className="inline-flex items-center gap-2">
-        {style.pulse ? (
-          <span className="relative flex h-1.5 w-1.5 sm:h-2.5 sm:w-2.5 shrink-0">
-            <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-red-500 opacity-75" />
-            <span className="relative inline-flex h-1.5 w-1.5 sm:h-2.5 sm:w-2.5 rounded-full bg-red-500 shadow-[0_0_8px_#ef4444]" />
-          </span>
-        ) : null}
-        <span className="text-center sm:text-left">{phaseLabel(cup)}</span>
+      <span className="relative flex h-1.5 w-1.5 shrink-0">
+        <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-[var(--color-brand)] opacity-60" />
+        <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-[var(--color-brand)]" />
       </span>
-      {cup.countdownEndsAt && cup.phase !== "tournament_live" ? (
-        <Countdown endsAt={cup.countdownEndsAt} prefix={countdownPrefix(cup)} />
+      <span className="min-w-0 truncate text-left leading-snug">
+        {label}
+      </span>
+      {cup.countdownEndsAt && showCountdown(cup.phase) ? (
+        <Countdown endsAt={cup.countdownEndsAt} />
       ) : null}
+      <span
+        aria-hidden
+        className="shrink-0 text-white/40 transition-transform group-hover:translate-x-0.5 group-hover:text-[var(--color-brand)]"
+      >
+        →
+      </span>
     </Link>
   );
 }

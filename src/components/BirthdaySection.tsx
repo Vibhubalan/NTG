@@ -121,7 +121,7 @@ export default function BirthdaySection() {
       {/* Tabs Selector Switcher */}
       <div className="flex flex-col items-center mb-16">
         <span className="text-[10px] font-semibold uppercase tracking-[0.4em] text-[var(--color-brand)]/80 mb-6">
-          06 · Host at NTG
+          05 · Host at NTG
         </span>
         <div className="inline-flex rounded-full border border-white/10 bg-white/[0.02] p-1.5 backdrop-blur-md">
           {(["events", "sponsors", "birthday"] as HostTabId[]).map((tabId) => {

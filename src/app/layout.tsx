@@ -3,8 +3,6 @@ import { Space_Grotesk, Inter } from "next/font/google";
 import Navbar from "@/components/Navbar";
 import AuthSessionProvider from "@/components/providers/SessionProvider";
 import RouteProgressBar from "@/components/providers/RouteProgressBar";
-import { getSession } from "@core/auth/session";
-import CustomCursor from "@/components/CustomCursor";
 import { SITE_DESCRIPTION, SITE_NAME, SITE_TITLE, resolveSiteUrl } from "@/lib/site";
 import "./globals.css";
 
@@ -63,8 +61,8 @@ export default async function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  const session = await getSession();
-
+  // Do not await getSession() here — it forces every page dynamic and kills caching/ISR.
+  // Navbar uses useSession() client-side; SessionProvider hydrates without a server session.
   return (
     <html
       lang="en"
@@ -78,10 +76,9 @@ export default async function RootLayout({
         >
           Skip to content
         </a>
-        <AuthSessionProvider session={session}>
+        <AuthSessionProvider>
           <RouteProgressBar />
           <Navbar />
-          <CustomCursor />
           {children}
         </AuthSessionProvider>
       </body>

@@ -5,6 +5,7 @@ import Link from "next/link";
 import BrandIcon from "@/components/ui/BrandIcon";
 import StatusBadge from "@/components/platform/ui/StatusBadge";
 import { allowPastTournamentClicks } from "@/lib/env";
+import { prefetchTournamentCupApis } from "@/lib/prefetch-tournament-cup";
 import { toTournamentDisplay } from "@/lib/tournament-display";
 import type { TournamentPreview } from "@core/contracts";
 
@@ -98,6 +99,8 @@ export default function TournamentListFiltered({ tournaments }: Props) {
             ) : (
               <Link
                 href={`/esports/tournaments/${t.slug}`}
+                onMouseEnter={() => prefetchTournamentCupApis(t.slug)}
+                onFocus={() => prefetchTournamentCupApis(t.slug)}
                 className="group relative flex flex-col gap-5 overflow-hidden rounded-[1.25rem] border border-white/[0.06] bg-white/[0.02] p-5 transition-all duration-400 hover:border-white/14 hover:bg-white/[0.035] sm:flex-row sm:items-center sm:justify-between sm:p-6"
                 style={{ ["--cup" as string]: t.hex }}
               >

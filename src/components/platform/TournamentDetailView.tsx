@@ -2,7 +2,7 @@
 
 import dynamic from "next/dynamic";
 import Image from "next/image";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import BrandIcon from "@/components/ui/BrandIcon";
 import StatusBadge from "@/components/platform/ui/StatusBadge";
 import TournamentBracketEmpty from "@/components/platform/tournament/TournamentBracketEmpty";
@@ -17,6 +17,10 @@ import type { TournamentStatsEligibility } from "@/lib/tournament-stats";
 import TournamentStatsSection from "@/components/platform/tournament/TournamentStatsSection";
 import { resolveChampion } from "@/lib/tournament-champion";
 import { gameMetaFor, formatRegistrationLabel, buildTournamentScheduleCardView } from "@/lib/tournament-display";
+import {
+  loadTournamentBrackets,
+  loadTournamentGames,
+} from "@/lib/prefetch-tournament-cup";
 import type { RegistrationPreview } from "./TournamentRegisterForm";
 import type { TournamentDetail } from "@core/contracts";
 import type { ValorantRegistrationProfileCard } from "@core/contracts/registration-profile";
@@ -53,7 +57,7 @@ type Props = {
 
 export default function TournamentDetailView({
   tournament,
-  brackets,
+  brackets: initialBrackets,
   isLoggedIn,
   registrationPreview,
   registrationProfileCard,
@@ -61,11 +65,18 @@ export default function TournamentDetailView({
   auctionEnded,
   showMatchesTab: showMatchesTabProp,
   publishedGames,
-  statsEligibility,
+  statsEligibility: initialStatsEligibility,
 }: Props) {
   const [activeTab, setActiveTab] = useState<"overview" | "brackets" | "matches" | "stats">("overview");
   const [activeStageIndex, setActiveStageIndex] = useState<number>(0);
   const [generatedFallback, setGeneratedFallback] = useState<TournamentBracketView | null>(null);
+  const [brackets, setBrackets] = useState(initialBrackets);
+  const [bracketsLoading, setBracketsLoading] = useState(false);
+  const bracketsFetchStarted = useRef(false);
+  const [statsGames, setStatsGames] = useState<PublicGame[] | undefined>(publishedGames);
+  const [statsEligibility, setStatsEligibility] = useState(initialStatsEligibility);
+  const [statsLoading, setStatsLoading] = useState(false);
+  const statsFetchStarted = useRef(false);
   const showMatchesTab = showMatchesTabProp ?? tournament.yourGamesEnabled ?? true;
   const meta = gameMetaFor(tournament.game);
   const dateStr = tournament.startsAt
@@ -152,8 +163,43 @@ export default function TournamentDetailView({
 
   const posterSrc = tournament.posterUrl ?? "/images/tournament_poster.png";
 
+  // Warm the heavy bracket UI chunk while the user is still on Overview.
   useEffect(() => {
-    if (activeTab !== "brackets" || brackets.length > 0) return;
+    void import("@/components/platform/tournament/TournamentBracket");
+  }, []);
+
+  useEffect(() => {
+    if (bracketsFetchStarted.current) return;
+    if (initialBrackets.length === 0) return;
+    if (initialBrackets.some((b) => b.bracket != null)) {
+      bracketsFetchStarted.current = true;
+      return;
+    }
+
+    bracketsFetchStarted.current = true;
+    let cancelled = false;
+    let finished = false;
+    setBracketsLoading(true);
+    // Reuses list/hero hover prefetch when that request is already in flight.
+    void loadTournamentBrackets(tournament.slug)
+      .then((data) => {
+        if (cancelled || !data?.brackets) return;
+        finished = true;
+        setBrackets(data.brackets);
+      })
+      .finally(() => {
+        if (!cancelled) setBracketsLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+      if (!finished) bracketsFetchStarted.current = false;
+    };
+  }, [initialBrackets, tournament.slug]);
+
+  useEffect(() => {
+    if (bracketsLoading) return;
+    if (brackets.some((b) => b.bracket)) return;
     if (!tournament.teams.length) return;
 
     let cancelled = false;
@@ -173,7 +219,33 @@ export default function TournamentDetailView({
     return () => {
       cancelled = true;
     };
-  }, [activeTab, brackets.length, tournament.teams, tournament.registrationFormat, tournament.slug, tournament.name]);
+  }, [brackets, bracketsLoading, tournament.teams, tournament.registrationFormat, tournament.slug, tournament.name]);
+
+  useEffect(() => {
+    if (statsFetchStarted.current) return;
+    if (Array.isArray(publishedGames)) {
+      statsFetchStarted.current = true;
+      setStatsGames(publishedGames);
+      return;
+    }
+
+    statsFetchStarted.current = true;
+    let cancelled = false;
+    setStatsLoading(true);
+    void loadTournamentGames(tournament.slug)
+      .then((data) => {
+        if (cancelled || !data) return;
+        setStatsGames((data.games as PublicGame[] | undefined) ?? []);
+        if (data.statsEligibility) setStatsEligibility(data.statsEligibility);
+      })
+      .finally(() => {
+        if (!cancelled) setStatsLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [publishedGames, tournament.slug]);
 
   return (
     <article className="pb-24">
@@ -425,15 +497,21 @@ export default function TournamentDetailView({
         <section className="space-y-6">
           <TournamentGamesSection
             slug={tournament.slug}
-            initialGames={publishedGames ?? []}
+            initialGames={publishedGames}
           />
         </section>
       ) : activeTab === "stats" && showMatchesTab ? (
         <section className="space-y-6">
-          <TournamentStatsSection
-            games={publishedGames ?? []}
-            eligibility={statsEligibility}
-          />
+          {statsLoading || statsGames === undefined ? (
+            <div className="rounded-2xl border border-white/10 bg-white/[0.02] p-12 text-center text-white/40">
+              Loading stats...
+            </div>
+          ) : (
+            <TournamentStatsSection
+              games={statsGames}
+              eligibility={statsEligibility}
+            />
+          )}
         </section>
       ) : (
         <section className="space-y-8">
@@ -503,6 +581,10 @@ export default function TournamentDetailView({
                               : "Single Elimination"
                       }
                     />
+                  ) : bracketsLoading ? (
+                    <div className="rounded-2xl border border-white/10 bg-white/[0.02] p-12 text-center text-white/40">
+                      Loading brackets...
+                    </div>
                   ) : (
                     <TournamentBracketEmpty />
                   )}

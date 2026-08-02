@@ -1,5 +1,5 @@
 // NTG Modular Platform — single schema, logical sections per bundle
-// @auth-membership | @tournaments-leagues | @socials-gallery
+// @auth-membership | @tournaments-leagues | @roster-listings | @lounge-commerce
 
 generator client {
   provider = "prisma-client-js"
@@ -129,11 +129,6 @@ enum ValorantRole {
   FLEX
 }
 
-enum MomentsDisplayMode {
-  BLEND
-  CAROUSEL
-}
-
 enum UserActivityAction {
   SIGNUP
   LEAVE
@@ -242,7 +237,6 @@ model User {
   platformSettingsUpdated PlatformSetting[]         @relation("PlatformSettingUpdatedBy")
   rosterPlayers           RosterPlayer[]
   listingApplications     ListingApplication[]
-  timeLimitedQaResponses  TimeLimitedQaResponse[]
 }
 
 model EmailOtp {
@@ -740,70 +734,6 @@ model LeaderboardRankAuditLog {
   @@index([createdAt])
 }
 
-// ─── @socials-gallery ───────────────────────────────────────────────────────
-
-model GallerySource {
-  id       String        @id @default(cuid())
-  platform String
-  handle   String
-  active   Boolean       @default(true)
-  items    GalleryItem[]
-
-  @@unique([platform, handle])
-}
-
-model GalleryItem {
-  id           String        @id @default(cuid())
-  sourceId     String
-  source       GallerySource @relation(fields: [sourceId], references: [id], onDelete: Cascade)
-  externalId   String
-  mediaType    String
-  embedUrl     String?
-  thumbnailUrl String?
-  caption      String?
-  publishedAt  DateTime?
-  pinned       Boolean       @default(false)
-
-  @@unique([sourceId, externalId])
-}
-
-model MomentsFeaturedDeck {
-  id          String                 @id @default(cuid())
-  slug        String                 @unique
-  eyebrow     String
-  title       String
-  subtitle    String
-  displayMode MomentsDisplayMode     @default(BLEND)
-  active      Boolean                @default(true)
-  sortOrder   Int                    @default(0)
-  createdAt   DateTime               @default(now())
-  updatedAt   DateTime               @updatedAt
-  images      MomentsFeaturedImage[]
-}
-
-model MomentsFeaturedImage {
-  id        String              @id @default(cuid())
-  deckId    String
-  deck      MomentsFeaturedDeck @relation(fields: [deckId], references: [id], onDelete: Cascade)
-  url       String
-  alt       String
-  caption   String?
-  sortOrder Int                 @default(0)
-
-  @@index([deckId, sortOrder])
-}
-
-model SocialReelPost {
-  id        String   @id @default(cuid())
-  reelUrl   String   @unique
-  coverUrl  String?
-  caption   String?
-  sortOrder Int      @default(0)
-  active    Boolean  @default(true)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-}
-
 /**
  * Tamper-evident log of admin mutations (no PII in metadata).
  */
@@ -1002,49 +932,4 @@ model ListingApplication {
 
   @@unique([listingId, userId])
   @@index([listingId, createdAt])
-}
-
-// ─── Time-limited Q&A ───────────────────────────────────────────────────────
-
-model TimeLimitedQaCampaign {
-  id          String   @id @default(cuid())
-  slug        String   @unique @default("qa")
-  title       String   @default("Q&A")
-  description String?
-  active      Boolean  @default(true)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-
-  formFields TimeLimitedQaFormField[]
-  responses  TimeLimitedQaResponse[]
-}
-
-model TimeLimitedQaFormField {
-  id         String                @id @default(cuid())
-  campaignId String
-  campaign   TimeLimitedQaCampaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
-  sortOrder  Int                   @default(0)
-  fieldType  ListingFieldType
-  label      String
-  helpText   String?
-  required   Boolean               @default(false)
-  options    Json?
-  createdAt  DateTime              @default(now())
-  updatedAt  DateTime              @updatedAt
-
-  @@index([campaignId, sortOrder])
-}
-
-model TimeLimitedQaResponse {
-  id            String                @id @default(cuid())
-  campaignId    String
-  campaign      TimeLimitedQaCampaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
-  userId        String?
-  user          User?                 @relation(fields: [userId], references: [id], onDelete: SetNull)
-  isAnonymous   Boolean               @default(false)
-  submitterName String?
-  responses     Json?
-  createdAt     DateTime              @default(now())
-
-  @@index([campaignId, createdAt])
 }

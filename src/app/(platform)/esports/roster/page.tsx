@@ -5,7 +5,7 @@ import { listOpenListings } from "@roster-listings/index";
 import { CS2_ROSTER_CHARACTER_IMAGES } from "@/lib/cs2-roster-assets";
 import { preload } from "react-dom";
 
-export const dynamic = "force-dynamic";
+export const revalidate = 120;
 
 export const metadata = {
   title: "NTG Roster",

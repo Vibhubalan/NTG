@@ -363,7 +363,7 @@ export default function AdminTournamentEditor({
         : [];
 
   const cupUrl = `/esports/tournaments/${form.slug}`;
-  const hubUrl = "/esports";
+  const hubUrl = "/esports/tournaments";
 
   function isRegistrationLiveNow(): boolean {
     if (
@@ -1059,7 +1059,7 @@ export default function AdminTournamentEditor({
               rel="noopener noreferrer"
               className="rounded-xl border border-cyan-500/20 bg-cyan-500/[0.04] px-4 py-2 text-xs font-semibold text-cyan-300 hover:bg-cyan-500/10 hover:text-white transition-all"
             >
-              Esports Hub
+              Tournaments page
             </a>
           )}
           <button
@@ -1119,7 +1119,7 @@ export default function AdminTournamentEditor({
           <div className="space-y-6 animate-in fade-in duration-200">
             <AdminSection
               title="Name & Game Details"
-              showsOn="Cups list, cup page title, and esports hub card"
+              showsOn="Tournaments list, tournament page title, and tournament cards"
               viewHref={cupUrl}
             >
               <div className="grid gap-4 sm:grid-cols-2">
@@ -1247,7 +1247,7 @@ export default function AdminTournamentEditor({
                       onChange={(e) => setForm({ ...form, showOnEsportsHub: e.target.checked })}
                     />
                     <div>
-                      <p className="font-semibold text-white/95">Feature on Esports Hub</p>
+                      <p className="font-semibold text-white/95">Feature on Tournaments</p>
                       <p className="text-xs text-white/40 mt-0.5">Sorts first in the esports hub registration slideshow</p>
                     </div>
                   </label>
@@ -1281,7 +1281,7 @@ export default function AdminTournamentEditor({
                     <p>
                       <strong className="text-emerald-300">Registration is live</strong>. Visible on{" "}
                       <a href={hubUrl} target="_blank" rel="noopener noreferrer" className="underline hover:text-white">
-                        /esports
+                        /esports/tournaments
                       </a>{" "}
                       and the cup register form.
                       {form.autoManageStatus
@@ -1670,14 +1670,14 @@ export default function AdminTournamentEditor({
           <div className="space-y-6 animate-in fade-in duration-200">
             <AdminSection
               title="Banner & Artwork Uploads"
-              showsOn="Background layers on Esports Hub cards and individual detail heroes"
+              showsOn="Background layers on tournament cards and individual detail heroes"
               viewHref={hubUrl}
-              viewLabel="Esports Hub Preview"
+              viewLabel="Tournament Card Preview"
             >
               <div className="space-y-6">
                 <ImageUploadField
-                  label="Esports Hub Card Background"
-                  hint="Banner background overlay behind registration open cards on /esports"
+                  label="Tournament Card Background"
+                  hint="Banner background overlay behind registration open cards on /esports/tournaments"
                   prefix={`tournaments/${form.slug}/hub`}
                   currentUrl={form.hubBannerUrl}
                   onUploaded={(url) => setForm({ ...form, hubBannerUrl: url, posterUrl: url })}

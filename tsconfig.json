@@ -23,11 +23,9 @@
       "@core/*": ["./src/core/*"],
       "@auth-membership/*": ["./src/modules/auth-membership/*"],
       "@tournaments-leagues/*": ["./src/modules/tournaments-leagues/*"],
-      "@socials-gallery/*": ["./src/modules/socials-gallery/*"],
       "@landing-home/*": ["./src/modules/landing-home/*"],
       "@lounge-commerce/*": ["./src/modules/lounge-commerce/*"],
-      "@roster-listings/*": ["./src/modules/roster-listings/*"],
-      "@time-limited-qa/*": ["./src/modules/time-limited-qa/*"]
+      "@roster-listings/*": ["./src/modules/roster-listings/*"]
     }
   },
   "include": [

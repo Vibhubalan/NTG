@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { getHeroCupStatus, getTournamentDetail } from "@tournaments-leagues/index";
 import { resolveEffectivePublicAuction } from "@tournaments-leagues/domain/auction-hero-phase";
 import HeroCupStatusBanner from "@/components/HeroCupStatusBanner";
@@ -6,9 +5,6 @@ import SplitText from "./SplitText";
 import { getSession } from "@core/auth/session";
 import { requireAdmin } from "@core/auth/require-admin";
 import { tryAuctionLink } from "@/lib/auction-link";
-
-const heroCtaBase =
-  "inline-flex h-10 w-auto cursor-pointer select-none items-center justify-center gap-1.5 whitespace-nowrap rounded-full px-3 text-[10px] font-semibold uppercase tracking-[0.12em] transition-all hover:scale-[1.03] active:scale-[0.98] sm:h-12 sm:gap-2 sm:px-5 sm:text-sm sm:tracking-[0.18em]";
 
 // Same gating rules as the tournament detail page's "Enter Live Auction" button
 // (admin.ok, or a registered+eligible user when the admin has made the auction public).
@@ -108,47 +104,6 @@ export default async function Hero() {
           <span className="sm:hidden"> </span>
           atmosphere, engineered for the players who set the standard.
         </p>
-
-        <div className="flex flex-wrap items-center justify-center gap-2 sm:gap-3">
-          <Link
-            href="/listings"
-            className={`cta group relative ${heroCtaBase} hover:brightness-110`}
-            style={{ fontSize: "13px", height: "40px", padding: "0 20px" }}
-          >
-            <span>Opportunities</span>
-            <svg
-              viewBox="0 0 24 24"
-              className="h-3 w-3 shrink-0 transition-transform group-hover:translate-x-0.5 sm:h-4 sm:w-4"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              aria-hidden
-            >
-              <path d="M5 12h14M13 5l7 7-7 7" />
-            </svg>
-          </Link>
-          <Link
-            href="/esports/tournaments"
-            className={`glass group ${heroCtaBase} border border-white/15 text-white/90 hover:border-cyan-400/35 hover:bg-white/[0.08] hover:text-white hover:shadow-[0_0_32px_-10px_rgba(34,211,238,0.4)]`}
-            style={{ fontSize: "13px", height: "40px", padding: "0 20px" }}
-          >
-            <span>Tournaments</span>
-            <svg
-              viewBox="0 0 24 24"
-              className="h-3 w-3 shrink-0 text-white/70 transition-transform group-hover:translate-x-0.5 group-hover:text-white sm:h-4 sm:w-4"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              aria-hidden
-            >
-              <path d="M5 12h14M13 5l7 7-7 7" />
-            </svg>
-          </Link>
-        </div>
       </div>
     </section>
   );

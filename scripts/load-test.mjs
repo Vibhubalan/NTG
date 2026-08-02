@@ -12,10 +12,9 @@ const BASE = (process.argv[2] ?? process.env.LOAD_TEST_URL ?? "http://localhost:
 
 const ROUTES = [
   "/",
-  "/esports",
   "/esports/tournaments",
   "/esports/leaderboard",
-  "/gallery",
+  "/esports/roster",
   "/login",
   "/api/tournaments/fc26-cup-1",
   "/api/reviews",

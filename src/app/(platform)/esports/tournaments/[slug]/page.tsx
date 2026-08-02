@@ -1,10 +1,10 @@
 import { notFound } from "next/navigation";
 import TournamentDetailView from "@/components/platform/TournamentDetailView";
-import { fetchChallongeBracket } from "@/lib/challonge-api";
 import { normalizeBracketUrlItems } from "@/lib/challonge";
 import { getSession } from "@core/auth/session";
 import { requireAdmin } from "@core/auth/require-admin";
 import {
+  getTournamentBySlug,
   getTournamentDetail,
   getRegistrationEligibility,
   getValorantRegistrationProfileCard,
@@ -16,10 +16,11 @@ import { resolveEffectivePublicAuction } from "@tournaments-leagues/domain/aucti
 
 type Props = { params: Promise<{ slug: string }> };
 
+export const dynamic = "force-dynamic";
+
 export async function generateMetadata({ params }: Props) {
   const { slug } = await params;
-  const session = await getSession();
-  const t = await getTournamentDetail(slug, session?.user?.id);
+  const t = await getTournamentBySlug(slug);
   return { title: t ? t.name : "Tournament" };
 }
 
@@ -29,43 +30,44 @@ export default async function TournamentDetailPage({ params }: Props) {
   const userId = session?.user?.id;
   const tournament = await getTournamentDetail(slug, userId);
   if (!tournament) notFound();
-  const isCompleted = tournament.status === "COMPLETED";
+
+  // Bracket shells only — Challonge bodies load client-side (prefetch on mount / list hover).
+  // Never await Challonge on the request path (keeps cup TTFB fast).
   const bracketItems = normalizeBracketUrlItems({
     bracketUrl: tournament.bracketUrl,
     bracketUrls: tournament.bracketUrls,
   });
+  const brackets = bracketItems.map((item) => ({
+    url: item.url,
+    name: item.name ?? null,
+    isFinal: item.isFinal !== false,
+    bracket: null,
+  }));
 
-  const [
-    brackets,
-    admin,
-    registrationPreview,
-    registrationProfileCard,
-    publishedGames,
-    statsEligibility,
-  ] = await Promise.all([
-      bracketItems.length
-        ? Promise.all(
-            bracketItems.map(async (item) => ({
-              url: item.url,
-              name: item.name ?? null,
-              isFinal: item.isFinal !== false,
-              bracket: await fetchChallongeBracket(item.url, isCompleted),
-            })),
-          )
-        : Promise.resolve([]),
+  // Matches + stats are DB-backed and key for the cup — load with the page shell.
+  // Isolate failures so a games/stats query never 404s the whole cup.
+  const [admin, registrationPreview, registrationProfileCard, publishedGamesResult, statsEligibility] =
+    await Promise.all([
       requireAdmin(),
       userId ? getRegistrationEligibility(slug, userId) : Promise.resolve(null),
       userId && tournament.game === "VALORANT" && tournament.userRegistered
         ? getValorantRegistrationProfileCard(slug, userId)
         : Promise.resolve(null),
-      listPublishedTournamentGames(slug),
-      listTournamentStatsEligibility(slug),
+      listPublishedTournamentGames(slug).catch(() => ({
+        ok: false as const,
+        error: "Failed to load games.",
+      })),
+      listTournamentStatsEligibility(slug).catch(() => ({
+        byUserId: {},
+        byRiotId: {},
+      })),
     ]);
 
-  const publishedList = publishedGames.ok ? publishedGames.games : [];
-  const publishedCount = publishedList.length;
+  const publishedGames = publishedGamesResult.ok ? publishedGamesResult.games : [];
   const showMatchesTab =
-    (tournament.yourGamesEnabled ?? true) || publishedCount > 0;
+    (publishedGamesResult.ok
+      ? publishedGamesResult.yourGamesEnabled
+      : tournament.yourGamesEnabled) ?? true;
 
   const publicAuction = resolveEffectivePublicAuction(
     tournament.publicAuction ?? false,
@@ -79,8 +81,7 @@ export default async function TournamentDetailPage({ params }: Props) {
       ? "captain"
       : "observe";
   const auctionEligible =
-    tournament.registrationFormat === "AUCTION" &&
-    !!userId;
+    tournament.registrationFormat === "AUCTION" && !!userId;
   const showEnterButton =
     tournament.registrationFormat === "AUCTION" &&
     (admin.ok || (auctionEligible && publicAuction));
@@ -102,7 +103,7 @@ export default async function TournamentDetailPage({ params }: Props) {
         auctionHref={auctionHref}
         auctionEnded={auctionEnded}
         showMatchesTab={showMatchesTab}
-        publishedGames={publishedList}
+        publishedGames={publishedGames}
         statsEligibility={statsEligibility}
       />
       {admin.ok ? (

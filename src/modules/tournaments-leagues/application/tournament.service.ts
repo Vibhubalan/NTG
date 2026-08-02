@@ -1,4 +1,5 @@
 import { cache } from "react";
+import { unstable_cache } from "next/cache";
 import { prisma } from "@core/database/client";
 import type {
   LeaderboardPreview,
@@ -12,16 +13,22 @@ import { resolveAuctionHeroPhase, type HeroCupPhase } from "../domain/auction-he
 const tournamentRepo = new TournamentRepository();
 const leaderboardRepo = new LeaderboardRepository();
 
+const listTournamentPreviewsCached = unstable_cache(
+  async () => tournamentRepo.listPreviews(),
+  ["tournament-previews"],
+  { revalidate: 60, tags: ["tournament-previews"] },
+);
+
 export async function listTournamentPreviews(): Promise<TournamentPreview[]> {
   // Do NOT call Challonge here — homepage / lists / APIs would burn the API quota
   // (one request per cup with a bracket link on every page load). Champion comes
-  // from DB placements. Challonge is only fetched on the cup detail page.
-  return tournamentRepo.listPreviews();
+  // from DB placements. Challonge is only fetched on the cup detail page / brackets API.
+  return listTournamentPreviewsCached();
 }
 
-export async function getTournamentBySlug(slug: string): Promise<TournamentPreview | null> {
+export const getTournamentBySlug = cache(async (slug: string): Promise<TournamentPreview | null> => {
   return tournamentRepo.findPreviewBySlug(slug);
-}
+});
 
 export const getTournamentDetail = cache(async (slug: string, userId?: string) => {
   return tournamentRepo.findDetailBySlug(slug, userId);

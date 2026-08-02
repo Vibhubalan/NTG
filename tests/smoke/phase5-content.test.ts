@@ -14,11 +14,10 @@ describe.runIf(online)("Phase 5 — content & public pages", () => {
     expect(text).toMatch(/tournament|cup|Cup/i);
   });
 
-  it("esports hub and gallery load", async () => {
-    for (const path of ["/esports", "/gallery"]) {
-      const { status } = await getPath(path);
-      expect(status, path).toBe(200);
-    }
+  it("tournaments hub redirects from legacy /esports", async () => {
+    const { status, location } = await getPath("/esports");
+    expect([307, 308]).toContain(status);
+    expect(location).toMatch(/\/esports\/tournaments/);
   });
 
   it("tournament list includes FC26 cup", async () => {

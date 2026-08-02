@@ -6,11 +6,9 @@ import { usePathname } from "next/navigation";
 export type Crumb = { label: string; href?: string };
 
 const SEGMENT_LABELS: Record<string, string> = {
-  esports: "Esports",
-  tournaments: "Cups",
+  tournaments: "Tournaments",
   roster: "Roster",
-  leaderboard: "Rankings",
-  gallery: "Moments",
+  leaderboard: "Leaderboards",
   profile: "Profile",
   login: "Login",
   signup: "Join",
@@ -26,11 +24,9 @@ function titleFromSlug(slug: string) {
 }
 
 export function crumbsFromPath(pathname: string): Crumb[] {
-  if (pathname === "/esports") return [{ label: "Esports" }];
-  if (pathname === "/gallery") return [{ label: "Esports", href: "/esports" }, { label: "Moments" }];
-  if (pathname === "/profile") return [{ label: "Esports", href: "/esports" }, { label: "Profile" }];
+  if (pathname === "/profile") return [{ label: "Profile" }];
   if (pathname === "/login" || pathname === "/signup") {
-    return [{ label: "Esports", href: "/esports" }, { label: SEGMENT_LABELS[pathname.slice(1)] ?? "Account" }];
+    return [{ label: SEGMENT_LABELS[pathname.slice(1)] ?? "Account" }];
   }
 
   if (pathname === "/listings") {
@@ -47,12 +43,11 @@ export function crumbsFromPath(pathname: string): Crumb[] {
   }
 
   if (parts[0] === "esports") {
-    crumbs.push({ label: "Esports", href: "/esports" });
     if (parts[1] === "tournaments") {
-      crumbs.push({ label: "Cups", href: parts[2] ? "/esports/tournaments" : undefined });
+      crumbs.push({ label: "Tournaments", href: parts[2] ? "/esports/tournaments" : undefined });
       if (parts[2]) crumbs.push({ label: titleFromSlug(parts[2]) });
     } else if (parts[1] === "leaderboard") {
-      crumbs.push({ label: "Rankings" });
+      crumbs.push({ label: "Leaderboards" });
     } else if (parts[1] === "roster") {
       crumbs.push({ label: "Roster" });
     }
@@ -64,7 +59,7 @@ export function crumbsFromPath(pathname: string): Crumb[] {
 export default function PlatformBreadcrumb() {
   const pathname = usePathname();
   const crumbs = crumbsFromPath(pathname);
-  if (crumbs.length <= 1 && pathname === "/esports") return null;
+  if (crumbs.length === 0) return null;
 
   return (
     <nav aria-label="Breadcrumb" className="mb-8 flex items-center gap-2 text-[11px] uppercase tracking-[0.2em]">

@@ -103,7 +103,6 @@ export const AUTH_RATE_LIMITS = {
   steamLink: { prefix: "auth:steam-link", limit: 10, windowMs: 15 * 60 * 1000 },
   tournamentRegister: { prefix: "app:tournament-register", limit: 10, windowMs: 15 * 60 * 1000 },
   listingApply: { prefix: "app:listing-apply", limit: 10, windowMs: 15 * 60 * 1000 },
-  qaSubmit: { prefix: "app:qa-submit", limit: 8, windowMs: 15 * 60 * 1000 },
   teamLogoUpload: { prefix: "app:team-logo-upload", limit: 10, windowMs: 60 * 60 * 1000 },
   profilePatch: { prefix: "app:profile-patch", limit: 30, windowMs: 15 * 60 * 1000 },
 } as const satisfies Record<string, RateLimitConfig>;

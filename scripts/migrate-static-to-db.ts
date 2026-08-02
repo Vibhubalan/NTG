@@ -1,9 +1,8 @@
 /**
- * One-time migration: copy static tournament overlay + moments into DB.
+ * One-time migration: copy static tournament overlay into DB.
  * Run: dotenv -e .env.local -- tsx scripts/migrate-static-to-db.ts
  */
 import { prisma } from "../src/core/database/client";
-import { loungeFeaturedDeck } from "../src/lib/moments-featured";
 import { defaultPrizeSplit } from "../src/modules/tournaments-leagues/application/admin-tournament.service";
 
 type StaticTournamentOverlay = {
@@ -74,28 +73,6 @@ async function main() {
     }
 
     console.log(`  ✓ ${slug}`);
-  }
-
-  const deckCount = await prisma.momentsFeaturedDeck.count();
-  if (deckCount === 0) {
-    const deck = await prisma.momentsFeaturedDeck.create({
-      data: {
-        slug: loungeFeaturedDeck.slug,
-        eyebrow: loungeFeaturedDeck.eyebrow,
-        title: loungeFeaturedDeck.title,
-        subtitle: loungeFeaturedDeck.subtitle,
-        displayMode: "BLEND",
-        active: true,
-        images: {
-          create: loungeFeaturedDeck.images.map((img, i) => ({
-            url: img.src,
-            alt: img.alt,
-            sortOrder: i,
-          })),
-        },
-      },
-    });
-    console.log(`  ✓ featured deck ${deck.slug}`);
   }
 
   console.log("Done. Set NEXT_PUBLIC_USE_STATIC_TOURNAMENT_DETAIL=0 when ready.");

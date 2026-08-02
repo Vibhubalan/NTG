@@ -5,6 +5,7 @@ import { motion } from "framer-motion";
 import Link from "next/link";
 import BrandIcon from "./ui/BrandIcon";
 import { allowPastTournamentClicks } from "@/lib/env";
+import { prefetchTournamentCupApis } from "@/lib/prefetch-tournament-cup";
 import StatusBadge from "@/components/platform/ui/StatusBadge";
 import type { TournamentVaultProps } from "./tournaments/types";
 
@@ -245,6 +246,8 @@ export default function TournamentVault({ tournaments, registration, auction, hi
             ) : (
               <Link
                 href={`/esports/tournaments/${t.slug}`}
+                onMouseEnter={() => prefetchTournamentCupApis(t.slug)}
+                onFocus={() => prefetchTournamentCupApis(t.slug)}
                 className="flex-1 overflow-hidden rounded-2xl border border-white/[0.06] bg-white/[0.02] transition-colors hover:border-white/15 hover:bg-white/[0.04]"
               >
                 <div className="flex flex-col gap-4 px-5 py-5 sm:flex-row sm:items-center sm:justify-between sm:px-7 sm:py-6">

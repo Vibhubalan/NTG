@@ -13,7 +13,7 @@ export default function TournamentCalendarHeader() {
     >
       <div>
         <span className="text-[10px] font-medium uppercase tracking-[0.4em] text-[var(--color-brand)]/80">
-          03 · Competitive Schedule
+          04 · Competitive Schedule
         </span>
         <h2 className="mt-3 font-display text-4xl font-semibold tracking-[-0.02em] text-white sm:text-5xl">
           Competitive <span className="font-display italic font-light text-white/55">lounge</span>{" "}

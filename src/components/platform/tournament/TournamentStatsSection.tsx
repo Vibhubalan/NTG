@@ -8,15 +8,16 @@ import {
   type TournamentStatsEligibility,
 } from "@/lib/tournament-stats";
 import type { PublicGame } from "./TournamentGamesSection";
+import TournamentMetaSection from "./TournamentMetaSection";
 
 type AggregatedPlayer = AggregatedPlayerStats;
+type StatsSubTab = "players" | "meta";
 
 type SortField =
   | "totalKills"
   | "avgAcs"
   | "gamesPlayed"
   | "kd"
-  | "avgAdr"
   | "avgHsPercent"
   | "mvpCount";
 type SortDir = "asc" | "desc";
@@ -38,8 +39,6 @@ function fieldValue(p: AggregatedPlayer, field: SortField): number {
       return p.gamesPlayed;
     case "kd":
       return p.totalDeaths > 0 ? p.totalKills / p.totalDeaths : p.totalKills;
-    case "avgAdr":
-      return p.avgAdr;
     case "avgHsPercent":
       return p.avgHsPercent;
   }
@@ -51,6 +50,7 @@ type Props = {
 };
 
 export default function TournamentStatsSection({ games, eligibility }: Props) {
+  const [subTab, setSubTab] = useState<StatsSubTab>("players");
   const [sortBy, setSortBy] = useState<SortField>("totalKills");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
   const [selectedRole, setSelectedRole] = useState<AgentRole | "ALL">("ALL");
@@ -148,6 +148,35 @@ export default function TournamentStatsSection({ games, eligibility }: Props) {
 
   return (
     <div className="space-y-4">
+      <div className="flex flex-wrap items-center gap-2">
+        {(
+          [
+            { id: "players" as const, label: "Players" },
+            { id: "meta" as const, label: "Meta" },
+          ] as const
+        ).map((tab) => (
+          <button
+            key={tab.id}
+            type="button"
+            onClick={() => setSubTab(tab.id)}
+            className={`rounded-full px-4 py-2 text-[11px] font-medium uppercase tracking-[0.18em] transition-all ${
+              subTab === tab.id
+                ? "bg-emerald-400/15 text-emerald-300 ring-1 ring-inset ring-emerald-400/35"
+                : "text-white/45 ring-1 ring-inset ring-white/10 hover:text-white/70"
+            }`}
+          >
+            {tab.label}
+          </button>
+        ))}
+        <span className="ml-1 text-xs text-white/35">
+          {games.length} match{games.length !== 1 ? "es" : ""}
+        </span>
+      </div>
+
+      {subTab === "meta" ? (
+        <TournamentMetaSection games={games} eligibility={eligibility} />
+      ) : (
+        <>
       {/* Header & Search */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div className="flex items-center gap-3">
@@ -155,7 +184,7 @@ export default function TournamentStatsSection({ games, eligibility }: Props) {
             Tournament Leaderboard
           </h3>
           <span className="text-xs text-white/40">
-            {games.length} match{games.length !== 1 ? "es" : ""} · {searchedPlayers.length} players
+            {searchedPlayers.length} players
           </span>
         </div>
 
@@ -211,21 +240,14 @@ export default function TournamentStatsSection({ games, eligibility }: Props) {
                 K / D / A{sortIcon("totalKills")}
               </th>
               <th
-                className="w-[7%] px-1 py-3 sm:px-3 sm:py-4 text-center cursor-pointer hover:text-white select-none transition-colors"
+                className="w-[8%] px-1 py-3 sm:px-3 sm:py-4 text-center cursor-pointer hover:text-white select-none transition-colors"
                 title="Toggle high→low / low→high"
                 onClick={() => toggleSort("kd")}
               >
                 K/D{sortIcon("kd")}
               </th>
               <th
-                className="w-[7%] px-1 py-3 sm:px-3 sm:py-4 text-center cursor-pointer hover:text-white select-none transition-colors"
-                title="Toggle high→low / low→high"
-                onClick={() => toggleSort("avgAdr")}
-              >
-                ADR{sortIcon("avgAdr")}
-              </th>
-              <th
-                className="w-[7%] px-1 py-3 sm:px-3 sm:py-4 text-center cursor-pointer hover:text-white select-none transition-colors"
+                className="w-[8%] px-1 py-3 sm:px-3 sm:py-4 text-center cursor-pointer hover:text-white select-none transition-colors"
                 title="Toggle high→low / low→high"
                 onClick={() => toggleSort("avgHsPercent")}
               >
@@ -368,10 +390,6 @@ export default function TournamentStatsSection({ games, eligibility }: Props) {
                     </td>
 
                     <td className="px-1 py-3 sm:px-3 sm:py-4 text-center font-mono text-xs sm:text-sm text-white/90 font-medium">
-                      {p.avgAdr}
-                    </td>
-
-                    <td className="px-1 py-3 sm:px-3 sm:py-4 text-center font-mono text-xs sm:text-sm text-white/90 font-medium">
                       {p.avgHsPercent}%
                     </td>
 
@@ -406,7 +424,7 @@ export default function TournamentStatsSection({ games, eligibility }: Props) {
               })
             ) : (
               <tr>
-                <td colSpan={9} className="px-5 py-10 text-center text-white/40 italic">
+                <td colSpan={8} className="px-5 py-10 text-center text-white/40 italic">
                   {searchQuery
                     ? `No players found matching "${searchQuery}".`
                     : `No players found for agent role filter "${selectedRole}".`}
@@ -416,6 +434,8 @@ export default function TournamentStatsSection({ games, eligibility }: Props) {
           </tbody>
         </table>
       </div>
+        </>
+      )}
     </div>
   );
 }

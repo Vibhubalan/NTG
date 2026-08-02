@@ -14,8 +14,6 @@ const moduleBoundaryRules = {
               "@auth-membership/domain/*",
               "@tournaments-leagues/infrastructure/*",
               "@tournaments-leagues/domain/*",
-              "@socials-gallery/infrastructure/*",
-              "@socials-gallery/domain/*",
             ],
             message:
               "Import from module index.ts or api/ only — infrastructure and domain are internal.",
@@ -24,7 +22,6 @@ const moduleBoundaryRules = {
             group: [
               "@auth-membership/*",
               "@tournaments-leagues/*",
-              "@socials-gallery/*",
             ],
             importNames: ["prisma"],
             message: "Use @core/database/client for Prisma access outside owning module infrastructure.",
@@ -60,7 +57,7 @@ const eslintConfig = defineConfig([
         {
           patterns: [
             {
-              group: ["@core/database/*", "@auth-membership/*", "@tournaments-leagues/*", "@socials-gallery/*", "@landing-home/*"],
+              group: ["@core/database/*", "@auth-membership/*", "@tournaments-leagues/*", "@landing-home/*"],
               message: "Marketing components must not call modules or DB directly — use API routes or server adapters in phase 2.",
             },
           ],

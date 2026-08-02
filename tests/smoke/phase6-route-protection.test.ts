@@ -15,7 +15,7 @@ describe.runIf(online)("Phase 6 — route protection & mobile-ready pages", () =
     });
 
     it("blocks admin sub-routes", async () => {
-      for (const path of ["/admin/tournaments", "/admin/members", "/admin/moments"]) {
+      for (const path of ["/admin/tournaments", "/admin/members", "/admin/roster"]) {
         const { status, location } = await getPath(path);
         expectLoginRedirect(status, location, "/admin");
       }

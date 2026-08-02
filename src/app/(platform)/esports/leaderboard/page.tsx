@@ -1,10 +1,10 @@
 import ValorantRankingsBoard from "@/components/platform/ValorantRankingsBoard";
 import { getValorantRankings } from "@tournaments-leagues/index";
 
-export const dynamic = "force-dynamic";
+export const revalidate = 60;
 
 export const metadata = {
-  title: { absolute: "Rankings | NTG Esports" },
+  title: { absolute: "Leaderboards | NTG Lounge" },
 };
 
 export default async function EsportsLeaderboardPage() {

@@ -42,6 +42,9 @@ function remoteImagePatterns() {
 }
 
 const nextConfig: NextConfig = {
+  experimental: {
+    optimizePackageImports: ["framer-motion"],
+  },
   images: {
     formats: ["image/avif", "image/webp"],
     remotePatterns: remoteImagePatterns(),

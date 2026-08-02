@@ -6,36 +6,61 @@ import { usePathname } from "next/navigation";
 import { signOut, useSession } from "next-auth/react";
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-
-const marketingLinksBase = [
-  { label: "Arena", href: "/#arena" },
-  { label: "Games", href: "/#games" },
-  { label: "Competitive", href: "/esports/leaderboard" },
-  { label: "Esports", href: "/esports" },
-  { label: "Visit", href: "/#visit" },
-];
-
-const qaNavLink = {
-  label: "Q&A",
-  href: "/qa",
-  badge: "TIME LIMITED",
-} as const;
-
 type NavLinkItem = {
   label: string;
   href: string;
   badge?: string;
+  icon?: "home";
+  external?: boolean;
 };
 
-const platformLinksBase = [
-  { label: "Lounge", href: "/" },
-  { label: "Roster", href: "/esports/roster" },
-  { label: "Cups", href: "/esports/tournaments" },
+const loungeLinks: NavLinkItem[] = [
+  { label: "Tournaments", href: "/esports/tournaments" },
   { label: "Leaderboards", href: "/esports/leaderboard" },
+  { label: "Roster", href: "/esports/roster" },
+  { label: "Opportunities", href: "/listings" },
 ];
 
-function isPlatformRoute(path: string) {
-  const roots = ["/esports", "/gallery", "/profile", "/admin", "/listings"];
+function isExternalHref(href: string) {
+  return href.startsWith("http://") || href.startsWith("https://") || href.startsWith("mailto:");
+}
+
+const homeNavLink: NavLinkItem = {
+  label: "Home",
+  href: "/",
+  icon: "home",
+};
+
+function isHomePage(pathname: string | null) {
+  return !pathname || pathname === "/";
+}
+
+function isNavActive(pathname: string, href: string) {
+  if (href.startsWith("/#") || href.startsWith("#")) return false;
+  if (href === "/") return pathname === "/";
+  return pathname === href || pathname.startsWith(`${href}/`);
+}
+
+function HomeIcon({ className }: { className?: string }) {
+  return (
+    <svg
+      className={className}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.75"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden
+    >
+      <path d="M4 11.5 12 4l8 7.5" />
+      <path d="M6.5 10.5V19h11v-8.5" />
+    </svg>
+  );
+}
+
+function isCompetitiveRoute(path: string) {
+  const roots = ["/esports", "/profile", "/admin", "/listings"];
   return roots.some((r) => path === r || path.startsWith(`${r}/`));
 }
 
@@ -45,16 +70,16 @@ function NavLink({
   active,
   external,
   badge,
+  icon,
 }: {
   href: string;
   label: string;
   active?: boolean;
   external?: boolean;
   badge?: string;
+  icon?: NavLinkItem["icon"];
 }) {
   const pathname = usePathname();
-  const isEsports = label.toLowerCase() === "esports";
-  const isLounge = label.toLowerCase() === "lounge";
 
   const handleClick = (e: React.MouseEvent<HTMLAnchorElement>) => {
     if (href.startsWith("/#") || href.startsWith("#")) {
@@ -70,34 +95,18 @@ function NavLink({
     }
   };
 
-  let textColorClass = active ? "text-white" : "text-white/60 hover:text-white";
-  let textSpanClass = "";
-  let containerSpanClass = "relative z-10 flex items-center justify-center gap-1.5";
-
-  if (isEsports || isLounge) {
-    textColorClass = active ? "" : "opacity-75 hover:opacity-100 transition-opacity";
-    const gradient = isEsports
-      ? "from-[var(--color-iris)] to-[var(--color-brand)]"
-      : "from-emerald-400 to-cyan-400";
-    const shadow = isEsports
-      ? "drop-shadow-[0_0_8px_rgba(124,58,237,0.3)]"
-      : "drop-shadow-[0_0_8px_rgba(52,211,153,0.3)]";
-
-    textSpanClass = `bg-gradient-to-r ${gradient} bg-clip-text text-transparent font-bold ${active ? shadow : ""
-      }`;
-  }
-
+  const textColorClass = active ? "text-white" : "text-white/60 hover:text-white";
+  const containerSpanClass = "relative z-10 flex items-center justify-center gap-1.5";
   const className = `group relative rounded-full px-4 py-2 text-[12px] font-medium uppercase tracking-[0.16em] transition-colors sm:px-5 sm:py-2.5 sm:text-[13px] sm:tracking-[0.18em] flex items-center ${textColorClass}`;
 
   const underline = !active && (
     <span className="absolute inset-x-3 bottom-1.5 h-px origin-left scale-x-0 bg-gradient-to-r from-[var(--color-brand)] to-[var(--color-iris)] transition-transform duration-300 group-hover:scale-x-100 sm:inset-x-4" />
   );
 
-  const loungeIcon = isLounge && (
-    <svg className="h-[1.2em] w-[1.2em] shrink-0 text-emerald-400 opacity-90 pb-[1px]" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-      <path strokeLinecap="round" strokeLinejoin="round" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
-    </svg>
-  );
+  const iconEl =
+    icon === "home" ? (
+      <HomeIcon className="h-[1.05em] w-[1.05em] shrink-0 opacity-80" />
+    ) : null;
 
   const badgeEl = badge ? (
     <span className="ml-1.5 rounded-full border border-amber-500/35 bg-amber-500/15 px-1.5 py-0.5 text-[8px] font-bold uppercase tracking-[0.14em] text-amber-200/95">
@@ -105,12 +114,18 @@ function NavLink({
     </span>
   ) : null;
 
-  if (external) {
+  if (external || isExternalHref(href)) {
     return (
-      <a href={href} className={className} onClick={handleClick}>
+      <a
+        href={href}
+        className={className}
+        onClick={handleClick}
+        target={isExternalHref(href) ? "_blank" : undefined}
+        rel={isExternalHref(href) ? "noopener noreferrer" : undefined}
+      >
         <span className={containerSpanClass}>
-          {loungeIcon}
-          <span className={textSpanClass || undefined}>{label}</span>
+          {iconEl}
+          <span>{label}</span>
           {badgeEl}
         </span>
         {underline}
@@ -121,8 +136,8 @@ function NavLink({
   return (
     <Link href={href} className={className} onClick={handleClick}>
       <span className={containerSpanClass}>
-        {loungeIcon}
-        <span className={textSpanClass || undefined}>{label}</span>
+        {iconEl}
+        <span>{label}</span>
         {badgeEl}
       </span>
       {underline}
@@ -364,13 +379,11 @@ function MobileMenu({
   onClose,
   links,
   pathname,
-  platform,
 }: {
   open: boolean;
   onClose: () => void;
   links: NavLinkItem[];
   pathname: string;
-  platform: boolean;
 }) {
   useEffect(() => {
     if (!open) return;
@@ -405,31 +418,18 @@ function MobileMenu({
         </div>
         <ul className="divide-y divide-white/[0.06] px-2 py-2">
           {links.map((link) => {
-            const active = platform
-              ? pathname === link.href || pathname.startsWith(`${link.href}/`)
-              : link.href === "/esports"
-                ? pathname.startsWith("/esports")
-                : link.href === "/qa"
-                  ? pathname === "/qa"
-                  : false;
+            const active = isNavActive(pathname, link.href);
 
             const rowClass = `flex w-full items-center justify-between px-4 py-4 text-left text-[13px] font-semibold uppercase tracking-[0.2em] transition-colors ${active ? "text-white" : "text-white/70 hover:text-white"
               }`;
 
-            const isLounge = link.label.toLowerCase() === "lounge";
-            const loungeIcon = isLounge && (
-              <svg className="inline-block h-[1.1em] w-[1.1em] ml-2 opacity-80 shrink-0 mb-1" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
-              </svg>
-            );
-
             const content = (
               <>
                 <span className="flex flex-wrap items-center gap-2">
-                  <span>
-                    {link.label}
-                    {loungeIcon}
-                  </span>
+                  {link.icon === "home" ? (
+                    <HomeIcon className="h-[1.05em] w-[1.05em] shrink-0 opacity-80" />
+                  ) : null}
+                  <span>{link.label}</span>
                   {link.badge ? (
                     <span className="rounded-full border border-amber-500/35 bg-amber-500/15 px-2 py-0.5 text-[9px] font-bold uppercase tracking-[0.12em] text-amber-200/95">
                       {link.badge}
@@ -457,13 +457,25 @@ function MobileMenu({
 
             return (
               <li key={link.href}>
-                <Link
-                  href={link.href}
-                  className={rowClass}
-                  onClick={(e) => handleMobileClick(e, link.href)}
-                >
-                  {content}
-                </Link>
+                {link.external || isExternalHref(link.href) ? (
+                  <a
+                    href={link.href}
+                    className={rowClass}
+                    onClick={onClose}
+                    target={isExternalHref(link.href) ? "_blank" : undefined}
+                    rel={isExternalHref(link.href) ? "noopener noreferrer" : undefined}
+                  >
+                    {content}
+                  </a>
+                ) : (
+                  <Link
+                    href={link.href}
+                    className={rowClass}
+                    onClick={(e) => handleMobileClick(e, link.href)}
+                  >
+                    {content}
+                  </Link>
+                )}
               </li>
             );
           })}
@@ -535,31 +547,12 @@ function NavbarContent() {
       .catch(() => setIsAdmin(false));
   }, [status, session?.user?.id]);
 
-  const [qaEnabled, setQaEnabled] = useState(false);
-
-  useEffect(() => {
-    function loadQaStatus() {
-      fetch("/api/qa/status", { cache: "no-store" })
-        .then((r) => (r.ok ? r.json() : { enabled: false }))
-        .then((data: { enabled?: boolean }) => setQaEnabled(Boolean(data.enabled)))
-        .catch(() => setQaEnabled(false));
-    }
-    loadQaStatus();
-    window.addEventListener("focus", loadQaStatus);
-    return () => window.removeEventListener("focus", loadQaStatus);
-  }, [pathname]);
-
   if (pathname && isAuthRoute(pathname)) return null;
 
   const signedIn = status === "authenticated" && session?.user;
-  const platform = isPlatformRoute(pathname);
-  const logoHref = platform ? "/esports" : "/";
-
-  const links: NavLinkItem[] = platform
-    ? platformLinksBase
-    : qaEnabled
-      ? [...marketingLinksBase, qaNavLink]
-      : marketingLinksBase;
+  const links: NavLinkItem[] = isHomePage(pathname)
+    ? loungeLinks
+    : [homeNavLink, ...loungeLinks];
 
   return (
     <header
@@ -583,7 +576,7 @@ function NavbarContent() {
         style={{ transform: "translateZ(0)" }}
       >
         <div className="flex items-center justify-between gap-2 sm:gap-4">
-          <Link href={logoHref} className="flex min-w-0 shrink items-center gap-2 sm:gap-3" aria-label="NTG Lounge">
+          <Link href="/" className="flex min-w-0 shrink items-center gap-2 sm:gap-3" aria-label="NTG Lounge">
             <Image
               src="/ntg-logo.png"
               alt="NTG Lounge"
@@ -594,9 +587,7 @@ function NavbarContent() {
             />
             <span className="truncate font-display text-[12px] font-semibold tracking-[0.12em] text-white/95 sm:text-[15px] sm:tracking-[0.18em]">
               NTG{" "}
-              <span className={platform ? "bg-gradient-to-r from-[var(--color-iris)] to-[var(--color-brand)] bg-clip-text text-transparent" : "text-[var(--color-brand)]"}>
-                {platform ? "ESPORTS" : "LOUNGE"}
-              </span>
+              <span className="text-[var(--color-brand)]">LOUNGE</span>
             </span>
           </Link>
 
@@ -606,17 +597,10 @@ function NavbarContent() {
                 <NavLink
                   href={link.href}
                   label={link.label}
-                  active={
-                    platform
-                      ? pathname === link.href || pathname.startsWith(`${link.href}/`)
-                      : link.href === "/esports"
-                        ? pathname.startsWith("/esports")
-                        : link.href === "/qa"
-                          ? pathname === "/qa"
-                          : false
-                  }
-                  external={!platform && link.href.startsWith("#")}
+                  active={isNavActive(pathname, link.href)}
+                  external={link.external || link.href.startsWith("#")}
                   badge={link.badge}
+                  icon={link.icon}
                 />
               </li>
             ))}
@@ -652,7 +636,6 @@ function NavbarContent() {
           onClose={() => setMenuOpen(false)}
           links={links}
           pathname={pathname}
-          platform={platform}
         />
       </nav>
     </header>
@@ -660,19 +643,13 @@ function NavbarContent() {
 }
 
 export default function Navbar() {
-  const [mounted, setMounted] = useState(false);
-
   useEffect(() => {
-    setMounted(true);
-    if (typeof window !== "undefined") {
-      window.history.scrollRestoration = "manual";
-      if (!isPlatformRoute(window.location.pathname) && !window.location.hash) {
-        window.scrollTo(0, 0);
-      }
+    window.history.scrollRestoration = "manual";
+    if (!isCompetitiveRoute(window.location.pathname) && !window.location.hash) {
+      window.scrollTo(0, 0);
     }
   }, []);
 
-  if (!mounted) return null;
-
-  return createPortal(<NavbarContent />, document.body);
+  // Render in-tree (no portal / no mount gate) so nav is instant on first paint and navigations.
+  return <NavbarContent />;
 }

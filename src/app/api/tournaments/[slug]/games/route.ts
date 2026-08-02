@@ -1,4 +1,7 @@
-import { listPublishedTournamentGames } from "@tournaments-leagues/index";
+import {
+  listPublishedTournamentGames,
+  listTournamentStatsEligibility,
+} from "@tournaments-leagues/index";
 import { serverEnv } from "@core/config/env.server";
 import { NextResponse } from "next/server";
 
@@ -12,13 +15,24 @@ export async function GET(_req: Request, { params }: Props) {
   }
 
   const { slug } = await params;
-  const result = await listPublishedTournamentGames(slug);
+  const [result, statsEligibility] = await Promise.all([
+    listPublishedTournamentGames(slug),
+    listTournamentStatsEligibility(slug),
+  ]);
   if (!result.ok) {
     return NextResponse.json({ error: result.error }, { status: 404 });
   }
 
-  return NextResponse.json({
-    yourGamesEnabled: result.yourGamesEnabled,
-    games: result.games,
-  });
+  return NextResponse.json(
+    {
+      yourGamesEnabled: result.yourGamesEnabled,
+      games: result.games,
+      statsEligibility,
+    },
+    {
+      headers: {
+        "Cache-Control": "private, max-age=30, stale-while-revalidate=120",
+      },
+    },
+  );
 }

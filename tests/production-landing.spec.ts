@@ -2,7 +2,7 @@ import { test, expect } from "@playwright/test";
 
 /**
  * End-to-end flows for the live production landing page (main branch only).
- * Does not cover feature-branch routes (/gallery, /signup, /esports, etc.).
+ * Does not cover feature-branch routes (/signup, /esports/tournaments, etc.).
  */
 
 test.describe("Production landing user flows", () => {
