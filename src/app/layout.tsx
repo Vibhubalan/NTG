@@ -69,6 +69,11 @@ export default async function RootLayout({
       className={`${spaceGrotesk.variable} ${inter.variable} antialiased`}
       data-scroll-behavior="smooth"
     >
+      <head>
+        {/* Warm DNS/TLS for remote Valorant art before Stats/Matches need icons. */}
+        <link rel="preconnect" href="https://media.valorant-api.com" crossOrigin="anonymous" />
+        <link rel="dns-prefetch" href="https://media.valorant-api.com" />
+      </head>
       <body>
         <a
           href="#main-content"
