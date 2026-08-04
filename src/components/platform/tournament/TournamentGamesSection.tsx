@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { useEffect, useMemo, useState } from "react";
 import { parseApiJson } from "@/lib/parse-api-json";
 import { getAgentIconUrl } from "@/lib/valorant-agent";
@@ -296,9 +297,12 @@ export default function TournamentGamesSection({ slug, initialGames }: Props) {
       {/* Match Cards List Tiles */}
       {visibleGames.length > 0 ? (
         <div className="flex flex-col gap-4">
-          {visibleGames.map((g) => {
+          {visibleGames.map((g, gameIndex) => {
             const isSelected = selectedId === g.id;
             const mapSplash = getValorantMapSplashUrl(g.mapName);
+            // The top cards are above the fold, so lazy-loading them just
+            // delays the artwork until after hydration.
+            const splashIsAboveFold = gameIndex < 3;
             const winnerIsA = g.teamARounds > g.teamBRounds;
             const winnerIsB = g.teamBRounds > g.teamARounds;
             const teamANameClass = winnerIsA
@@ -335,10 +339,15 @@ export default function TournamentGamesSection({ slug, initialGames }: Props) {
                   }`}
                 >
                   {/* Background Map Artwork Image */}
-                  <img
+                  <Image
                     src={mapSplash}
                     alt={g.mapName ?? "Map"}
-                    className="absolute inset-0 h-full w-full object-cover object-center pointer-events-none opacity-70 group-hover:opacity-80 group-hover:scale-105 transition-all duration-700 ease-out"
+                    fill
+                    sizes="(max-width: 768px) 100vw, 1024px"
+                    quality={45}
+                    loading={splashIsAboveFold ? "eager" : "lazy"}
+                    fetchPriority={splashIsAboveFold ? "high" : "auto"}
+                    className="object-cover object-center pointer-events-none opacity-70 group-hover:opacity-80 group-hover:scale-105 transition-all duration-700 ease-out"
                   />
 
                   {/* Dark Vignette & Gradient Overlays */}
@@ -401,113 +410,290 @@ export default function TournamentGamesSection({ slug, initialGames }: Props) {
                 {isSelected && selected && selectedTeamData ? (
                   <div className="overflow-hidden rounded-2xl border border-white/10 bg-[#080d16] shadow-2xl backdrop-blur-xl transition-all duration-500 animate-in fade-in slide-in-from-top-4">
                     {/* Scoreboard Header */}
-                    <div className="flex items-center justify-between border-b border-white/10 bg-black/40 px-6 py-4">
-                      <div className="flex items-center gap-3">
-                        <span className="font-display text-sm font-black uppercase tracking-[0.2em] text-emerald-300">
-                          Player Stats Breakdown · {selected.mapName ?? "Map"}
+                    <div className="flex items-start justify-between gap-3 border-b border-white/10 bg-black/40 px-3 py-3 sm:items-center sm:px-6 sm:py-4">
+                      <div className="min-w-0">
+                        <span className="font-display text-[11px] font-black uppercase tracking-[0.14em] text-emerald-300 sm:text-sm sm:tracking-[0.2em]">
+                          Stats · {selected.mapName ?? "Map"}
                         </span>
-                        <span className="ml-2 text-xs font-medium text-white/50">
-                          {selected.gameLengthSec ? formatDuration(selected.gameLengthSec) : null}
-                          {selected.gameLengthSec && selected.startedAt ? " · " : null}
-                          {selected.startedAt
-                            ? `${new Date(selected.startedAt).toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" })} · ${new Date(selected.startedAt).toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" })}`
+                        <p className="mt-0.5 text-[10px] font-medium text-white/45 sm:text-xs">
+                          {selected.gameLengthSec
+                            ? formatDuration(selected.gameLengthSec)
                             : null}
-                        </span>
+                          {selected.gameLengthSec && selected.startedAt
+                            ? " · "
+                            : null}
+                          {selected.startedAt
+                            ? `${new Date(selected.startedAt).toLocaleDateString(undefined, { month: "short", day: "numeric" })} · ${new Date(selected.startedAt).toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" })}`
+                            : null}
+                        </p>
                       </div>
                       <button
                         type="button"
                         onClick={() => setSelectedId(null)}
-                        className="rounded-full border border-white/15 px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-white/60 hover:text-white hover:bg-white/10 cursor-pointer"
+                        className="shrink-0 rounded-full border border-white/15 px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-white/60 hover:bg-white/10 hover:text-white"
                       >
-                        Close Scoreboard
+                        Close
                       </button>
                     </div>
 
-                    {/* Team Tables */}
-                    <div className="p-4 sm:p-6 space-y-6">
+                    <div className="space-y-4 p-3 sm:space-y-6 sm:p-6">
                       {[
-                        {
-                          teamKey: "teamA",
-                          team: selectedTeamData.teamA,
-                        },
-                        {
-                          teamKey: "teamB",
-                          team: selectedTeamData.teamB,
-                        },
+                        { teamKey: "teamA", team: selectedTeamData.teamA },
+                        { teamKey: "teamB", team: selectedTeamData.teamB },
                       ].map(({ teamKey, team }) => (
-                        <div key={teamKey} className="overflow-hidden rounded-xl border border-white/15 bg-[#060b13] shadow-lg">
-                          {/* Team Section Header */}
-                          <div className="flex items-center justify-between px-4 py-3 bg-white/[0.04] text-white border-b border-white/10">
-                            <span className="font-display text-base font-black uppercase tracking-wider text-white">
+                        <div
+                          key={teamKey}
+                          className="overflow-hidden rounded-xl border border-white/15 bg-[#060b13] shadow-lg"
+                        >
+                          <div className="flex items-center justify-between gap-2 border-b border-white/10 bg-white/[0.04] px-3 py-2.5 sm:px-4 sm:py-3">
+                            <span className="min-w-0 truncate font-display text-sm font-black uppercase tracking-wider text-white sm:text-base">
                               {team.name}
                             </span>
-                            <span className="font-mono text-sm font-bold text-emerald-300">
+                            <span className="shrink-0 font-mono text-xs font-bold text-emerald-300 sm:text-sm">
                               {team.rounds} Rounds
                             </span>
                           </div>
 
-                          {/* Table Header & Rows */}
-                          <div className="overflow-x-auto">
-                            <table className="w-full min-w-[720px] text-left border-collapse">
+                          {/* Mobile: compact rows, no sideways scroll */}
+                          <ul className="divide-y divide-white/[0.06] sm:hidden">
+                            {team.players.length === 0 ? (
+                              <li className="px-3 py-6 text-center text-sm text-white/35">
+                                No player records mapped for this team.
+                              </li>
+                            ) : (
+                              team.players.map((p) => {
+                                const { name, tag } = parseRiotName(p.riotId);
+                                const kdNum =
+                                  p.deaths === 0 ? p.kills : p.kills / p.deaths;
+                                const isMvp = selected.mvpRiotId === p.riotId;
+                                const agentIconUrl = getAgentIconUrl(p.agent);
+                                return (
+                                  <li
+                                    key={p.id}
+                                    className={`px-3 py-2.5 ${
+                                      isMvp ? "bg-emerald-500/[0.06]" : ""
+                                    }`}
+                                  >
+                                    <div className="flex items-center gap-2">
+                                      {agentIconUrl ? (
+                                        <Image
+                                          src={agentIconUrl}
+                                          alt={p.agent ?? "Agent"}
+                                          width={32}
+                                          height={32}
+                                          className="h-8 w-8 shrink-0 object-contain mix-blend-screen"
+                                        />
+                                      ) : (
+                                        <div className="flex h-8 w-8 shrink-0 items-center justify-center text-[9px] font-bold text-white/40">
+                                          {p.agent?.slice(0, 2) ?? "??"}
+                                        </div>
+                                      )}
+                                      <div className="min-w-0 flex-1">
+                                        <div className="flex items-center gap-1">
+                                          <span className="truncate text-[13px] font-bold text-white">
+                                            {name}
+                                          </span>
+                                          {tag ? (
+                                            <span className="shrink-0 text-[10px] text-white/40">
+                                              #{tag}
+                                            </span>
+                                          ) : null}
+                                          {isMvp ? (
+                                            <span className="shrink-0 text-[9px] font-black text-amber-300">
+                                              MVP
+                                            </span>
+                                          ) : null}
+                                        </div>
+                                      </div>
+                                      <div className="shrink-0 text-right">
+                                        <p className="text-[9px] font-black tracking-wider text-white/35 uppercase">
+                                          ACS
+                                        </p>
+                                        <p className="font-mono text-sm font-black text-emerald-300">
+                                          {p.acs}
+                                        </p>
+                                      </div>
+                                    </div>
+                                    <div className="mt-1.5 grid grid-cols-4 gap-1 pl-10 text-center">
+                                      <div>
+                                        <p className="text-[8px] font-black tracking-wider text-white/35 uppercase">
+                                          K/D/A
+                                        </p>
+                                        <p className="font-mono text-[11px] font-bold tabular-nums text-white/85">
+                                          <span className="text-emerald-300">
+                                            {p.kills}
+                                          </span>
+                                          /
+                                          <span className="text-rose-300">
+                                            {p.deaths}
+                                          </span>
+                                          /
+                                          <span className="text-white/55">
+                                            {p.assists}
+                                          </span>
+                                        </p>
+                                      </div>
+                                      <div>
+                                        <p className="text-[8px] font-black tracking-wider text-white/35 uppercase">
+                                          K/D
+                                        </p>
+                                        <p
+                                          className={`font-mono text-[11px] font-bold tabular-nums ${
+                                            kdNum >= 1.2
+                                              ? "text-emerald-400"
+                                              : kdNum < 0.8
+                                                ? "text-rose-400"
+                                                : "text-white/80"
+                                          }`}
+                                        >
+                                          {kdNum.toFixed(1)}
+                                        </p>
+                                      </div>
+                                      <div>
+                                        <p className="text-[8px] font-black tracking-wider text-white/35 uppercase">
+                                          FK/FD
+                                        </p>
+                                        <p className="font-mono text-[11px] font-bold tabular-nums">
+                                          <span className="text-cyan-300">
+                                            {p.firstKills ?? 0}
+                                          </span>
+                                          <span className="text-white/25">/</span>
+                                          <span className="text-orange-300/90">
+                                            {p.firstDeaths ?? 0}
+                                          </span>
+                                        </p>
+                                      </div>
+                                      <div>
+                                        <p className="text-[8px] font-black tracking-wider text-white/35 uppercase">
+                                          ADR·HS
+                                        </p>
+                                        <p className="font-mono text-[11px] font-bold tabular-nums text-white/80">
+                                          {Math.round(p.adr)}·
+                                          {Math.round(p.hsPercent)}%
+                                        </p>
+                                      </div>
+                                    </div>
+                                  </li>
+                                );
+                              })
+                            )}
+                          </ul>
+
+                          {/* Desktop table */}
+                          <div className="hidden overflow-x-auto sm:block">
+                            <table className="w-full min-w-[720px] border-collapse text-left">
                               <thead>
                                 <tr className="border-b border-white/[0.08] bg-[#0c1421]/90 text-[10px] font-black uppercase tracking-[0.14em] text-white/40">
-                                  <th className="py-3 px-4 w-[280px]">Player</th>
+                                  <th className="w-[280px] px-4 py-3">Player</th>
                                   <th
-                                    className="py-3 px-2 text-center cursor-pointer hover:text-white transition-colors w-[90px]"
+                                    className="w-[90px] cursor-pointer px-2 py-3 text-center transition-colors hover:text-white"
                                     onClick={() => handleSortHeaderClick("acs")}
                                   >
-                                    <span className="inline-flex items-center gap-1 text-emerald-300 font-bold">
-                                      ACS {sortField === "acs" ? (sortAsc ? "▲" : "▼") : ""}
+                                    <span className="inline-flex items-center gap-1 font-bold text-emerald-300">
+                                      ACS{" "}
+                                      {sortField === "acs"
+                                        ? sortAsc
+                                          ? "▲"
+                                          : "▼"
+                                        : ""}
                                     </span>
                                   </th>
                                   <th
-                                    className="py-3 px-2 text-center cursor-pointer hover:text-white transition-colors w-[65px]"
-                                    onClick={() => handleSortHeaderClick("kills")}
+                                    className="w-[65px] cursor-pointer px-2 py-3 text-center transition-colors hover:text-white"
+                                    onClick={() =>
+                                      handleSortHeaderClick("kills")
+                                    }
                                   >
-                                    K {sortField === "kills" ? (sortAsc ? "▲" : "▼") : ""}
+                                    K{" "}
+                                    {sortField === "kills"
+                                      ? sortAsc
+                                        ? "▲"
+                                        : "▼"
+                                      : ""}
                                   </th>
-                                  <th className="py-3 px-2 text-center w-[65px]">D</th>
-                                  <th className="py-3 px-2 text-center w-[65px]">A</th>
+                                  <th className="w-[65px] px-2 py-3 text-center">
+                                    D
+                                  </th>
+                                  <th className="w-[65px] px-2 py-3 text-center">
+                                    A
+                                  </th>
                                   <th
-                                    className="py-3 px-2 text-center cursor-pointer hover:text-white transition-colors w-[85px]"
+                                    className="w-[85px] cursor-pointer px-2 py-3 text-center transition-colors hover:text-white"
                                     onClick={() => handleSortHeaderClick("kd")}
                                   >
-                                    K/D {sortField === "kd" ? (sortAsc ? "▲" : "▼") : ""}
+                                    K/D{" "}
+                                    {sortField === "kd"
+                                      ? sortAsc
+                                        ? "▲"
+                                        : "▼"
+                                      : ""}
                                   </th>
                                   <th
-                                    className="py-3 px-2 text-center cursor-pointer hover:text-white transition-colors w-[65px]"
-                                    onClick={() => handleSortHeaderClick("firstKills")}
+                                    className="w-[65px] cursor-pointer px-2 py-3 text-center transition-colors hover:text-white"
+                                    onClick={() =>
+                                      handleSortHeaderClick("firstKills")
+                                    }
                                     title="First kills"
                                   >
-                                    FK {sortField === "firstKills" ? (sortAsc ? "▲" : "▼") : ""}
+                                    FK{" "}
+                                    {sortField === "firstKills"
+                                      ? sortAsc
+                                        ? "▲"
+                                        : "▼"
+                                      : ""}
                                   </th>
                                   <th
-                                    className="py-3 px-2 text-center cursor-pointer hover:text-white transition-colors w-[65px]"
-                                    onClick={() => handleSortHeaderClick("firstDeaths")}
+                                    className="w-[65px] cursor-pointer px-2 py-3 text-center transition-colors hover:text-white"
+                                    onClick={() =>
+                                      handleSortHeaderClick("firstDeaths")
+                                    }
                                     title="First deaths"
                                   >
-                                    FD {sortField === "firstDeaths" ? (sortAsc ? "▲" : "▼") : ""}
+                                    FD{" "}
+                                    {sortField === "firstDeaths"
+                                      ? sortAsc
+                                        ? "▲"
+                                        : "▼"
+                                      : ""}
                                   </th>
                                   <th
-                                    className="py-3 px-2 text-center cursor-pointer hover:text-white transition-colors w-[85px]"
+                                    className="w-[85px] cursor-pointer px-2 py-3 text-center transition-colors hover:text-white"
                                     onClick={() => handleSortHeaderClick("adr")}
                                   >
-                                    ADR {sortField === "adr" ? (sortAsc ? "▲" : "▼") : ""}
+                                    ADR{" "}
+                                    {sortField === "adr"
+                                      ? sortAsc
+                                        ? "▲"
+                                        : "▼"
+                                      : ""}
                                   </th>
                                   <th
-                                    className="py-3 px-2 text-center cursor-pointer hover:text-white transition-colors w-[80px]"
-                                    onClick={() => handleSortHeaderClick("hsPercent")}
+                                    className="w-[80px] cursor-pointer px-2 py-3 text-center transition-colors hover:text-white"
+                                    onClick={() =>
+                                      handleSortHeaderClick("hsPercent")
+                                    }
                                   >
-                                    HS% {sortField === "hsPercent" ? (sortAsc ? "▲" : "▼") : ""}
+                                    HS%{" "}
+                                    {sortField === "hsPercent"
+                                      ? sortAsc
+                                        ? "▲"
+                                        : "▼"
+                                      : ""}
                                   </th>
                                 </tr>
                               </thead>
                               <tbody className="divide-y divide-white/[0.04]">
                                 {team.players.map((p) => {
                                   const { name, tag } = parseRiotName(p.riotId);
-                                  const kdNum = p.deaths === 0 ? p.kills : p.kills / p.deaths;
-                                  const isMvp = selected.mvpRiotId === p.riotId;
-                                  const agentIconUrl = getAgentIconUrl(p.agent);
+                                  const kdNum =
+                                    p.deaths === 0
+                                      ? p.kills
+                                      : p.kills / p.deaths;
+                                  const isMvp =
+                                    selected.mvpRiotId === p.riotId;
+                                  const agentIconUrl = getAgentIconUrl(
+                                    p.agent,
+                                  );
 
                                   return (
                                     <tr
@@ -518,13 +704,15 @@ export default function TournamentGamesSection({ slug, initialGames }: Props) {
                                           : "hover:bg-white/[0.04]"
                                       }`}
                                     >
-                                      <td className="py-2.5 px-4">
+                                      <td className="px-4 py-2.5">
                                         <div className="flex items-center gap-3">
                                           <div className="shrink-0">
                                             {agentIconUrl ? (
-                                              <img
+                                              <Image
                                                 src={agentIconUrl}
                                                 alt={p.agent ?? "Agent"}
+                                                width={40}
+                                                height={40}
                                                 className="h-10 w-10 object-contain mix-blend-screen"
                                               />
                                             ) : (
@@ -533,10 +721,9 @@ export default function TournamentGamesSection({ slug, initialGames }: Props) {
                                               </div>
                                             )}
                                           </div>
-
                                           <div className="min-w-0 flex-1">
-                                            <div className="flex items-center gap-1.5 flex-wrap">
-                                              <span className="truncate font-bold text-sm text-white group-hover:text-emerald-300 transition-colors">
+                                            <div className="flex flex-wrap items-center gap-1.5">
+                                              <span className="truncate text-sm font-bold text-white transition-colors group-hover:text-emerald-300">
                                                 {name}
                                               </span>
                                               {tag ? (
@@ -545,7 +732,7 @@ export default function TournamentGamesSection({ slug, initialGames }: Props) {
                                                 </span>
                                               ) : null}
                                               {isMvp ? (
-                                                <span className="inline-flex items-center gap-0.5 rounded bg-amber-400/20 px-1.5 py-0.5 text-[9px] font-black uppercase text-amber-300 ring-1 ring-amber-400/40 shadow-[0_0_10px_rgba(245,158,11,0.25)]">
+                                                <span className="inline-flex items-center gap-0.5 rounded bg-amber-400/20 px-1.5 py-0.5 text-[9px] font-black text-amber-300 uppercase ring-1 ring-amber-400/40 shadow-[0_0_10px_rgba(245,158,11,0.25)]">
                                                   👑 MVP
                                                 </span>
                                               ) : null}
@@ -553,42 +740,41 @@ export default function TournamentGamesSection({ slug, initialGames }: Props) {
                                           </div>
                                         </div>
                                       </td>
-
-                                      <td className="py-2.5 px-2 text-center align-middle font-mono font-black text-base text-emerald-300">
+                                      <td className="px-2 py-2.5 text-center align-middle font-mono text-base font-black text-emerald-300">
                                         {p.acs}
                                       </td>
-
-                                      <td className="py-2.5 px-2 text-center align-middle font-mono font-bold text-sm text-white">
+                                      <td className="px-2 py-2.5 text-center align-middle font-mono text-sm font-bold text-white">
                                         {p.kills}
                                       </td>
-
-                                      <td className="py-2.5 px-2 text-center align-middle font-mono text-sm text-white/60">
+                                      <td className="px-2 py-2.5 text-center align-middle font-mono text-sm text-white/60">
                                         {p.deaths}
                                       </td>
-
-                                      <td className="py-2.5 px-2 text-center align-middle font-mono text-sm text-white/60">
+                                      <td className="px-2 py-2.5 text-center align-middle font-mono text-sm text-white/60">
                                         {p.assists}
                                       </td>
-
-                                      <td className="py-2.5 px-2 text-center align-middle font-mono font-bold text-sm">
-                                        <span className={kdNum >= 1.2 ? "text-emerald-400" : kdNum < 0.8 ? "text-rose-400" : "text-white/80"}>
+                                      <td className="px-2 py-2.5 text-center align-middle font-mono text-sm font-bold">
+                                        <span
+                                          className={
+                                            kdNum >= 1.2
+                                              ? "text-emerald-400"
+                                              : kdNum < 0.8
+                                                ? "text-rose-400"
+                                                : "text-white/80"
+                                          }
+                                        >
                                           {kdNum.toFixed(1)}
                                         </span>
                                       </td>
-
-                                      <td className="py-2.5 px-2 text-center align-middle font-mono text-sm font-bold text-cyan-300">
+                                      <td className="px-2 py-2.5 text-center align-middle font-mono text-sm font-bold text-cyan-300">
                                         {p.firstKills ?? 0}
                                       </td>
-
-                                      <td className="py-2.5 px-2 text-center align-middle font-mono text-sm font-bold text-orange-300/90">
+                                      <td className="px-2 py-2.5 text-center align-middle font-mono text-sm font-bold text-orange-300/90">
                                         {p.firstDeaths ?? 0}
                                       </td>
-
-                                      <td className="py-2.5 px-2 text-center align-middle font-mono text-sm text-white/80">
+                                      <td className="px-2 py-2.5 text-center align-middle font-mono text-sm text-white/80">
                                         {p.adr.toFixed(1)}
                                       </td>
-
-                                      <td className="py-2.5 px-2 text-center align-middle font-mono text-sm text-white/80">
+                                      <td className="px-2 py-2.5 text-center align-middle font-mono text-sm text-white/80">
                                         {Math.round(p.hsPercent)}%
                                       </td>
                                     </tr>
@@ -597,7 +783,10 @@ export default function TournamentGamesSection({ slug, initialGames }: Props) {
 
                                 {team.players.length === 0 ? (
                                   <tr>
-                                    <td colSpan={10} className="px-4 py-6 text-center text-sm text-white/35">
+                                    <td
+                                      colSpan={10}
+                                      className="px-4 py-6 text-center text-sm text-white/35"
+                                    >
                                       No player records mapped for this team.
                                     </td>
                                   </tr>

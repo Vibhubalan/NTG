@@ -30,8 +30,37 @@ export const getTournamentBySlug = cache(async (slug: string): Promise<Tournamen
   return tournamentRepo.findPreviewBySlug(slug);
 });
 
+/** Cache tag for a tournament's shared (non-personalized) detail payload. */
+export function tournamentDetailTag(slug: string): string {
+  return `tournament-detail:${slug}`;
+}
+
+/**
+ * Shared detail (teams, bracket, placements, prize info, ...) is expensive
+ * (deep nested query) but identical for every visitor. Cache it across
+ * requests/users with a short stale-while-revalidate window: warm hits are
+ * instant, and a request landing just after expiry still gets the (slightly
+ * stale) cached payload immediately while Next refetches in the background —
+ * so nobody, including the very next visitor after expiry, blocks on the DB.
+ */
+async function getCachedTournamentDetailShared(slug: string) {
+  return unstable_cache(
+    () => tournamentRepo.findDetailBySlug(slug),
+    ["tournament-detail-shared", slug],
+    { revalidate: 20, tags: [tournamentDetailTag(slug)] },
+  )();
+}
+
 export const getTournamentDetail = cache(async (slug: string, userId?: string) => {
-  return tournamentRepo.findDetailBySlug(slug, userId);
+  const shared = await getCachedTournamentDetailShared(slug);
+  if (!shared) return null;
+
+  const role = userId ? shared.registrationRoleByUserId[userId] : undefined;
+  return {
+    ...shared.detail,
+    userRegistered: Boolean(role),
+    userParticipantRole: role ?? null,
+  };
 });
 
 export async function getActiveRegistrationBanner(): Promise<TournamentRegistrationBanner | null> {

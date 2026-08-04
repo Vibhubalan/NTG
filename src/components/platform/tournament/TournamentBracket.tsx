@@ -521,14 +521,14 @@ function RoundRobinBracketView({
   return (
     <div className="space-y-8">
       {/* Stage Shell */}
-      <div className="overflow-hidden rounded-2xl border border-white/[0.08] bg-[#070a12] p-6 sm:p-8 shadow-2xl">
+      <div className="overflow-hidden rounded-2xl border border-white/[0.08] bg-[#070a12] p-3 sm:p-8 shadow-2xl">
         {/* Header & Main View Switcher: Standings | Matches */}
-        <div className="flex flex-col gap-6 sm:flex-row sm:items-center sm:justify-between border-b border-white/[0.06] pb-6">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between border-b border-white/[0.06] pb-4 sm:pb-6 sm:gap-6">
           <div>
             <span className="text-[11px] font-bold uppercase tracking-[0.22em] text-[#22c55e]">
               {stageName || "GROUP STAGE"}
             </span>
-            <h3 className="mt-1 font-display text-xl sm:text-2xl font-extrabold uppercase tracking-tight text-white">
+            <h3 className="mt-1 font-display text-lg sm:text-2xl font-extrabold uppercase tracking-tight text-white">
               {tournamentName || bracket.tournamentName || "TOURNAMENT QUALIFIERS"}
             </h3>
             <p className="mt-1 text-xs font-medium text-white/40">
@@ -537,11 +537,11 @@ function RoundRobinBracketView({
           </div>
 
           {/* STANDINGS | MATCHES Main Tabs */}
-          <div className="flex items-center gap-1.5 rounded-xl bg-white/[0.04] p-1 border border-white/[0.06] w-fit">
+          <div className="flex items-center gap-1.5 rounded-xl bg-white/[0.04] p-1 border border-white/[0.06] w-full sm:w-fit">
             <button
               type="button"
               onClick={() => setMainTab("standings")}
-              className={`rounded-lg px-6 py-2.5 text-xs font-bold uppercase tracking-[0.18em] transition-all ${
+              className={`flex-1 rounded-lg px-4 py-2.5 text-xs font-bold uppercase tracking-[0.18em] transition-all sm:flex-none sm:px-6 ${
                 mainTab === "standings"
                   ? "bg-white text-black shadow-lg"
                   : "text-white/45 hover:text-white"
@@ -552,7 +552,7 @@ function RoundRobinBracketView({
             <button
               type="button"
               onClick={() => setMainTab("matches")}
-              className={`rounded-lg px-6 py-2.5 text-xs font-bold uppercase tracking-[0.18em] transition-all ${
+              className={`flex-1 rounded-lg px-4 py-2.5 text-xs font-bold uppercase tracking-[0.18em] transition-all sm:flex-none sm:px-6 ${
                 mainTab === "matches"
                   ? "bg-white text-black shadow-lg"
                   : "text-white/45 hover:text-white"
@@ -564,20 +564,20 @@ function RoundRobinBracketView({
         </div>
 
         {/* Group Cards Container */}
-        <div className="mt-8 space-y-10">
+        <div className="mt-5 space-y-6 sm:mt-8 sm:space-y-10">
           {groups.map((group) => {
             const computedStandings = computeGroupHistoryAndStats(group);
 
             return (
               <div
                 key={group.id}
-                className="rounded-xl border border-white/[0.08] bg-[#0c101b]/70 p-6 shadow-xl"
+                className="rounded-xl border border-white/[0.08] bg-[#0c101b]/70 p-3 shadow-xl sm:p-6"
               >
                 {/* Group Title */}
-                <div className="mb-6 flex items-center justify-between border-b border-white/[0.06] pb-4">
+                <div className="mb-4 flex items-center justify-between border-b border-white/[0.06] pb-3 sm:mb-6 sm:pb-4">
                   <div className="flex items-center gap-3">
                     <span className="h-2.5 w-2.5 rounded-full bg-[#22c55e]" />
-                    <h4 className="font-display text-lg font-black uppercase tracking-wide text-white">
+                    <h4 className="font-display text-base font-black uppercase tracking-wide text-white sm:text-lg">
                       {group.name}
                     </h4>
                   </div>
@@ -585,91 +585,166 @@ function RoundRobinBracketView({
 
                 {/* Sub-View Content: Standings or Matches */}
                 {mainTab === "standings" ? (
-                  /* Standings Table */
-                  <div className="overflow-x-auto rounded-xl border border-white/[0.06] bg-[#070a12]">
-                    <table className="w-full text-left text-xs">
-                      <thead>
-                        <tr className="border-b border-white/[0.08] bg-white/[0.02] text-[10px] font-bold uppercase tracking-wider text-white/40">
-                          <th className="py-3 px-4">Rank</th>
-                          <th className="py-3 px-4">Participant</th>
-                          <th className="py-3 px-4 text-center">Match W-L-T</th>
-                          <th className="py-3 px-4 text-center">Pts Diff</th>
-                          <th className="py-3 px-4 text-center">Pts</th>
-                          <th className="py-3 px-4 text-center">TB</th>
-                          <th className="py-3 px-4 text-center">Set Wins</th>
-                          <th className="py-3 px-4 text-center">Set Ties</th>
-                          <th className="py-3 px-4 text-center">Match History</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-white/[0.04]">
-                        {computedStandings.length > 0 ? (
-                          computedStandings.map((row, idx) => (
-                            <tr
-                              key={idx}
-                              className="transition-colors hover:bg-white/[0.02]"
-                            >
-                              <td className="py-3.5 px-4 font-bold text-white/80 tabular-nums">
-                                {row.rank}
-                              </td>
-                              <td className="py-3.5 px-4 font-extrabold uppercase tracking-wide text-white">
-                                {row.name}
-                              </td>
-                              <td className="py-3.5 px-4 text-center font-semibold text-white/70 tabular-nums">
-                                {row.matchRecord}
-                              </td>
-                              <td className="py-3.5 px-4 text-center font-semibold text-white/60 tabular-nums">
-                                {row.ptsDiff > 0 ? `+${row.ptsDiff}` : row.ptsDiff}
-                              </td>
-                              <td className="py-3.5 px-4 text-center font-black text-[#22c55e] tabular-nums text-sm">
-                                {row.pts}
-                              </td>
-                              <td className="py-3.5 px-4 text-center text-white/40 tabular-nums">
-                                {row.tb}
-                              </td>
-                              <td className="py-3.5 px-4 text-center text-white/50 tabular-nums">
-                                {row.setWins}
-                              </td>
-                              <td className="py-3.5 px-4 text-center text-white/50 tabular-nums">
-                                {row.setTies}
-                              </td>
-                              <td className="py-3.5 px-4 text-center">
-                                <div className="flex items-center justify-center gap-1.5">
-                                  {row.matchHistory && row.matchHistory.length > 0 ? (
-                                    row.matchHistory.map((res, hIdx) => (
-                                      <span
-                                        key={hIdx}
-                                        className={`flex h-5 w-5 items-center justify-center rounded text-[10px] font-black uppercase shadow-sm ${
-                                          res === "W"
-                                            ? "bg-[#22c55e] text-[#070a12]"
-                                            : res === "L"
-                                              ? "bg-rose-500/80 text-white"
-                                              : "bg-amber-500/80 text-white"
-                                        }`}
-                                      >
-                                        {res}
-                                      </span>
-                                    ))
-                                  ) : (
-                                    <span className="text-white/20">—</span>
-                                  )}
+                  <>
+                    {/* Mobile compact standings — no horizontal scroll */}
+                    <div className="overflow-hidden rounded-xl border border-white/[0.06] bg-[#070a12] sm:hidden">
+                      {computedStandings.length > 0 ? (
+                        <>
+                          <div className="grid grid-cols-[1.5rem_minmax(0,1fr)_3.25rem_2.25rem] items-center gap-2 border-b border-white/[0.08] bg-white/[0.02] px-2.5 py-2 text-[9px] font-bold uppercase tracking-wider text-white/40">
+                            <span>#</span>
+                            <span>Team</span>
+                            <span className="text-center">W-L-T</span>
+                            <span className="text-right">Pts</span>
+                          </div>
+                          <ul className="divide-y divide-white/[0.05]">
+                            {computedStandings.map((row, idx) => (
+                              <li key={idx} className="px-2.5 py-2.5">
+                                <div className="grid grid-cols-[1.5rem_minmax(0,1fr)_3.25rem_2.25rem] items-center gap-2">
+                                  <span className="font-mono text-[11px] font-bold tabular-nums text-white/70">
+                                    {row.rank}
+                                  </span>
+                                  <span className="min-w-0 text-[11px] font-extrabold uppercase leading-snug tracking-wide text-white">
+                                    {row.name}
+                                  </span>
+                                  <span className="text-center font-mono text-[11px] font-semibold tabular-nums whitespace-nowrap text-white/70">
+                                    {row.matchRecord}
+                                  </span>
+                                  <span className="text-right font-mono text-sm font-black tabular-nums text-[#22c55e]">
+                                    {row.pts}
+                                  </span>
                                 </div>
+                                <div className="mt-1.5 flex flex-wrap items-center justify-between gap-2 pl-8 text-[10px] text-white/40">
+                                  <span className="font-mono tabular-nums">
+                                    Pts Diff{" "}
+                                    {row.ptsDiff > 0
+                                      ? `+${row.ptsDiff}`
+                                      : row.ptsDiff}
+                                  </span>
+                                  <div className="flex items-center gap-1">
+                                    {row.matchHistory &&
+                                    row.matchHistory.length > 0 ? (
+                                      row.matchHistory.map((res, hIdx) => (
+                                        <span
+                                          key={hIdx}
+                                          className={`flex h-4 w-4 items-center justify-center rounded text-[9px] font-black uppercase ${
+                                            res === "W"
+                                              ? "bg-[#22c55e] text-[#070a12]"
+                                              : res === "L"
+                                                ? "bg-rose-500/80 text-white"
+                                                : "bg-amber-500/80 text-white"
+                                          }`}
+                                        >
+                                          {res}
+                                        </span>
+                                      ))
+                                    ) : (
+                                      <span className="text-white/20">—</span>
+                                    )}
+                                  </div>
+                                </div>
+                              </li>
+                            ))}
+                          </ul>
+                        </>
+                      ) : (
+                        <p className="py-8 text-center text-sm text-white/40 italic">
+                          No team standings available yet.
+                        </p>
+                      )}
+                    </div>
+
+                    {/* Desktop full table */}
+                    <div className="hidden overflow-x-auto rounded-xl border border-white/[0.06] bg-[#070a12] sm:block">
+                      <table className="w-full text-left text-xs">
+                        <thead>
+                          <tr className="border-b border-white/[0.08] bg-white/[0.02] text-[10px] font-bold uppercase tracking-wider text-white/40">
+                            <th className="py-3 px-4">Rank</th>
+                            <th className="py-3 px-4">Participant</th>
+                            <th className="py-3 px-4 text-center">Match W-L-T</th>
+                            <th className="py-3 px-4 text-center">Pts Diff</th>
+                            <th className="py-3 px-4 text-center">Pts</th>
+                            <th className="py-3 px-4 text-center">TB</th>
+                            <th className="py-3 px-4 text-center">Set Wins</th>
+                            <th className="py-3 px-4 text-center">Set Ties</th>
+                            <th className="py-3 px-4 text-center">Match History</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-white/[0.04]">
+                          {computedStandings.length > 0 ? (
+                            computedStandings.map((row, idx) => (
+                              <tr
+                                key={idx}
+                                className="transition-colors hover:bg-white/[0.02]"
+                              >
+                                <td className="py-3.5 px-4 font-bold text-white/80 tabular-nums">
+                                  {row.rank}
+                                </td>
+                                <td className="py-3.5 px-4 font-extrabold uppercase tracking-wide text-white">
+                                  {row.name}
+                                </td>
+                                <td className="py-3.5 px-4 text-center font-semibold text-white/70 tabular-nums whitespace-nowrap">
+                                  {row.matchRecord}
+                                </td>
+                                <td className="py-3.5 px-4 text-center font-semibold text-white/60 tabular-nums">
+                                  {row.ptsDiff > 0
+                                    ? `+${row.ptsDiff}`
+                                    : row.ptsDiff}
+                                </td>
+                                <td className="py-3.5 px-4 text-center font-black text-[#22c55e] tabular-nums text-sm">
+                                  {row.pts}
+                                </td>
+                                <td className="py-3.5 px-4 text-center text-white/40 tabular-nums">
+                                  {row.tb}
+                                </td>
+                                <td className="py-3.5 px-4 text-center text-white/50 tabular-nums">
+                                  {row.setWins}
+                                </td>
+                                <td className="py-3.5 px-4 text-center text-white/50 tabular-nums">
+                                  {row.setTies}
+                                </td>
+                                <td className="py-3.5 px-4 text-center">
+                                  <div className="flex items-center justify-center gap-1.5">
+                                    {row.matchHistory &&
+                                    row.matchHistory.length > 0 ? (
+                                      row.matchHistory.map((res, hIdx) => (
+                                        <span
+                                          key={hIdx}
+                                          className={`flex h-5 w-5 items-center justify-center rounded text-[10px] font-black uppercase shadow-sm ${
+                                            res === "W"
+                                              ? "bg-[#22c55e] text-[#070a12]"
+                                              : res === "L"
+                                                ? "bg-rose-500/80 text-white"
+                                                : "bg-amber-500/80 text-white"
+                                          }`}
+                                        >
+                                          {res}
+                                        </span>
+                                      ))
+                                    ) : (
+                                      <span className="text-white/20">—</span>
+                                    )}
+                                  </div>
+                                </td>
+                              </tr>
+                            ))
+                          ) : (
+                            <tr>
+                              <td
+                                colSpan={9}
+                                className="py-8 text-center text-white/40 italic"
+                              >
+                                No team standings available yet.
                               </td>
                             </tr>
-                          ))
-                        ) : (
-                          <tr>
-                            <td colSpan={9} className="py-8 text-center text-white/40 italic">
-                              No team standings available yet.
-                            </td>
-                          </tr>
-                        )}
-                      </tbody>
-                    </table>
-                  </div>
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
+                  </>
                 ) : (
-                  /* Matches Grid: Round 1 to 5 grid (Displays full names clearly) */
-                  <div className="overflow-x-auto pb-2">
-                    <div className="grid min-w-[900px] grid-cols-5 gap-3 sm:gap-4">
+                  /* Matches: stack rounds on mobile, side-by-side on desktop */
+                  <div className="space-y-4 sm:overflow-x-auto sm:pb-2">
+                    <div className="grid grid-cols-1 gap-4 sm:min-w-[900px] sm:grid-cols-5 sm:gap-3">
                       {group.rounds.map((round) => (
                         <div key={round.id} className="min-w-0 space-y-3">
                           <div className="rounded-lg bg-white/[0.03] border border-white/[0.06] py-2 px-2 text-center">

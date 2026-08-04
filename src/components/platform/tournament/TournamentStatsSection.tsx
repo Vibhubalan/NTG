@@ -1,9 +1,12 @@
 "use client";
 
+import Image from "next/image";
 import { useMemo, useState } from "react";
 import { getAgentIconUrl, getAgentRole, type AgentRole } from "@/lib/valorant-agent";
 import {
   aggregatePlayerStats,
+  computeStandoutBaseline,
+  weightedAcs,
   type AggregatedPlayerStats,
   type TournamentStatsEligibility,
 } from "@/lib/tournament-stats";
@@ -14,6 +17,7 @@ type AggregatedPlayer = AggregatedPlayerStats;
 type StatsSubTab = "players" | "meta";
 
 type SortField =
+  | "rating"
   | "totalKills"
   | "avgAcs"
   | "gamesPlayed"
@@ -24,13 +28,18 @@ type SortField =
   | "totalFirstDeaths";
 type SortDir = "asc" | "desc";
 
+/** Player row plus the Bayesian-weighted ACS used for the default ranking. */
+type RatedPlayer = AggregatedPlayer & { rating: number };
+
 function parseRiotName(riotId: string) {
   const [name, tag] = riotId.split("#");
   return { name: name ?? riotId, tag: tag ?? "" };
 }
 
-function fieldValue(p: AggregatedPlayer, field: SortField): number {
+function fieldValue(p: RatedPlayer, field: SortField): number {
   switch (field) {
+    case "rating":
+      return p.rating;
     case "mvpCount":
       return p.mvpCount;
     case "totalKills":
@@ -78,6 +87,9 @@ function rowStyles(idx: number, mvps: number) {
   return { rowBgClass, mvpBadgeClass, nameColorClass, rankClass };
 }
 
+/** Where sorting lands initially, and returns to on the third click of a column. */
+const DEFAULT_SORT: SortField = "rating";
+
 type Props = {
   games: PublicGame[];
   eligibility?: TournamentStatsEligibility;
@@ -85,7 +97,7 @@ type Props = {
 
 export default function TournamentStatsSection({ games, eligibility }: Props) {
   const [subTab, setSubTab] = useState<StatsSubTab>("players");
-  const [sortBy, setSortBy] = useState<SortField>("totalKills");
+  const [sortBy, setSortBy] = useState<SortField>(DEFAULT_SORT);
   const [sortDir, setSortDir] = useState<SortDir>("desc");
   const [selectedRole, setSelectedRole] = useState<AgentRole | "ALL">("ALL");
   const [searchQuery, setSearchQuery] = useState("");
@@ -100,8 +112,18 @@ export default function TournamentStatsSection({ games, eligibility }: Props) {
     });
   }, [games, selectedRole, eligibility]);
 
+  // Baseline follows the visible pool, so filtering to a role compares players
+  // against that role rather than against Duelist ACS.
+  const ratedPlayers = useMemo<RatedPlayer[]>(() => {
+    const baseline = computeStandoutBaseline(filteredPlayers);
+    return filteredPlayers.map((p) => ({
+      ...p,
+      rating: weightedAcs(p.avgAcs, p.gamesPlayed, baseline),
+    }));
+  }, [filteredPlayers]);
+
   const sorted = useMemo(() => {
-    const arr = [...filteredPlayers];
+    const arr = [...ratedPlayers];
     arr.sort((a, b) => {
       const primary = fieldValue(a, sortBy) - fieldValue(b, sortBy);
       if (primary !== 0) return sortDir === "desc" ? -primary : primary;
@@ -125,7 +147,7 @@ export default function TournamentStatsSection({ games, eligibility }: Props) {
       return 0;
     });
     return arr;
-  }, [filteredPlayers, sortBy, sortDir]);
+  }, [ratedPlayers, sortBy, sortDir]);
 
   const searchedPlayers = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
@@ -143,7 +165,7 @@ export default function TournamentStatsSection({ games, eligibility }: Props) {
       if (sortDir === "desc") {
         setSortDir("asc");
       } else {
-        setSortBy("totalKills");
+        setSortBy(DEFAULT_SORT);
         setSortDir("desc");
       }
     } else {
@@ -183,6 +205,7 @@ export default function TournamentStatsSection({ games, eligibility }: Props) {
   }
 
   const sortChips: { field: SortField; label: string }[] = [
+    { field: "rating", label: "Rating" },
     { field: "totalKills", label: "KDA" },
     { field: "avgAcs", label: "ACS" },
     { field: "kd", label: "K/D" },
@@ -238,6 +261,10 @@ export default function TournamentStatsSection({ games, eligibility }: Props) {
                 <p className="mt-0.5 text-xs text-white/40">
                   {searchedPlayers.length} players
                 </p>
+                <p className="mt-1.5 text-[11px] leading-snug text-white/35">
+                  Rating balances score with how many games someone played —
+                  one hot match can&apos;t beat a full tournament run.
+                </p>
               </div>
               <button
                 type="button"
@@ -277,14 +304,14 @@ export default function TournamentStatsSection({ games, eligibility }: Props) {
               </svg>
             </div>
 
-            {/* Mobile sort chips — inset rings so edges aren’t clipped by overflow */}
-            <div className="grid w-full min-w-0 grid-cols-5 gap-1.5 md:hidden">
+            {/* Mobile sort chips */}
+            <div className="grid w-full min-w-0 grid-cols-6 gap-1 md:hidden">
               {sortChips.map((chip) => (
                 <button
                   key={chip.field}
                   type="button"
                   onClick={() => toggleSort(chip.field)}
-                  className={`inline-flex min-w-0 items-center justify-center rounded-lg border px-0.5 py-2 text-center text-[9px] font-black tracking-wide uppercase transition-all ${
+                  className={`inline-flex min-w-0 items-center justify-center rounded-md border px-0.5 py-1.5 text-center text-[9px] font-black tracking-wide uppercase transition-all ${
                     sortBy === chip.field
                       ? "border-emerald-400/50 bg-emerald-400/15 text-emerald-300"
                       : "border-white/10 bg-white/[0.03] text-white/50"
@@ -299,188 +326,166 @@ export default function TournamentStatsSection({ games, eligibility }: Props) {
             </div>
           </div>
 
-          {/* ── Mobile cards ── */}
-          <div className="space-y-4 md:hidden">
+          {/* ── Mobile compact leaderboard ── */}
+          <div className="overflow-hidden rounded-xl border border-white/10 bg-[#080d16] md:hidden">
             {searchedPlayers.length === 0 ? (
-              <div className="rounded-2xl border border-white/10 bg-[#080d16] px-4 py-10 text-center text-sm text-white/40 italic">
+              <div className="px-4 py-10 text-center text-sm text-white/40 italic">
                 {searchQuery
                   ? `No players found matching "${searchQuery}".`
                   : `No players found for agent role filter "${selectedRole}".`}
               </div>
             ) : (
-              searchedPlayers.map((p, idx) => {
-                const { name, tag } = parseRiotName(p.riotId);
-                const kd = playerKd(p);
-                const agentIcon = getAgentIconUrl(p.mostPlayedAgent);
-                const { mvpBadgeClass, nameColorClass } = rowStyles(
-                  idx,
-                  p.mvpCount,
-                );
-                const topAgents = Object.entries(p.agentCounts).sort(
-                  (a, b) => b[1] - a[1],
-                );
-                const cardSurface =
-                  idx < 3
-                    ? "border-emerald-400/20 bg-[#0b1420] shadow-[inset_0_1px_0_rgba(52,211,153,0.12)]"
-                    : "border-white/[0.08] bg-[#0a0f18]";
+              <>
+                <div className="grid grid-cols-[1.5rem_minmax(0,1fr)_3.25rem_2.5rem_2.5rem_1.75rem] items-center gap-1.5 border-b border-white/10 bg-black/40 px-2.5 py-2 text-[9px] font-black tracking-wider text-white/40 uppercase">
+                  <span>#</span>
+                  <span>Player</span>
+                  <span className="text-right">Rating</span>
+                  <span className="text-right">ACS</span>
+                  <span className="text-right">K/D</span>
+                  <span className="text-right">GP</span>
+                </div>
+                <ul className="divide-y divide-white/[0.06]">
+                  {searchedPlayers.map((p, idx) => {
+                    const { name, tag } = parseRiotName(p.riotId);
+                    const kd = playerKd(p);
+                    const agentIcon = getAgentIconUrl(p.mostPlayedAgent);
+                    const allAgents = Object.entries(p.agentCounts).sort(
+                      (a, b) => b[1] - a[1],
+                    );
+                    const rankClass =
+                      idx === 0
+                        ? "text-yellow-400"
+                        : idx === 1
+                          ? "text-white/80"
+                          : idx === 2
+                            ? "text-amber-500"
+                            : "text-white/35";
 
-                return (
-                  <article
-                    key={p.key}
-                    className={`rounded-2xl border px-4 py-4 shadow-[0_8px_24px_-16px_rgba(0,0,0,0.8)] ${cardSurface}`}
-                  >
-                    <div className="flex items-center gap-3">
-                      <span
-                        className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border font-mono text-sm font-black tabular-nums ${
-                          idx === 0
-                            ? "border-yellow-400/35 bg-yellow-400/10 text-yellow-300"
-                            : idx === 1
-                              ? "border-white/20 bg-white/10 text-white/85"
-                              : idx === 2
-                                ? "border-amber-600/35 bg-amber-700/15 text-amber-400"
-                                : "border-white/10 bg-white/[0.04] text-white/55"
+                    return (
+                      <li
+                        key={p.key}
+                        className={`px-2.5 py-2 ${
+                          idx < 3 ? "bg-emerald-500/[0.04]" : ""
                         }`}
                       >
-                        {idx + 1}
-                      </span>
-                      <div className="shrink-0">
-                        {agentIcon ? (
-                          <img
-                            src={agentIcon}
-                            alt={p.mostPlayedAgent ?? "Agent"}
-                            className="h-10 w-10 object-contain mix-blend-screen drop-shadow-md"
-                          />
-                        ) : (
-                          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-white/10 text-xs font-bold text-white/50">
-                            {name.slice(0, 2)}
-                          </div>
-                        )}
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <div className="flex flex-wrap items-center gap-1.5">
-                          <span className={`truncate text-[15px] ${nameColorClass}`}>
-                            {name}
+                        <div className="grid grid-cols-[1.5rem_minmax(0,1fr)_3.25rem_2.5rem_2.5rem_1.75rem] items-center gap-1.5">
+                          <span
+                            className={`font-mono text-[11px] font-black tabular-nums ${rankClass}`}
+                          >
+                            {idx + 1}
                           </span>
-                          {p.mvpCount > 0 ? (
-                            <span className={`shrink-0 ${mvpBadgeClass}`}>
-                              👑 {p.mvpCount}x MVP
-                            </span>
-                          ) : null}
-                        </div>
-                        {tag ? (
-                          <p className="mt-0.5 font-mono text-[11px] text-white/40">
-                            #{tag}
-                          </p>
-                        ) : null}
-                      </div>
-                    </div>
-
-                    <div className="mt-4 grid grid-cols-3 gap-1.5 rounded-xl border border-white/[0.07] bg-black/40 p-3 text-center sm:grid-cols-6">
-                      <div>
-                        <p className="text-[9px] font-black tracking-wider text-white/40 uppercase">
-                          ACS
-                        </p>
-                        <p className="mt-1 font-mono text-sm font-black text-white">
-                          {p.avgAcs}
-                        </p>
-                      </div>
-                      <div>
-                        <p className="text-[9px] font-black tracking-wider text-white/40 uppercase">
-                          K/D
-                        </p>
-                        <p
-                          className={`mt-1 font-mono text-sm font-black ${
-                            Number(kd) >= 1 ? "text-emerald-300" : "text-rose-300"
-                          }`}
-                        >
-                          {kd}
-                        </p>
-                      </div>
-                      <div>
-                        <p className="text-[9px] font-black tracking-wider text-white/40 uppercase">
-                          GP
-                        </p>
-                        <p className="mt-1 font-mono text-sm font-black text-white/85">
-                          {p.gamesPlayed}
-                        </p>
-                      </div>
-                      <div>
-                        <p className="text-[9px] font-black tracking-wider text-white/40 uppercase">
-                          FK
-                        </p>
-                        <p className="mt-1 font-mono text-sm font-black text-cyan-300">
-                          {p.totalFirstKills}
-                        </p>
-                      </div>
-                      <div>
-                        <p className="text-[9px] font-black tracking-wider text-white/40 uppercase">
-                          FD
-                        </p>
-                        <p className="mt-1 font-mono text-sm font-black text-orange-300/90">
-                          {p.totalFirstDeaths}
-                        </p>
-                      </div>
-                      <div>
-                        <p className="text-[9px] font-black tracking-wider text-white/40 uppercase">
-                          HS%
-                        </p>
-                        <p className="mt-1 font-mono text-sm font-black text-white/85">
-                          {p.avgHsPercent}%
-                        </p>
-                      </div>
-                    </div>
-
-                    <div className="mt-3 flex items-center justify-between gap-2 rounded-lg bg-white/[0.03] px-2.5 py-2">
-                      <p className="font-mono text-[11px] font-bold">
-                        <span className="text-emerald-300">{p.totalKills}</span>
-                        <span className="text-white/30"> / </span>
-                        <span className="text-rose-300">{p.totalDeaths}</span>
-                        <span className="text-white/30"> / </span>
-                        <span className="text-white/55">{p.totalAssists}</span>
-                      </p>
-                      <span className="text-[9px] font-black tracking-wider text-white/35 uppercase">
-                        K / D / A
-                      </span>
-                    </div>
-
-                    {topAgents.length > 0 ? (
-                      <div className="mt-3 flex flex-wrap items-center gap-1.5 border-t border-white/[0.08] pt-3">
-                        <span className="mr-1 text-[9px] font-black tracking-wider text-white/35 uppercase">
-                          Agents
-                        </span>
-                        {topAgents.map(([agent, count]) => {
-                          const icon = getAgentIconUrl(agent);
-                          return (
-                            <div
-                              key={agent}
-                              title={`${agent} · ${count}g`}
-                              className="relative flex items-center justify-center rounded-md bg-black/30 p-0.5 ring-1 ring-white/10"
-                            >
-                              {icon ? (
-                                <img
-                                  src={icon}
-                                  alt={agent}
-                                  className="h-6 w-6 object-contain mix-blend-screen drop-shadow"
-                                />
-                              ) : (
-                                <span className="flex h-6 w-6 items-center justify-center text-[8px] font-bold text-white/50">
-                                  {agent.slice(0, 2)}
+                          <div className="flex min-w-0 items-center gap-1.5">
+                            {agentIcon ? (
+                              <Image
+                                src={agentIcon}
+                                alt={p.mostPlayedAgent ?? "Agent"}
+                                width={28}
+                                height={28}
+                                className="h-7 w-7 shrink-0 object-contain mix-blend-screen"
+                              />
+                            ) : (
+                              <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded bg-white/10 text-[9px] font-bold text-white/50">
+                                {name.slice(0, 2)}
+                              </div>
+                            )}
+                            <div className="min-w-0">
+                              <div className="flex items-center gap-1">
+                                <span className="truncate text-[13px] font-bold text-white">
+                                  {name}
                                 </span>
-                              )}
+                                {p.mvpCount > 0 ? (
+                                  <span className="shrink-0 text-[9px] font-black text-amber-300">
+                                    {p.mvpCount}★
+                                  </span>
+                                ) : null}
+                              </div>
+                              {tag ? (
+                                <span className="block truncate font-mono text-[10px] text-white/35">
+                                  #{tag}
+                                </span>
+                              ) : null}
                             </div>
-                          );
-                        })}
-                      </div>
-                    ) : null}
-                  </article>
-                );
-              })
+                          </div>
+                          <span className="text-right font-mono text-[12px] font-black tabular-nums text-emerald-300">
+                            {p.rating.toFixed(1)}
+                          </span>
+                          <span className="text-right font-mono text-[12px] font-bold tabular-nums text-white/85">
+                            {p.avgAcs}
+                          </span>
+                          <span
+                            className={`text-right font-mono text-[12px] font-bold tabular-nums ${
+                              Number(kd) >= 1
+                                ? "text-cyan-300"
+                                : "text-rose-300"
+                            }`}
+                          >
+                            {kd}
+                          </span>
+                          <span className="text-right font-mono text-[12px] font-bold tabular-nums text-white/55">
+                            {p.gamesPlayed}
+                          </span>
+                        </div>
+                        <div className="mt-1 flex items-center justify-between gap-2 pl-9 text-[10px] text-white/35">
+                          <span className="font-mono font-semibold">
+                            <span className="text-emerald-300/80">
+                              {p.totalKills}
+                            </span>
+                            <span className="text-white/25">/</span>
+                            <span className="text-rose-300/80">
+                              {p.totalDeaths}
+                            </span>
+                            <span className="text-white/25">/</span>
+                            <span className="text-white/50">
+                              {p.totalAssists}
+                            </span>
+                          </span>
+                          <span className="font-mono tabular-nums">
+                            FK {p.totalFirstKills}
+                            <span className="mx-1 text-white/20">·</span>
+                            FD {p.totalFirstDeaths}
+                            <span className="mx-1 text-white/20">·</span>
+                            HS {p.avgHsPercent}%
+                          </span>
+                        </div>
+                        {allAgents.length > 0 ? (
+                          <div className="mt-1.5 flex flex-wrap items-center gap-1 pl-9">
+                            {allAgents.map(([agent, count]) => {
+                              const icon = getAgentIconUrl(agent);
+                              return (
+                                <div
+                                  key={agent}
+                                  title={`${agent} · ${count}g`}
+                                  className="flex items-center justify-center rounded bg-black/30 p-0.5 ring-1 ring-white/10"
+                                >
+                                  {icon ? (
+                                    <Image
+                                      src={icon}
+                                      alt={agent}
+                                      width={18}
+                                      height={18}
+                                      className="h-[18px] w-[18px] object-contain mix-blend-screen"
+                                    />
+                                  ) : (
+                                    <span className="flex h-[18px] w-[18px] items-center justify-center text-[7px] font-bold text-white/50">
+                                      {agent.slice(0, 2)}
+                                    </span>
+                                  )}
+                                </div>
+                              );
+                            })}
+                          </div>
+                        ) : null}
+                      </li>
+                    );
+                  })}
+                </ul>
+              </>
             )}
           </div>
 
           {/* ── Desktop table ── */}
           <div className="hidden overflow-x-auto rounded-2xl border border-white/10 bg-[#080d16] shadow-2xl md:block">
-            <table className="w-full min-w-[820px] text-sm sm:text-base">
+            <table className="w-full min-w-[900px] text-sm sm:text-base">
               <thead>
                 <tr className="border-b border-white/10 bg-black/50 text-xs font-black tracking-wider text-white/60 uppercase">
                   <th className="w-12 px-4 py-4 text-left">#</th>
@@ -491,6 +496,13 @@ export default function TournamentStatsSection({ games, eligibility }: Props) {
                     onClick={() => toggleSort("gamesPlayed")}
                   >
                     GP{sortIcon("gamesPlayed")}
+                  </th>
+                  <th
+                    className="cursor-pointer px-3 py-4 text-center select-none transition-colors hover:text-white"
+                    title="Rating: ACS adjusted for how many games were played"
+                    onClick={() => toggleSort("rating")}
+                  >
+                    Rating{sortIcon("rating")}
                   </th>
                   <th
                     className="cursor-pointer px-3 py-4 text-center select-none transition-colors hover:text-white"
@@ -572,9 +584,11 @@ export default function TournamentStatsSection({ games, eligibility }: Props) {
                           <div className="flex min-w-0 items-center gap-3">
                             <div className="shrink-0">
                               {agentIcon ? (
-                                <img
+                                <Image
                                   src={agentIcon}
                                   alt={p.mostPlayedAgent ?? "Agent"}
+                                  width={44}
+                                  height={44}
                                   className="h-11 w-11 object-contain mix-blend-screen drop-shadow-md filter"
                                 />
                               ) : (
@@ -602,6 +616,9 @@ export default function TournamentStatsSection({ games, eligibility }: Props) {
                         </td>
                         <td className="px-3 py-4 text-center font-mono text-sm font-medium text-white/80">
                           {p.gamesPlayed}
+                        </td>
+                        <td className="px-3 py-4 text-center font-mono text-base font-black text-emerald-300">
+                          {p.rating.toFixed(1)}
                         </td>
                         <td className="px-3 py-4 text-center font-mono text-base font-black text-white">
                           {p.avgAcs}
@@ -638,11 +655,13 @@ export default function TournamentStatsSection({ games, eligibility }: Props) {
                               .map(([agent]) => {
                                 const icon = getAgentIconUrl(agent);
                                 return icon ? (
-                                  <img
+                                  <Image
                                     key={agent}
                                     src={icon}
                                     alt={agent}
                                     title={agent}
+                                    width={32}
+                                    height={32}
                                     className="h-8 w-8 object-contain mix-blend-screen drop-shadow-md filter"
                                   />
                                 ) : (
@@ -663,7 +682,7 @@ export default function TournamentStatsSection({ games, eligibility }: Props) {
                 ) : (
                   <tr>
                     <td
-                      colSpan={10}
+                      colSpan={11}
                       className="px-5 py-10 text-center text-white/40 italic"
                     >
                       {searchQuery

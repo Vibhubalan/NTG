@@ -7,8 +7,11 @@ const BASE = process.env.SMOKE_BASE_URL?.replace(/\/$/, "") ?? "http://localhost
 
 async function fetchHtml(route: string): Promise<string | null> {
   try {
+    // Follow redirects: some public entry points are redirect-only pages
+    // (e.g. /esports -> /esports/tournaments), and what matters for a11y is
+    // the page the visitor actually lands on.
     const res = await fetch(`${BASE}${route}`, {
-      redirect: "manual",
+      redirect: "follow",
       signal: AbortSignal.timeout(15_000),
     });
     if (res.status !== 200) return null;

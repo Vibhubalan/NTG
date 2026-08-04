@@ -36,14 +36,21 @@ export type StatsGame = {
 export const META_SAMPLE_FLOOR = 2;
 /** Include anyone with ≥1 counted game; fairness is in the score, not a hard GP cutoff. */
 export const STANDOUT_GP_FLOOR = 1;
-/** Best Flex: distinct agents required in a role. */
-export const FLEX_MIN_AGENTS_PER_ROLE = 2;
+
 /**
- * If nobody has 2 agents in all 4 roles, allow 3-of-4 Flex once the cup
- * has at least this many published/custom games in the aggregation set.
+ * Award eligibility scales with the tournament instead of being hardcoded, so
+ * the same rules work for a 7-game cup and a 19-game one.
  */
-export const FLEX_FALLBACK_TOURNAMENT_GAMES = 35;
-/** When ranking 3-of-4 Flex candidates, prefer coverage in this order. */
+export const AWARD_GP_SHARE = 0.25;
+/** Never demand fewer than this many games for an award. */
+export const AWARD_GP_ABSOLUTE_FLOOR = 2;
+
+/**
+ * Best Flex: the player must have played every role — at least one agent in
+ * each of Duelist, Initiator, Controller and Sentinel.
+ */
+export const FLEX_MIN_ROLES = 4;
+/** When ranking Flex candidates, prefer coverage in this order. */
 export const FLEX_ROLE_PRIORITY: AgentRole[] = [
   "Initiator",
   "Controller",
@@ -51,15 +58,78 @@ export const FLEX_ROLE_PRIORITY: AgentRole[] = [
   "Duelist",
 ];
 
+export type StandoutBaseline = {
+  /** Mean games played in the pool; doubles as the shrinkage weight. */
+  meanGamesPlayed: number;
+  /** Appearance-weighted mean ACS for the pool. */
+  meanAcs: number;
+};
+
 /**
- * Fair standout score: quality × confidence from sample size.
- * - 1-game ACS spikes are tempered (log2(2)=1)
- * - More games earn trust, but raw ACS still matters
- * - A strong 3-game stretch can beat a weak 5-game stretch
+ * Population baseline for one pool of players — everyone, a single role, or a
+ * single agent.
+ *
+ * Deliberately computed per pool: Controllers post structurally lower ACS than
+ * Duelists, so measuring each player against their own pool is what makes the
+ * role boards comparable without inventing per-role weightings.
  */
-export function fairStandoutScore(avgAcs: number, gamesPlayed: number): number {
+export function computeStandoutBaseline(
+  pool: { avgAcs: number; gamesPlayed: number }[],
+): StandoutBaseline {
+  let appearances = 0;
+  let acsWeighted = 0;
+  for (const p of pool) {
+    appearances += p.gamesPlayed;
+    acsWeighted += p.avgAcs * p.gamesPlayed;
+  }
+  if (pool.length === 0 || appearances <= 0) {
+    return { meanGamesPlayed: 0, meanAcs: 0 };
+  }
+  return {
+    meanGamesPlayed: appearances / pool.length,
+    meanAcs: acsWeighted / appearances,
+  };
+}
+
+/**
+ * Bayesian-shrunk ACS: the player's average pulled toward the pool mean in
+ * proportion to how little they played, converging on their true average as
+ * games accumulate.
+ *
+ * A raw average lets two hot games beat a whole tournament. The previous
+ * ACS × log2(1+GP) product had the opposite failure — being unbounded in games
+ * played, 200 ACS over 15 games outscored 300 ACS over 3. This keeps the result
+ * in ACS units, so it is both comparable and displayable.
+ */
+export function weightedAcs(
+  avgAcs: number,
+  gamesPlayed: number,
+  baseline: StandoutBaseline,
+): number {
   if (gamesPlayed <= 0) return 0;
-  return avgAcs * Math.log2(1 + gamesPlayed);
+  const prior = baseline.meanGamesPlayed;
+  if (prior <= 0) return avgAcs;
+  return (gamesPlayed * avgAcs + prior * baseline.meanAcs) / (gamesPlayed + prior);
+}
+
+/**
+ * Games required to qualify for an award, derived from the pool's own busiest
+ * player rather than a fixed number.
+ *
+ * Clamped to the pool maximum so a card never blanks out purely because
+ * everyone in that pool played very few games.
+ */
+export function dynamicGamesThreshold(pool: { gamesPlayed: number }[]): number {
+  let maxGp = 0;
+  for (const p of pool) {
+    if (p.gamesPlayed > maxGp) maxGp = p.gamesPlayed;
+  }
+  if (maxGp <= 0) return 0;
+  const scaled = Math.max(
+    AWARD_GP_ABSOLUTE_FLOOR,
+    Math.floor(maxGp * AWARD_GP_SHARE),
+  );
+  return Math.min(maxGp, scaled);
 }
 
 export type StatsTeamMembership = {
@@ -576,16 +646,18 @@ function toStandout(p: AggregatedPlayerStats): StandoutPlayer {
 }
 
 /**
- * Rank by fairStandoutScore (ACS × log2(1+GP)), then K/D, then games.
+ * Rank by weighted (Bayesian) ACS against the pool's own baseline, then K/D,
+ * then games.
  */
 function rankStandouts(
   players: AggregatedPlayerStats[],
   tieBreak?: (p: AggregatedPlayerStats) => number,
 ): AggregatedPlayerStats | null {
   if (players.length === 0) return null;
+  const baseline = computeStandoutBaseline(players);
   const sorted = [...players].sort((a, b) => {
-    const scoreA = fairStandoutScore(a.avgAcs, a.gamesPlayed);
-    const scoreB = fairStandoutScore(b.avgAcs, b.gamesPlayed);
+    const scoreA = weightedAcs(a.avgAcs, a.gamesPlayed, baseline);
+    const scoreB = weightedAcs(b.avgAcs, b.gamesPlayed, baseline);
     if (scoreB !== scoreA) return scoreB - scoreA;
     if (tieBreak) {
       const tA = tieBreak(a);
@@ -618,34 +690,31 @@ export function countAgentsPerRole(
   return counts;
 }
 
-/** Roles that have at least `minAgents` distinct agents. */
-export function rolesMeetingAgentFloor(
+/** Roles the player actually appeared on. */
+export function distinctRolesPlayed(
   agentCounts: Record<string, number>,
-  minAgents: number = FLEX_MIN_AGENTS_PER_ROLE,
 ): AgentRole[] {
   const counts = countAgentsPerRole(agentCounts);
-  return (Object.keys(counts) as AgentRole[]).filter((role) => counts[role] >= minAgents);
-}
-
-/** Full Flex: ≥2 distinct agents in every role. */
-export function qualifiesFullFlex(agentCounts: Record<string, number>): boolean {
-  return rolesMeetingAgentFloor(agentCounts).length >= 4;
+  return (Object.keys(counts) as AgentRole[]).filter((role) => counts[role] > 0);
 }
 
 /**
- * Fallback Flex: ≥2 distinct agents in at least 3 roles.
- * Used when nobody qualifies for full Flex and the cup has enough games.
+ * Flex: played at least one agent in every role.
+ *
+ * Role span is the whole of the requirement — a Jett/Raze/Reyna player has
+ * three agents but never left Duelist, so an agent count would hand the award
+ * to a one-role player.
  */
-export function qualifiesFallbackFlex(agentCounts: Record<string, number>): boolean {
-  return rolesMeetingAgentFloor(agentCounts).length >= 3;
+export function qualifiesFlex(agentCounts: Record<string, number>): boolean {
+  return distinctRolesPlayed(agentCounts).length >= FLEX_MIN_ROLES;
 }
 
 /**
  * Higher = better coverage of priority roles (Initiator → Controller → Sentinel → Duelist).
- * Used to prefer flexers who filled higher-priority roles when falling back to 3-of-4.
+ * Breaks ties between flexers who covered the same number of roles.
  */
 export function flexPriorityScore(agentCounts: Record<string, number>): number {
-  const met = new Set(rolesMeetingAgentFloor(agentCounts));
+  const met = new Set(distinctRolesPlayed(agentCounts));
   let score = 0;
   FLEX_ROLE_PRIORITY.forEach((role, index) => {
     if (met.has(role)) {
@@ -659,14 +728,13 @@ export function flexPriorityScore(agentCounts: Record<string, number>): number {
 /**
  * Best overall + best per role + best Flex.
  *
- * Flex rules:
- * 1. Prefer players with ≥2 distinct agents in each of the 4 roles.
- * 2. If none qualify and the tournament has ≥35 games, fall back to players
- *    with ≥2 agents in at least 3 roles, preferring Initiator → Controller →
- *    Sentinel → Duelist coverage when ranking.
+ * Eligibility and Flex requirements are both derived from the tournament's own
+ * data, so nothing needs retuning between a short cup and a long one.
  *
- * Role boards count only appearances on that role's agents.
- * Uses fairStandoutScore so sample size and performance both matter.
+ * Flex requires having played all four roles.
+ *
+ * Role boards count only appearances on that role's agents, and each board is
+ * scored against its own baseline.
  */
 export function aggregateRoleStandouts(
   games: StatsGame[],
@@ -676,7 +744,9 @@ export function aggregateRoleStandouts(
   const overall = aggregatePlayerStats(games, { eligibility }).filter(
     (p) => p.gamesPlayed >= gpFloor,
   );
-  const bestOverallRow = rankStandouts(overall);
+  const awardFloor = dynamicGamesThreshold(overall);
+  const overallEligible = overall.filter((p) => p.gamesPlayed >= awardFloor);
+  const bestOverallRow = rankStandouts(overallEligible);
 
   const roles: AgentRole[] = ["Duelist", "Initiator", "Controller", "Sentinel"];
   const byRole: Partial<Record<AgentRole, StandoutPlayer | null>> = {};
@@ -685,14 +755,14 @@ export function aggregateRoleStandouts(
       eligibility,
       agentRoleFilter: (agent) => getAgentRole(agent) === role,
     }).filter((p) => p.gamesPlayed >= gpFloor);
-    const best = rankStandouts(rolePlayers);
+    const roleFloor = dynamicGamesThreshold(rolePlayers);
+    const best = rankStandouts(
+      rolePlayers.filter((p) => p.gamesPlayed >= roleFloor),
+    );
     byRole[role] = best ? toStandout(best) : null;
   }
 
-  let flexCandidates = overall.filter((p) => qualifiesFullFlex(p.agentCounts));
-  if (flexCandidates.length === 0 && games.length >= FLEX_FALLBACK_TOURNAMENT_GAMES) {
-    flexCandidates = overall.filter((p) => qualifiesFallbackFlex(p.agentCounts));
-  }
+  const flexCandidates = overallEligible.filter((p) => qualifiesFlex(p.agentCounts));
   const bestFlexRow = rankStandouts(flexCandidates, (p) =>
     flexPriorityScore(p.agentCounts),
   );
@@ -724,7 +794,7 @@ export type AgentStandout = {
 
 /**
  * Aggregates performance stats for every agent played in the tournament,
- * and identifies the #1 player per agent via fairStandoutScore.
+ * and identifies the #1 player per agent via weighted ACS.
  */
 export function aggregateAgentStandouts(
   games: StatsGame[],
@@ -816,9 +886,32 @@ export function aggregateAgentStandouts(
       });
     }
 
-    playersList.sort((a, b) => {
-      const scoreA = fairStandoutScore(a.avgAcs, a.gamesPlayedOnAgent);
-      const scoreB = fairStandoutScore(b.avgAcs, b.gamesPlayedOnAgent);
+    // Threshold comes from this agent's own pool, so a widely shared agent
+    // doesn't demand an unreachable game count (which is how a flat "share of
+    // total picks" rule ends up emptying the popular cards).
+    const agentPool = playersList.map((p) => ({
+      avgAcs: p.avgAcs,
+      gamesPlayed: p.gamesPlayedOnAgent,
+    }));
+    const agentFloor = dynamicGamesThreshold(agentPool);
+    const eligiblePlayers = playersList.filter(
+      (p) => p.gamesPlayedOnAgent >= agentFloor,
+    );
+    // Baseline is measured over the qualified players only, matching the
+    // overall and per-role boards (see rankStandouts). Including one-game
+    // players here would let them drag the benchmark that the contenders are
+    // scored against, so the same performance ranked differently depending on
+    // which board you looked at.
+    const baseline = computeStandoutBaseline(
+      eligiblePlayers.map((p) => ({
+        avgAcs: p.avgAcs,
+        gamesPlayed: p.gamesPlayedOnAgent,
+      })),
+    );
+
+    eligiblePlayers.sort((a, b) => {
+      const scoreA = weightedAcs(a.avgAcs, a.gamesPlayedOnAgent, baseline);
+      const scoreB = weightedAcs(b.avgAcs, b.gamesPlayedOnAgent, baseline);
       if (scoreB !== scoreA) return scoreB - scoreA;
       if (b.kd !== a.kd) return b.kd - a.kd;
       if (b.gamesPlayedOnAgent !== a.gamesPlayedOnAgent) {
@@ -831,7 +924,7 @@ export function aggregateAgentStandouts(
       agent,
       role,
       totalPickCount: acc.totalPicks,
-      bestPlayer: playersList[0] ?? null,
+      bestPlayer: eligiblePlayers[0] ?? null,
     });
   }
 

@@ -5,14 +5,15 @@ import {
   aggregatePlayerStats,
   aggregateRoleStandouts,
   aggregateTeamMapStats,
-  fairStandoutScore,
+  computeStandoutBaseline,
+  distinctRolesPlayed,
+  dynamicGamesThreshold,
   flexPriorityScore,
-  FLEX_FALLBACK_TOURNAMENT_GAMES,
   isStatsAppearanceEligible,
   normalizeCompKey,
-  qualifiesFallbackFlex,
-  qualifiesFullFlex,
+  qualifiesFlex,
   statsPlayerKey,
+  weightedAcs,
   winningTeamId,
   type StatsGame,
   type TournamentStatsEligibility,
@@ -320,19 +321,47 @@ describe("tournament-stats meta aggregations", () => {
     expect(ascent!.comps.every((c) => c.appearances >= 2)).toBe(true);
   });
 
-  it("does not award Flex for only 1 agent per role", () => {
+  it("awards Flex to a player who spanned all four roles", () => {
     const standouts = aggregateRoleStandouts(metaGames, metaEligibility);
-    // Flex#001 covers all 4 roles but only 1 agent each → not Flex under new rules
-    expect(standouts.bestFlex).toBeNull();
+    // Flex#001 played Jett / Sova / Omen / Cypher — one agent in each role.
+    expect(standouts.bestFlex?.riotId).toBe("Flex#001");
     expect(standouts.bestOverall).toBeTruthy();
     expect(standouts.byRole.Initiator).toBeTruthy();
   });
 
-  it("fairStandoutScore balances ACS with sample size", () => {
-    // 1-game spike tempered; solid multi-game stretch scores higher
-    expect(fairStandoutScore(400, 1)).toBeLessThan(fairStandoutScore(230, 3));
-    // Strong 3-game > weak 5-game
-    expect(fairStandoutScore(280, 3)).toBeGreaterThan(fairStandoutScore(180, 5));
+  it("weightedAcs favours quality over volume, but tempers tiny samples", () => {
+    const baseline = { meanGamesPlayed: 6, meanAcs: 220 };
+
+    // Volume alone must not win: 300 over 3 games beats 200 over 15.
+    expect(weightedAcs(300, 3, baseline)).toBeGreaterThan(
+      weightedAcs(200, 15, baseline),
+    );
+    // ...but a 2-game spike must not beat a strong full tournament.
+    expect(weightedAcs(300, 2, baseline)).toBeLessThan(
+      weightedAcs(280, 15, baseline),
+    );
+    // Result stays in ACS units and converges on the true average.
+    expect(weightedAcs(300, 200, baseline)).toBeCloseTo(297.6, 0);
+    expect(weightedAcs(250, 0, baseline)).toBe(0);
+  });
+
+  it("computeStandoutBaseline weights the mean ACS by appearances", () => {
+    const baseline = computeStandoutBaseline([
+      { avgAcs: 300, gamesPlayed: 1 },
+      { avgAcs: 200, gamesPlayed: 9 },
+    ]);
+    expect(baseline.meanGamesPlayed).toBe(5);
+    // 210, not the 250 a naive per-player average would give.
+    expect(baseline.meanAcs).toBe(210);
+    expect(computeStandoutBaseline([]).meanAcs).toBe(0);
+  });
+
+  it("dynamicGamesThreshold scales with the cup and never empties a card", () => {
+    expect(dynamicGamesThreshold([{ gamesPlayed: 19 }])).toBe(4);
+    expect(dynamicGamesThreshold([{ gamesPlayed: 7 }])).toBe(2);
+    // Clamped to the pool max, so a 1-game pool still yields a winner.
+    expect(dynamicGamesThreshold([{ gamesPlayed: 1 }])).toBe(1);
+    expect(dynamicGamesThreshold([])).toBe(0);
   });
 
   it("ranks standouts fairly: not pure GP, not pure one-off ACS", () => {
@@ -453,58 +482,78 @@ describe("tournament-stats meta aggregations", () => {
   });
 });
 
+describe("agent standout baseline", () => {
+  it("measures the baseline over qualified players only", () => {
+    // Jett pool: two genuine contenders plus a low-ACS regular, and ten
+    // one-game cameos that sit below the games threshold. The cameos are
+    // excluded from contention either way — the question is whether they are
+    // allowed to drag the benchmark the contenders are scored against.
+    //
+    // Baseline over qualified players only (current): Grind 181.9 > Spike 173.3.
+    // Baseline over everyone (previous): the 300 ACS cameos lift the mean to
+    // ~208, which flatters the low-games player and flips it to Spike 214.1.
+    const games: StatsGame[] = [];
+    for (let i = 0; i < 8; i++) {
+      const players = [
+        player("Grind#001", "team-a", "Jett", 200, "grind"),
+        player("Anchor#001", "team-b", "Jett", 100, "anchor"),
+      ];
+      if (i < 2) {
+        players.push(player("Spike#001", "team-a", "Jett", 220, "spike"));
+      }
+      if (i < 5) {
+        players.push(
+          player(`Cameo#${i}a`, "team-b", "Jett", 300, `cameo-${i}a`),
+          player(`Cameo#${i}b`, "team-b", "Jett", 300, `cameo-${i}b`),
+        );
+      }
+      games.push({
+        teamAId: "team-a",
+        teamBId: "team-b",
+        teamAName: "Alpha",
+        teamBName: "Bravo",
+        teamARounds: 13,
+        teamBRounds: 10,
+        mapName: "Ascent",
+        mvpRiotId: null,
+        players,
+      });
+    }
+
+    const byUserId: TournamentStatsEligibility["byUserId"] = {
+      grind: [{ teamId: "team-a", kind: "PRIMARY", since: null }],
+      spike: [{ teamId: "team-a", kind: "PRIMARY", since: null }],
+      anchor: [{ teamId: "team-b", kind: "PRIMARY", since: null }],
+    };
+    for (let i = 0; i < 5; i++) {
+      byUserId[`cameo-${i}a`] = [{ teamId: "team-b", kind: "PRIMARY", since: null }];
+      byUserId[`cameo-${i}b`] = [{ teamId: "team-b", kind: "PRIMARY", since: null }];
+    }
+    const elig: TournamentStatsEligibility = { byUserId, byRiotId: {} };
+
+    const jett = aggregateAgentStandouts(games, elig).find((a) => a.agent === "Jett");
+    expect(jett?.bestPlayer?.riotId).toBe("Grind#001");
+    expect(jett?.bestPlayer?.gamesPlayedOnAgent).toBe(8);
+  });
+});
+
 describe("best flex eligibility", () => {
-  it("requires ≥2 agents in every role for full Flex", () => {
+  it("requires one agent in every role", () => {
+    // One agent per role is enough, however few games each took.
     expect(
-      qualifiesFullFlex({
-        Jett: 1,
-        Raze: 1,
-        Sova: 1,
-        Fade: 1,
-        Omen: 1,
-        Viper: 1,
-        Cypher: 1,
-        Sage: 1,
-      }),
+      qualifiesFlex({ Jett: 1, Sova: 1, Omen: 1, Cypher: 1 }),
     ).toBe(true);
 
-    expect(
-      qualifiesFullFlex({
-        Jett: 2,
-        Sova: 1,
-        Fade: 1,
-        Omen: 1,
-        Viper: 1,
-        Cypher: 1,
-        Sage: 1,
-      }),
-    ).toBe(false); // only 1 duelist agent
+    // Three roles is no longer enough — this player never played Sentinel.
+    expect(qualifiesFlex({ Clove: 1, Raze: 1, Sova: 2 })).toBe(false);
   });
 
-  it("fallback Flex needs ≥2 agents in at least 3 roles", () => {
-    expect(
-      qualifiesFallbackFlex({
-        Sova: 1,
-        Fade: 1,
-        Omen: 1,
-        Viper: 1,
-        Cypher: 1,
-        Sage: 1,
-        // no duelist
-      }),
-    ).toBe(true);
-
-    expect(
-      qualifiesFallbackFlex({
-        Sova: 1,
-        Fade: 1,
-        Omen: 1,
-        Viper: 1,
-        Jett: 1,
-        // only 1 sentinel agent missing, and only 1 duelist → Initiator+Controller = 2 roles only if sentinel missing
-        Cypher: 1,
-      }),
-    ).toBe(false);
+  it("counts roles, not agents, so a one-role specialist never qualifies", () => {
+    // Plenty of agents and games, but all Duelists.
+    expect(qualifiesFlex({ Jett: 4, Raze: 3, Reyna: 2, Yoru: 2 })).toBe(false);
+    expect(distinctRolesPlayed({ Jett: 4, Raze: 3, Reyna: 2 })).toEqual([
+      "Duelist",
+    ]);
   });
 
   it("priority score prefers Initiator → Controller → Sentinel → Duelist", () => {
@@ -574,7 +623,7 @@ describe("best flex eligibility", () => {
     expect(Object.keys(standouts.bestFlex!.agentCounts).length).toBe(8);
   });
 
-  it("uses 3-of-4 fallback only when cup has ≥35 games and no full Flex", () => {
+  it("withholds the award from a 3-role player, however much they play", () => {
     const elig: TournamentStatsEligibility = {
       byUserId: {
         u1: [{ teamId: "team-a", kind: "PRIMARY", since: null }],
@@ -608,14 +657,15 @@ describe("best flex eligibility", () => {
       ],
     });
 
+    // 6 agents across Initiator/Controller/Sentinel, but no Duelist.
     const smallCup = fallbackAgents.map((a, i) => makeGame(a, i));
     expect(aggregateRoleStandouts(smallCup, elig).bestFlex).toBeNull();
 
-    const bigCup: StatsGame[] = [];
-    for (let i = 0; i < FLEX_FALLBACK_TOURNAMENT_GAMES; i++) {
-      bigCup.push(makeGame(fallbackAgents[i % fallbackAgents.length], i));
+    // Volume does not substitute for the missing role.
+    const longCup: StatsGame[] = [];
+    for (let i = 0; i < 30; i++) {
+      longCup.push(makeGame(fallbackAgents[i % fallbackAgents.length], i));
     }
-    const standouts = aggregateRoleStandouts(bigCup, elig);
-    expect(standouts.bestFlex?.riotId).toBe("AlmostFlex#001");
+    expect(aggregateRoleStandouts(longCup, elig).bestFlex).toBeNull();
   });
 });

@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { useMemo, useState, type ReactNode } from "react";
 import {
   getAgentIconUrl,
@@ -96,9 +97,11 @@ function AgentIcons({ agents, size = "sm" }: { agents: string[]; size?: "sm" | "
             title={agent}
             className="group relative flex items-center justify-center rounded-lg bg-black/40 p-1 ring-1 ring-white/10 hover:ring-emerald-400/50 transition-all"
           >
-            <img
+            <Image
               src={icon}
               alt={agent}
+              width={32}
+              height={32}
               className={`${cls} object-contain mix-blend-screen drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)]`}
             />
           </div>
@@ -126,6 +129,8 @@ const ROLE_CONFIG: Record<
     glowBg: string;
     accentColor: string;
     icon: string;
+    /** Shown instead of the generic message when nobody earned the award. */
+    emptyLabel?: string;
   }
 > = {
   bestOverall: {
@@ -181,6 +186,7 @@ const ROLE_CONFIG: Record<
     glowBg: "from-fuchsia-500/15 via-fuchsia-500/[0.03] to-transparent",
     accentColor: "text-fuchsia-400",
     icon: "⚡",
+    emptyLabel: "No player covered all four roles",
   },
 };
 
@@ -203,7 +209,9 @@ function StandoutCard({
             <span>{config.title}</span>
           </span>
         </div>
-        <p className="mt-6 text-xs text-white/30 font-medium">Not enough data yet</p>
+        <p className="mt-6 text-xs text-white/30 font-medium">
+          {config.emptyLabel ?? "Not enough data yet"}
+        </p>
       </div>
     );
   }
@@ -251,9 +259,11 @@ function StandoutCard({
                   className="relative flex h-8 w-8 items-center justify-center"
                   title={`${agent} · ${count}g`}
                 >
-                  <img
+                  <Image
                     src={agentIcon}
                     alt={agent}
+                    width={32}
+                    height={32}
                     className="h-full w-full object-contain mix-blend-screen drop-shadow-md"
                   />
                 </div>
@@ -271,9 +281,11 @@ function StandoutCard({
         ) : (
           <div className="relative flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-black/40 p-1.5 ring-1 ring-white/15 group-hover:ring-white/30 transition-all shadow-lg">
             {icon ? (
-              <img
+              <Image
                 src={icon}
                 alt={player.mostPlayedAgent ?? ""}
+                width={56}
+                height={56}
                 className="h-full w-full object-contain mix-blend-screen drop-shadow-[0_4px_8px_rgba(0,0,0,0.6)] group-hover:scale-110 transition-transform duration-300"
               />
             ) : (
@@ -472,10 +484,13 @@ export default function TournamentMetaSection({ games, eligibility }: Props) {
                           className="group relative overflow-hidden rounded-xl border border-white/10 bg-slate-950/80 shadow-lg transition-all duration-300 hover:border-emerald-400/40"
                         >
                           <div className="relative h-24 w-full overflow-hidden">
-                            <img
+                            <Image
                               src={mapSplash}
                               alt={m.mapName}
-                              className="h-full w-full object-cover object-center opacity-60 transition-transform duration-500 group-hover:scale-105"
+                              fill
+                              sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 320px"
+                              quality={45}
+                              className="object-cover object-center opacity-60 transition-transform duration-500 group-hover:scale-105"
                             />
                             <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/60 to-transparent" />
 
@@ -603,9 +618,11 @@ export default function TournamentMetaSection({ games, eligibility }: Props) {
                         style={{ boxShadow: `0 0 12px ${agentHex}25` }}
                       >
                         {agentIcon ? (
-                          <img
+                          <Image
                             src={agentIcon}
                             alt={item.agent}
+                            width={40}
+                            height={40}
                             className="h-full w-full object-contain mix-blend-screen drop-shadow"
                           />
                         ) : (

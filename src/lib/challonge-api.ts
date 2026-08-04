@@ -12,6 +12,7 @@ import {
   generateBracketFromParticipants,
   generateRoundRobinBracketFromParticipants,
 } from "@/lib/challonge-bracket-gen";
+import { getJson, setJson } from "@/lib/upstash-redis";
 import { promises as fs } from "fs";
 import path from "path";
 
@@ -456,6 +457,29 @@ const COOLDOWN_QUOTA_MS = 24 * 60 * 60_000;
 const MEMORY_TTL_MS = 10_000;
 const DISK_FRESH_MS = 10_000;
 const DISK_DIR = path.join(process.cwd(), ".cache", "challonge");
+
+/**
+ * Cross-instance cache (Upstash Redis) — the in-memory + disk caches above only
+ * live for a single serverless invocation on Vercel, so every cold function hit
+ * would otherwise re-fetch Challonge. Redis survives across instances.
+ */
+const REDIS_TTL_LIVE_SEC = 30;
+const REDIS_TTL_COMPLETED_SEC = 600;
+
+function redisBracketKey(slug: string): string {
+  return `challonge:bracket:${slug}`;
+}
+
+/** Store a freshly fetched bracket in memory, disk, and Redis (cross-instance). */
+function persistBracket(
+  slug: string,
+  bracket: TournamentBracketView,
+  allowStaleCache: boolean,
+) {
+  rememberBracket(slug, bracket);
+  const ttlSec = allowStaleCache ? REDIS_TTL_COMPLETED_SEC : REDIS_TTL_LIVE_SEC;
+  void setJson(redisBracketKey(slug), bracket, ttlSec);
+}
 
 let rateLimitedUntil = 0;
 let logged429 = false;
@@ -1009,6 +1033,12 @@ export async function fetchChallongeBracket(
   const memHit = rememberedBracket(slug);
   if (memHit) return memHit;
 
+  const redisHit = await getJson<TournamentBracketView>(redisBracketKey(slug));
+  if (redisHit) {
+    memoryCache.set(slug, { expiresAt: Date.now() + MEMORY_TTL_MS, bracket: redisHit });
+    return redisHit;
+  }
+
   const disk = await readDiskCache(slug);
   if (disk) {
     memoryCache.set(slug, {
@@ -1022,7 +1052,7 @@ export async function fetchChallongeBracket(
   // Prefer public module page (native UI, no API quota).
   const fromModule = await fetchChallongeModuleBracket(bracketUrl, slug);
   if (fromModule) {
-    rememberBracket(slug, fromModule);
+    persistBracket(slug, fromModule, allowStaleCache);
     return fromModule;
   }
 
@@ -1100,7 +1130,7 @@ export async function fetchChallongeBracket(
     }
 
     if (bracket) {
-      rememberBracket(slug, bracket);
+      persistBracket(slug, bracket, allowStaleCache);
       return bracket;
     }
     return disk?.bracket ?? null;

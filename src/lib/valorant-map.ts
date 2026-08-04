@@ -34,8 +34,13 @@ const OFFICIAL_MAP_SPLASH_IDS: Record<string, string> = {
   fracture: "b529732b-44a3-4d72-b6e4-907888e2a4f4",
 };
 
+// Used when a game has no map recorded or reports a name we don't know yet.
+// Must stay local: the valorant-api splash URLs 404 today, so a remote fallback
+// renders as a broken tile.
+const FALLBACK_MAP_SPLASH = "/images/maps/ascent.png";
+
 export function getValorantMapSplashUrl(mapName: string | null | undefined): string {
-  if (!mapName) return "https://media.valorant-api.com/maps/7eae24b7-42ba-45d9-96e6-2ab340dd1699/splash.png";
+  if (!mapName) return FALLBACK_MAP_SPLASH;
   const key = mapName.trim().toLowerCase();
 
   // Return local uploaded map image if present
@@ -48,6 +53,5 @@ export function getValorantMapSplashUrl(mapName: string | null | undefined): str
     return `https://media.valorant-api.com/maps/${id}/splash.png`;
   }
 
-  // Generic fallback
-  return "https://media.valorant-api.com/maps/7eae24b7-42ba-45d9-96e6-2ab340dd1699/splash.png";
+  return FALLBACK_MAP_SPLASH;
 }

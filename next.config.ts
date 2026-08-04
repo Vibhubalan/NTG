@@ -47,6 +47,12 @@ const nextConfig: NextConfig = {
   },
   images: {
     formats: ["image/avif", "image/webp"],
+    // Agent icons, map splashes and rank badges are effectively immutable, so
+    // the 4h default just forces needless re-optimization of the same bytes.
+    minimumCacheTTL: 2678400, // 31 days
+    // 45 is for decorative artwork that sits behind dark overlays (match card
+    // map splashes), where detail is never visible. 75 stays the default.
+    qualities: [45, 75],
     remotePatterns: remoteImagePatterns(),
   },
   async headers() {

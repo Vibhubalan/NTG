@@ -59,25 +59,21 @@ function RegisterShell({
 }) {
   if (layout === "featured") {
     return (
-      <section className="relative min-w-0 overflow-hidden rounded-2xl border border-white/[0.08] bg-gradient-to-br from-[#080e1c]/98 via-[#0c1428]/95 to-[#140a20]/98 p-4 shadow-[0_16px_48px_-20px_rgba(0,0,0,0.75)] sm:p-6">
+      <section className="relative min-w-0 overflow-hidden rounded-2xl border border-white/[0.08] bg-gradient-to-br from-[#080e1c]/98 via-[#0c1428]/95 to-[#140a20]/98 p-3 shadow-[0_16px_48px_-20px_rgba(0,0,0,0.75)] sm:p-6">
         <div className="pointer-events-none absolute -top-20 -right-20 h-48 w-48 rounded-full bg-[var(--color-brand)]/8 blur-3xl" />
         <div className="relative min-w-0">
-          <div className="mb-4 min-h-[4.75rem] border-b border-white/[0.06] pb-4">
+          <div className="mb-3 border-b border-white/[0.06] pb-3 sm:mb-4 sm:min-h-[4.75rem] sm:pb-4">
             <p className="text-[10px] font-bold tracking-[0.16em] text-[var(--color-brand)] uppercase sm:tracking-[0.32em]">
               {eyebrow}
             </p>
-            <h2 className="mt-1 line-clamp-2 break-words font-display text-xl font-bold tracking-tight text-white sm:line-clamp-1 sm:text-2xl">
+            <h2 className="mt-0.5 line-clamp-2 break-words font-display text-lg font-bold tracking-tight text-white sm:mt-1 sm:line-clamp-1 sm:text-2xl">
               {title}
             </h2>
             {subtitle ? (
-              <p className="mt-1 line-clamp-2 max-w-xl text-xs leading-snug text-white/45 sm:line-clamp-1">
+              <p className="mt-0.5 line-clamp-2 max-w-xl text-[11px] leading-snug text-white/45 sm:mt-1 sm:line-clamp-1 sm:text-xs">
                 {subtitle}
               </p>
-            ) : (
-              <p className="mt-1 text-xs text-transparent" aria-hidden>
-                .
-              </p>
-            )}
+            ) : null}
           </div>
           <div className="min-w-0">{children}</div>
         </div>

@@ -1,4 +1,6 @@
 import { prisma } from "@core/database/client";
+import { safeExpireTag } from "@/lib/safe-revalidate";
+import { tournamentDetailTag } from "./tournament.service";
 import type { PrizeSplitRow } from "@core/contracts";
 import type {
   BracketType,
@@ -558,6 +560,8 @@ export async function updateTournamentFull(
   const saved = await getTournamentAdmin(tournament.slug);
   if (!saved) return { ok: false, error: "Tournament not found after save." };
 
+  safeExpireTag(tournamentDetailTag(slug));
+
   return { ok: true, tournament: toAdminCupFieldsSnapshot(saved) };
 }
 
@@ -581,6 +585,7 @@ export async function clearTournamentPlacement(
   await prisma.tournamentPlacement.deleteMany({
     where: { tournamentId: tournament.id, role },
   });
+  safeExpireTag(tournamentDetailTag(slug));
   return { ok: true };
 }
 

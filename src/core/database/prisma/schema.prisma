@@ -2,7 +2,14 @@
 // @auth-membership | @tournaments-leagues | @roster-listings | @lounge-commerce
 
 generator client {
-  provider = "prisma-client-js"
+  provider        = "prisma-client-js"
+  // Nested `include`/`select` queries (tournament detail, games, stats
+  // eligibility) were issuing 10-15 sequential round trips to the DB and
+  // merging them in-app. On a remote pooled Postgres this round-trip latency
+  // — not query cost — was the dominant cost of loading a cup page. The
+  // `join` load strategy collapses each of those into one SQL query using
+  // LATERAL JOIN + JSON aggregation on the DB side instead.
+  previewFeatures = ["relationJoins"]
 }
 
 datasource db {

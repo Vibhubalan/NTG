@@ -67,14 +67,14 @@ function TeamPreviewScreen({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200"
+      className="fixed inset-0 z-[10001] flex items-start justify-center overflow-y-auto bg-black/70 px-3 pb-4 pt-[calc(env(safe-area-inset-top,0px)+5.75rem)] backdrop-blur-sm animate-in fade-in duration-200 sm:items-center sm:p-6"
       onClick={onClose}
     >
       <div
-        className="flex max-h-full w-full max-w-2xl flex-col overflow-hidden rounded-[1.5rem] border border-white/10 bg-[#0A0A0A] shadow-2xl"
+        className="flex w-full max-w-2xl flex-col overflow-hidden rounded-[1.5rem] border border-white/10 bg-[#0A0A0A] shadow-2xl max-h-[calc(100dvh-env(safe-area-inset-top,0px)-6.5rem)] sm:max-h-[min(85dvh,40rem)]"
         onClick={(e) => e.stopPropagation()}
       >
-        <header className="flex items-center gap-3 border-b border-white/[0.06] px-4 py-4 sm:px-6">
+        <header className="flex shrink-0 items-center gap-3 border-b border-white/[0.06] px-4 py-3.5 sm:px-6 sm:py-4">
           <button
             type="button"
             onClick={onClose}
@@ -88,50 +88,59 @@ function TeamPreviewScreen({
           <h3 className="min-w-0 flex-1 truncate font-display text-lg font-bold text-white">{team.name}</h3>
         </header>
 
-      <div className="flex-1 overflow-y-auto px-4 py-6 sm:px-6">
-        <p className="mb-5 text-[10px] font-medium uppercase tracking-[0.28em] text-white/35">
-          Squad · {team.players.length} {team.players.length === 1 ? "player" : "players"}
-        </p>
+        <div className="min-h-0 flex-1 overflow-y-auto px-4 py-5 sm:px-6 sm:py-6">
+          <p className="mb-4 text-[10px] font-medium uppercase tracking-[0.28em] text-white/35 sm:mb-5">
+            Squad · {team.players.length}{" "}
+            {team.players.length === 1 ? "player" : "players"}
+          </p>
 
-        <ul className="mx-auto max-w-lg space-y-2.5">
-          {sortByRole(team.players).map((player) => {
-            const role = playerRoleKey(player);
-            const badge = ROLE_BADGE[role] ?? ROLE_BADGE.PLAYER;
-            const secondary = isFifa ? player.olympusId : player.riotId;
-            const isPoach = player.membershipKind === "POACH";
-            return (
-              <li
-                key={player.id}
-                className={`flex items-center justify-between gap-3 rounded-2xl border px-4 py-3.5 ${
-                  isPoach
-                    ? "border-amber-400/20 bg-amber-500/[0.06]"
-                    : "border-white/[0.07] bg-white/[0.025]"
-                }`}
-              >
-                <div className="min-w-0">
-                  <p className="font-display text-[15px] font-semibold text-white truncate">{player.displayName}</p>
-                  {isPoach && player.poachedFromTeamName ? (
-                    <p className="mt-0.5 truncate text-xs font-semibold uppercase tracking-wider text-amber-300/90">
-                      Poached: {player.poachedFromTeamName}
-                    </p>
-                  ) : null}
-                  {secondary ? (
-                    <p className="mt-0.5 truncate text-xs text-white/45">{secondary}</p>
-                  ) : null}
-                </div>
-                <span
-                  className="shrink-0 rounded-full px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider"
-                  style={{ background: `${badge.color}1a`, color: badge.color, boxShadow: `inset 0 0 0 1px ${badge.color}40` }}
+          <ul className="mx-auto max-w-lg space-y-2.5">
+            {sortByRole(team.players).map((player) => {
+              const role = playerRoleKey(player);
+              const badge = ROLE_BADGE[role] ?? ROLE_BADGE.PLAYER;
+              const secondary = isFifa ? player.olympusId : player.riotId;
+              const isPoach = player.membershipKind === "POACH";
+              return (
+                <li
+                  key={player.id}
+                  className={`flex items-center justify-between gap-3 rounded-2xl border px-4 py-3.5 ${
+                    isPoach
+                      ? "border-amber-400/20 bg-amber-500/[0.06]"
+                      : "border-white/[0.07] bg-white/[0.025]"
+                  }`}
                 >
-                  {badge.label}
-                </span>
-              </li>
-            );
-          })}
-        </ul>
+                  <div className="min-w-0">
+                    <p className="truncate font-display text-[15px] font-semibold text-white">
+                      {player.displayName}
+                    </p>
+                    {isPoach && player.poachedFromTeamName ? (
+                      <p className="mt-0.5 truncate text-xs font-semibold uppercase tracking-wider text-amber-300/90">
+                        Poached: {player.poachedFromTeamName}
+                      </p>
+                    ) : null}
+                    {secondary ? (
+                      <p className="mt-0.5 truncate text-xs text-white/45">
+                        {secondary}
+                      </p>
+                    ) : null}
+                  </div>
+                  <span
+                    className="shrink-0 rounded-full px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider"
+                    style={{
+                      background: `${badge.color}1a`,
+                      color: badge.color,
+                      boxShadow: `inset 0 0 0 1px ${badge.color}40`,
+                    }}
+                  >
+                    {badge.label}
+                  </span>
+                </li>
+              );
+            })}
+          </ul>
+        </div>
       </div>
     </div>
-  </div>
   );
 }
 

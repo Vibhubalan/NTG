@@ -354,7 +354,16 @@ export class TournamentRepository {
     return t ? this.toPreview(t) : null;
   }
 
-  async findDetailBySlug(slug: string, userId?: string): Promise<TournamentDetail | null> {
+  /**
+   * Shared (non-personalized) tournament detail, plus a userId -> participantRole
+   * lookup built from the same query. Split out from personalization so the
+   * expensive part can be cached across users — see getTournamentDetail in
+   * tournament.service.ts, which merges in the per-request userId afterward.
+   */
+  async findDetailBySlug(slug: string): Promise<{
+    detail: TournamentDetail;
+    registrationRoleByUserId: Record<string, TournamentDetail["userParticipantRole"]>;
+  } | null> {
     const t = await prisma.tournament.findFirst({
       where: slugWhere(slug),
       include: {
@@ -412,11 +421,18 @@ export class TournamentRepository {
     const teamDetails = buildTeamDetailsFromData(t.tournamentTeams, allRegs);
 
     const teams = teamDetails.map((team) => team.name);
-    const userRegistration = userId
-      ? allRegs.find((r) => r.userId === userId)
-      : undefined;
 
-    return {
+    const registrationRoleByUserId: Record<
+      string,
+      TournamentDetail["userParticipantRole"]
+    > = {};
+    for (const reg of allRegs) {
+      if (!reg.userId) continue;
+      registrationRoleByUserId[reg.userId] =
+        reg.participantRole as TournamentDetail["userParticipantRole"];
+    }
+
+    const detail: TournamentDetail = {
       id: t.id,
       slug: t.slug,
       name: t.name,
@@ -491,15 +507,16 @@ export class TournamentRepository {
           })),
         })) ?? [],
       registrationCount: t._count.registrations,
-      userRegistered: Boolean(userRegistration),
-      userParticipantRole: userRegistration
-        ? (userRegistration.participantRole as TournamentDetail["userParticipantRole"])
-        : null,
+      // Personalized per-request in tournament.service.ts from registrationRoleByUserId.
+      userRegistered: false,
+      userParticipantRole: null,
       coCaptainSlots: t.coCaptainSlots,
       autoManageStatus: t.autoManageStatus,
       publicAuction: t.publicAuction,
       yourGamesEnabled: t.yourGamesEnabled ?? true,
     };
+
+    return { detail, registrationRoleByUserId };
   }
 
   async findActiveRegistrationBanners() {

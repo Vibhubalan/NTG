@@ -68,7 +68,10 @@ export default function TournamentDetailView({
   statsEligibility: initialStatsEligibility,
 }: Props) {
   const [activeTab, setActiveTab] = useState<"overview" | "brackets" | "matches" | "stats">("overview");
-  const [activeStageIndex, setActiveStageIndex] = useState<number>(0);
+  // null = the visitor hasn't picked a stage, so follow the latest one. Brackets
+  // arrive asynchronously, so this is derived rather than seeded in useState —
+  // at first render the list is usually still empty.
+  const [pickedStageIndex, setPickedStageIndex] = useState<number | null>(null);
   const [generatedFallback, setGeneratedFallback] = useState<TournamentBracketView | null>(null);
   const [brackets, setBrackets] = useState(initialBrackets);
   const [bracketsLoading, setBracketsLoading] = useState(false);
@@ -102,6 +105,14 @@ export default function TournamentDetailView({
     : mvpPlacement?.teamLabel?.trim()
       ? mvpPlacement.displayName
       : null;
+  // Later entries are later stages, so the last one is the live/most recent
+  // bracket — that's what a visitor opening the tab wants to see, not Stage 1.
+  const latestStageIndex = Math.max(brackets.length - 1, 0);
+  const activeStageIndex =
+    pickedStageIndex !== null && pickedStageIndex < brackets.length
+      ? pickedStageIndex
+      : latestStageIndex;
+
   const hasWinnerStage = brackets.some((b) => b.isFinal !== false);
   const primaryBracket =
     brackets
@@ -536,7 +547,7 @@ export default function TournamentDetailView({
                   <button
                     key={b.url}
                     type="button"
-                    onClick={() => setActiveStageIndex(idx)}
+                    onClick={() => setPickedStageIndex(idx)}
                     className={`rounded-xl px-5 py-2 text-xs font-bold uppercase tracking-[0.16em] transition-all ${
                       activeStageIndex === idx
                         ? "bg-[#22c55e] text-[#070a12] shadow-md shadow-emerald-500/20"

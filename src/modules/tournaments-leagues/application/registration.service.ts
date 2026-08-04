@@ -1,4 +1,6 @@
 import { prisma } from "@core/database/client";
+import { safeExpireTag } from "@/lib/safe-revalidate";
+import { tournamentDetailTag } from "./tournament.service";
 import type { RegistrationResult } from "@core/contracts";
 import {
   GameSlug,
@@ -1335,6 +1337,8 @@ export async function setTournamentPlacements(
       update: {},
     });
   }
+
+  safeExpireTag(tournamentDetailTag(slug));
 
   return { ok: true };
 }

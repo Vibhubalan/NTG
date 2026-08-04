@@ -1,4 +1,6 @@
 import { prisma } from "@core/database/client";
+import { unstable_cache } from "next/cache";
+import { safeExpireTag } from "@/lib/safe-revalidate";
 import { henrikFetch, henrikHeaders } from "@/lib/henrik-client";
 import { normalizeHenrikRegion } from "@/lib/henrik-region";
 import { slugWhere } from "@/lib/slug-utils";
@@ -589,6 +591,42 @@ function gameInclude(tournamentId: string): Prisma.TournamentGameInclude {
   };
 }
 
+/**
+ * Slimmer include for public reads (cup Matches tab). Skips the per-player
+ * leaderboard + registrations joins — the public Matches UI never renders
+ * rankTier per row — while keeping every KDA/ACS/agent field it does use.
+ */
+function publicGameInclude(): Prisma.TournamentGameInclude {
+  return {
+    teamA: { select: { name: true } },
+    teamB: { select: { name: true } },
+    players: {
+      include: {
+        user: { select: { name: true } },
+      },
+    },
+  };
+}
+
+/**
+ * The raw Henrik match payload is kept for re-derivation (see
+ * backfillTournamentGameFirstKillDeaths) but averages ~186 kB per game, and a
+ * bare `include` selects it alongside every other column. Listing one cup's
+ * games was therefore pulling ~20 MB to build a ~0.12 MB view. Every list read
+ * omits it; the jobs that genuinely need it select it explicitly.
+ */
+const NO_RAW_PAYLOAD = { payloadJson: true } as const;
+
+/** Cache tag for a tournament's published games list (Matches tab). */
+export function tournamentGamesTag(slug: string): string {
+  return `tournament-games:${slug}`;
+}
+
+/** Broader cache tag shared by the cup page's cached data (games + stats). */
+export function tournamentCupTag(slug: string): string {
+  return `tournament-cup:${slug}`;
+}
+
 export async function listTournamentGamesAdmin(slug: string): Promise<{
   ok: true;
   games: TournamentGameView[];
@@ -598,6 +636,7 @@ export async function listTournamentGamesAdmin(slug: string): Promise<{
 
   const games = await prisma.tournamentGame.findMany({
     where: { tournamentId: tournament.id },
+    omit: NO_RAW_PAYLOAD,
     include: gameInclude(tournament.id),
     orderBy: [{ startedAt: "desc" }, { scannedAt: "desc" }],
   });
@@ -605,7 +644,7 @@ export async function listTournamentGamesAdmin(slug: string): Promise<{
   return { ok: true, games: games.map(toGameView) };
 }
 
-export async function listPublishedTournamentGames(slug: string): Promise<{
+async function fetchPublishedTournamentGames(slug: string): Promise<{
   ok: true;
   yourGamesEnabled: boolean;
   games: TournamentGameView[];
@@ -618,7 +657,8 @@ export async function listPublishedTournamentGames(slug: string): Promise<{
       tournamentId: tournament.id,
       status: TournamentGameStatus.PUBLISHED,
     },
-    include: gameInclude(tournament.id),
+    omit: NO_RAW_PAYLOAD,
+    include: publicGameInclude(),
     orderBy: [{ startedAt: "desc" }, { publishedAt: "desc" }],
   });
 
@@ -627,6 +667,25 @@ export async function listPublishedTournamentGames(slug: string): Promise<{
     yourGamesEnabled: tournament.yourGamesEnabled,
     games: games.map(toGameView),
   };
+}
+
+/**
+ * Cached, tagged read used by the public cup page (Matches tab). Recreating the
+ * unstable_cache wrapper per-slug keeps the cache key + tags scoped to this
+ * tournament — see tournament.service.ts for the same pattern with no args.
+ */
+export async function listPublishedTournamentGames(slug: string): Promise<{
+  ok: true;
+  yourGamesEnabled: boolean;
+  games: TournamentGameView[];
+} | { ok: false; error: string }> {
+  return unstable_cache(
+    () => fetchPublishedTournamentGames(slug),
+    ["tournament-published-games", slug],
+    // revalidateTag on publish/status-change covers the common case instantly;
+    // this time-based revalidate is just a backstop against any missed path.
+    { revalidate: 60, tags: [tournamentGamesTag(slug), tournamentCupTag(slug)] },
+  )();
 }
 
 export type ScanChunkResult = {
@@ -849,6 +908,11 @@ export async function publishTournamentGames(opts: {
     });
   }
 
+  if (result.count > 0) {
+    safeExpireTag(tournamentGamesTag(opts.slug));
+    safeExpireTag(tournamentCupTag(opts.slug));
+  }
+
   return { ok: true, count: result.count };
 }
 
@@ -878,6 +942,15 @@ export async function setTournamentGameStatus(opts: {
     },
   });
 
+  // A status flip can add or remove a row from the public PUBLISHED list either way.
+  if (
+    opts.status === TournamentGameStatus.PUBLISHED ||
+    game.status === TournamentGameStatus.PUBLISHED
+  ) {
+    safeExpireTag(tournamentGamesTag(opts.slug));
+    safeExpireTag(tournamentCupTag(opts.slug));
+  }
+
   return { ok: true };
 }
 
@@ -894,6 +967,12 @@ export async function deleteTournamentGame(opts: {
   if (!game) return { ok: false, error: "Game not found." };
 
   await prisma.tournamentGame.delete({ where: { id: game.id } });
+
+  if (game.status === TournamentGameStatus.PUBLISHED) {
+    safeExpireTag(tournamentGamesTag(opts.slug));
+    safeExpireTag(tournamentCupTag(opts.slug));
+  }
+
   return { ok: true };
 }
 
@@ -936,7 +1015,7 @@ function addStatsEligibilityIdentity(
 }
 
 /** Official team memberships used to filter public Stats (primary + admin poach). */
-export async function listTournamentStatsEligibility(
+async function fetchTournamentStatsEligibility(
   slug: string,
 ): Promise<TournamentStatsEligibility> {
   const empty: TournamentStatsEligibility = { byUserId: {}, byRiotId: {} };
@@ -1012,6 +1091,22 @@ export async function listTournamentStatsEligibility(
   }
 
   return eligibility;
+}
+
+/**
+ * Cached, tagged read (not personalized — rosters/registrations look the
+ * same for every visitor). Same short stale-while-revalidate window as
+ * listPublishedTournamentGames so the Stats tab doesn't pay this DB cost
+ * on every single request.
+ */
+export async function listTournamentStatsEligibility(
+  slug: string,
+): Promise<TournamentStatsEligibility> {
+  return unstable_cache(
+    () => fetchTournamentStatsEligibility(slug),
+    ["tournament-stats-eligibility", slug],
+    { revalidate: 20, tags: [tournamentCupTag(slug)] },
+  )();
 }
 
 /**
