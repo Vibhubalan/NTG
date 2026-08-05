@@ -673,19 +673,28 @@ async function fetchPublishedTournamentGames(slug: string): Promise<{
  * Cached, tagged read used by the public cup page (Matches tab). Recreating the
  * unstable_cache wrapper per-slug keeps the cache key + tags scoped to this
  * tournament — see tournament.service.ts for the same pattern with no args.
+ *
+ * A cached "not found" is never trusted — fall through to a live read so a
+ * transient miss cannot 404 Matches for the whole revalidate window.
  */
 export async function listPublishedTournamentGames(slug: string): Promise<{
   ok: true;
   yourGamesEnabled: boolean;
   games: TournamentGameView[];
 } | { ok: false; error: string }> {
-  return unstable_cache(
-    () => fetchPublishedTournamentGames(slug),
-    ["tournament-published-games", slug],
-    // revalidateTag on publish/status-change covers the common case instantly;
-    // this time-based revalidate is just a backstop against any missed path.
-    { revalidate: 60, tags: [tournamentGamesTag(slug), tournamentCupTag(slug)] },
-  )();
+  try {
+    const cached = await unstable_cache(
+      () => fetchPublishedTournamentGames(slug),
+      ["tournament-published-games", slug],
+      // revalidateTag on publish/status-change covers the common case instantly;
+      // this time-based revalidate is just a backstop against any missed path.
+      { revalidate: 60, tags: [tournamentGamesTag(slug), tournamentCupTag(slug)] },
+    )();
+    if (cached.ok) return cached;
+  } catch (error) {
+    console.error(`[tournament] cached games failed for ${slug}:`, error);
+  }
+  return fetchPublishedTournamentGames(slug);
 }
 
 export type ScanChunkResult = {
@@ -1102,11 +1111,16 @@ async function fetchTournamentStatsEligibility(
 export async function listTournamentStatsEligibility(
   slug: string,
 ): Promise<TournamentStatsEligibility> {
-  return unstable_cache(
-    () => fetchTournamentStatsEligibility(slug),
-    ["tournament-stats-eligibility", slug],
-    { revalidate: 20, tags: [tournamentCupTag(slug)] },
-  )();
+  try {
+    return await unstable_cache(
+      () => fetchTournamentStatsEligibility(slug),
+      ["tournament-stats-eligibility", slug],
+      { revalidate: 20, tags: [tournamentCupTag(slug)] },
+    )();
+  } catch (error) {
+    console.error(`[tournament] cached stats eligibility failed for ${slug}:`, error);
+    return fetchTournamentStatsEligibility(slug);
+  }
 }
 
 /**

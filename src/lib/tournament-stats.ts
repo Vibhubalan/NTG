@@ -44,6 +44,12 @@ export const STANDOUT_GP_FLOOR = 1;
 export const AWARD_GP_SHARE = 0.25;
 /** Never demand fewer than this many games for an award. */
 export const AWARD_GP_ABSOLUTE_FLOOR = 2;
+/**
+ * Cap on the Bayesian prior (C). Without this, a high mean-GP pool keeps
+ * pulling solid 4–6 game samples toward the mean so a longer mediocre run
+ * can outrank a clearly better shorter one.
+ */
+export const AWARD_PRIOR_CAP = 3;
 
 /**
  * Agent awards: below this many tournament picks the agent is treated as rare,
@@ -51,10 +57,12 @@ export const AWARD_GP_ABSOLUTE_FLOOR = 2;
  */
 export const AGENT_RARE_PICK_CEILING = 8;
 /**
- * Popular agents require a larger on-agent sample. Floor scales with how often
- * the agent was picked in the cup (clamped to the busiest player on that agent).
+ * Popular agents bump the games floor a little with pick volume, but never
+ * above this — a hard high floor was DQ'ing strong 5-game runs in favor of
+ * weaker 6-game ones.
  */
-export const AGENT_AWARD_PICK_SHARE = 0.2;
+export const AGENT_AWARD_PICK_SHARE = 0.1;
+export const AGENT_AWARD_GP_CAP = 3;
 
 /**
  * Best Flex: the player must have played every role — at least one agent in
@@ -123,7 +131,7 @@ export function weightedAcs(
   baseline: StandoutBaseline,
 ): number {
   if (gamesPlayed <= 0) return 0;
-  const prior = baseline.meanGamesPlayed;
+  const prior = Math.min(baseline.meanGamesPlayed, AWARD_PRIOR_CAP);
   if (prior <= 0) return avgAcs;
   return (gamesPlayed * avgAcs + prior * baseline.meanAcs) / (gamesPlayed + prior);
 }
@@ -149,8 +157,9 @@ export function dynamicGamesThreshold(pool: { gamesPlayed: number }[]): number {
 }
 
 /**
- * Games required to win "best on this agent". Rare agents stay soft; heavily
- * picked agents demand enough games that a 2-map spike cannot take the card.
+ * Games required to win "best on this agent". Rare agents stay soft; popular
+ * agents ask for a modest sample (capped) so 2-map spikes lose, but a strong
+ * 5-game run is never DQ'd in favor of a weaker 6-game one.
  */
 export function agentAwardGamesThreshold(
   totalPicks: number,
@@ -169,9 +178,12 @@ export function agentAwardGamesThreshold(
     return Math.min(maxGp, Math.max(1, Math.min(poolFloor, 2)));
   }
 
-  const popularityFloor = Math.max(
-    AWARD_GP_ABSOLUTE_FLOOR,
-    Math.floor(totalPicks * AGENT_AWARD_PICK_SHARE),
+  const popularityFloor = Math.min(
+    AGENT_AWARD_GP_CAP,
+    Math.max(
+      AWARD_GP_ABSOLUTE_FLOOR,
+      Math.floor(totalPicks * AGENT_AWARD_PICK_SHARE),
+    ),
   );
   return Math.min(maxGp, Math.max(poolFloor, popularityFloor));
 }
@@ -719,8 +731,10 @@ function rankStandoutList(
     const kdA = a.totalDeaths > 0 ? a.totalKills / a.totalDeaths : a.totalKills;
     const kdB = b.totalDeaths > 0 ? b.totalKills / b.totalDeaths : b.totalKills;
     if (kdB !== kdA) return kdB - kdA;
+    // Prefer quality over volume when Rating/K/D are tied.
+    if (b.avgAcs !== a.avgAcs) return b.avgAcs - a.avgAcs;
     if (b.gamesPlayed !== a.gamesPlayed) return b.gamesPlayed - a.gamesPlayed;
-    return b.avgAcs - a.avgAcs;
+    return 0;
   });
 }
 
@@ -896,8 +910,9 @@ export type AgentStandout = {
  * Aggregates performance stats for every agent played in the tournament,
  * and identifies the #1 player per agent via weighted ACS.
  *
- * Pass `excludePlayerKeys` (e.g. Best Flex) so that player keeps Flex and agent
- * cards fall through to the next-ranked eligible player.
+ * Optional `excludePlayerKeys` skips named players when picking a winner.
+ * Role exclusivity (Flex / Duelist / …) is handled only in role standouts —
+ * Flex winners are still eligible for Best by Agents.
  */
 export function aggregateAgentStandouts(
   games: StatsGame[],
@@ -1036,10 +1051,11 @@ export function aggregateAgentStandouts(
         if (apaB !== apaA) return apaB - apaA;
       }
       if (b.kd !== a.kd) return b.kd - a.kd;
+      if (b.avgAcs !== a.avgAcs) return b.avgAcs - a.avgAcs;
       if (b.gamesPlayedOnAgent !== a.gamesPlayedOnAgent) {
         return b.gamesPlayedOnAgent - a.gamesPlayedOnAgent;
       }
-      return b.avgAcs - a.avgAcs;
+      return 0;
     });
 
     const bestPlayer =

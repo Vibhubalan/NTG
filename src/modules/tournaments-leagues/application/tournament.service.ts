@@ -42,17 +42,39 @@ export function tournamentDetailTag(slug: string): string {
  * instant, and a request landing just after expiry still gets the (slightly
  * stale) cached payload immediately while Next refetches in the background —
  * so nobody, including the very next visitor after expiry, blocks on the DB.
+ *
+ * Never treat a cached miss as final: `unstable_cache` can store `null` after a
+ * transient blip, which would 404 the cup page for the whole revalidate window.
+ * On null/error we fall through to a live DB read.
  */
 async function getCachedTournamentDetailShared(slug: string) {
-  return unstable_cache(
-    () => tournamentRepo.findDetailBySlug(slug),
-    ["tournament-detail-shared", slug],
-    { revalidate: 20, tags: [tournamentDetailTag(slug)] },
-  )();
+  try {
+    const cached = await unstable_cache(
+      () => tournamentRepo.findDetailBySlug(slug),
+      ["tournament-detail-shared", slug],
+      { revalidate: 20, tags: [tournamentDetailTag(slug)] },
+    )();
+    if (cached) return cached;
+  } catch (error) {
+    console.error(`[tournament] cached detail failed for ${slug}:`, error);
+  }
+  return tournamentRepo.findDetailBySlug(slug);
 }
 
 export const getTournamentDetail = cache(async (slug: string, userId?: string) => {
-  const shared = await getCachedTournamentDetailShared(slug);
+  let shared: Awaited<ReturnType<typeof getCachedTournamentDetailShared>> = null;
+  try {
+    shared = await getCachedTournamentDetailShared(slug);
+  } catch (error) {
+    console.error(`[tournament] detail load failed for ${slug}:`, error);
+    // One live retry — avoids a cup 404/500 from a single pooler blip.
+    try {
+      shared = await tournamentRepo.findDetailBySlug(slug);
+    } catch (retryError) {
+      console.error(`[tournament] detail retry failed for ${slug}:`, retryError);
+      throw retryError;
+    }
+  }
   if (!shared) return null;
 
   const role = userId ? shared.registrationRoleByUserId[userId] : undefined;

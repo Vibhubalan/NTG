@@ -12,7 +12,6 @@ import {
   aggregateRoleStandouts,
   aggregateTeamMapStats,
   aggregateAgentStandouts,
-  STANDOUT_GP_FLOOR,
   type StandoutPlayer,
   type TournamentStatsEligibility,
 } from "@/lib/tournament-stats";
@@ -352,12 +351,10 @@ export default function TournamentMetaSection({ games, eligibility }: Props) {
     () => aggregateRoleStandouts(games, eligibility),
     [games, eligibility],
   );
-  const agentStandouts = useMemo(() => {
-    const exclude = standouts.bestFlex
-      ? [standouts.bestFlex.riotId.toLowerCase()]
-      : undefined;
-    return aggregateAgentStandouts(games, eligibility, STANDOUT_GP_FLOOR, exclude);
-  }, [games, eligibility, standouts.bestFlex]);
+  const agentStandouts = useMemo(
+    () => aggregateAgentStandouts(games, eligibility),
+    [games, eligibility],
+  );
 
   const filteredAgentStandouts = useMemo(() => {
     const withMaster = agentStandouts.filter((a) => a.bestPlayer != null);
@@ -569,7 +566,7 @@ export default function TournamentMetaSection({ games, eligibility }: Props) {
         onToggle={() => toggleSection("roleStandouts")}
         accentDotClass="bg-amber-400 animate-pulse"
         title="Best Players by Roles"
-        description="Highest Rating per role — Flex kept first; other cards take the next player. Initiator favors assists."
+        description="Highest Rating per role — Flex kept first, then other roles take the next player. Initiator favors assists."
       >
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           <StandoutCard roleKey="bestOverall" player={standouts.bestOverall} />
@@ -587,7 +584,7 @@ export default function TournamentMetaSection({ games, eligibility }: Props) {
         onToggle={() => toggleSection("agentMasters")}
         accentDotClass="bg-cyan-400 animate-pulse"
         title="Best Players by Agents"
-        description="Top Rating per agent — popular agents need more games; Flex winner skipped; Initiators favor assists"
+        description="Top Rating per agent — quality over empty volume; Initiators favor assists"
         headerExtra={agentRoleFilters}
       >
         {filteredAgentStandouts.length === 0 ? (

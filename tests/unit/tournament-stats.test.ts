@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  AGENT_RARE_PICK_CEILING,
   agentAwardGamesThreshold,
   aggregateAgentStandouts,
   aggregateMapMeta,
@@ -343,8 +344,12 @@ describe("tournament-stats meta aggregations", () => {
     expect(weightedAcs(300, 2, baseline)).toBeLessThan(
       weightedAcs(280, 15, baseline),
     );
+    // Prior is capped, so a clear 5-game run beats a mediocre longer one.
+    expect(weightedAcs(280, 5, baseline)).toBeGreaterThan(
+      weightedAcs(190, 6, baseline),
+    );
     // Result stays in ACS units and converges on the true average.
-    expect(weightedAcs(300, 200, baseline)).toBeCloseTo(297.6, 0);
+    expect(weightedAcs(300, 200, baseline)).toBeCloseTo(298.9, 0);
     expect(weightedAcs(250, 0, baseline)).toBe(0);
   });
 
@@ -367,16 +372,57 @@ describe("tournament-stats meta aggregations", () => {
     expect(dynamicGamesThreshold([])).toBe(0);
   });
 
-  it("agentAwardGamesThreshold stays soft for rare agents and rises with picks", () => {
-    const pool = [{ gamesPlayed: 6 }, { gamesPlayed: 2 }, { gamesPlayed: 1 }];
+  it("agentAwardGamesThreshold stays soft and never DQ's solid mid-samples", () => {
+    const pool = [{ gamesPlayed: 6 }, { gamesPlayed: 5 }, { gamesPlayed: 2 }];
     // Rare: allow low GP even if the pool could support a higher floor.
     expect(agentAwardGamesThreshold(4, pool)).toBe(2);
     expect(agentAwardGamesThreshold(3, [{ gamesPlayed: 1 }])).toBe(1);
-    // Popular: pick volume pushes the floor above the pool-only rule.
-    expect(agentAwardGamesThreshold(30, pool)).toBe(6);
-    // Never above the busiest player on that agent.
+    // Popular: modest bump, capped so a 5-game Clove run still qualifies.
+    expect(agentAwardGamesThreshold(30, pool)).toBe(3);
     expect(agentAwardGamesThreshold(40, [{ gamesPlayed: 3 }])).toBe(3);
     expect(agentAwardGamesThreshold(20, [])).toBe(0);
+  });
+
+  it("awards popular agents to the stronger ACS sample, not just more games", () => {
+    const elig: TournamentStatsEligibility = {
+      byUserId: {
+        good: [{ teamId: "team-a", kind: "PRIMARY", since: null }],
+        bad: [{ teamId: "team-a", kind: "PRIMARY", since: null }],
+        fill: [{ teamId: "team-a", kind: "PRIMARY", since: null }],
+        opp: [{ teamId: "team-b", kind: "PRIMARY", since: null }],
+      },
+      byRiotId: {},
+    };
+
+    // 12 Clove picks → popular agent. Good plays 5 strong games; Bad plays 6 weak.
+    const games: StatsGame[] = [];
+    for (let i = 0; i < 6; i++) {
+      games.push({
+        teamAId: "team-a",
+        teamBId: "team-b",
+        teamAName: "Alpha",
+        teamBName: "Bravo",
+        teamARounds: 13,
+        teamBRounds: 5,
+        mapName: "Ascent",
+        mvpRiotId: null,
+        players: [
+          ...(i < 5
+            ? [player("GoodClove#001", "team-a", "Clove", 290, "good")]
+            : [player("Fill#001", "team-a", "Jett", 200, "fill")]),
+          player("BadClove#001", "team-a", "Clove", 175, "bad"),
+          player("Fill#002", "team-a", "Sova", 200, "fill"),
+          player("Fill#003", "team-a", "Cypher", 200, "fill"),
+          player("Fill#004", "team-a", "Raze", 200, "fill"),
+          player("Opp#001", "team-b", "Omen", 180, "opp"),
+        ],
+      });
+    }
+
+    const clove = aggregateAgentStandouts(games, elig).find((a) => a.agent === "Clove");
+    expect(clove?.totalPickCount).toBeGreaterThan(AGENT_RARE_PICK_CEILING);
+    expect(clove?.bestPlayer?.riotId).toBe("GoodClove#001");
+    expect(clove?.bestPlayer?.gamesPlayedOnAgent).toBe(5);
   });
 
   it("ranks standouts fairly: not pure GP, not pure one-off ACS", () => {
@@ -635,17 +681,15 @@ describe("best flex eligibility", () => {
 
     const standouts = aggregateRoleStandouts(flexGames, elig);
     // Flex is awarded first and kept; role cards take the next player.
+    // Agent awards are independent — Flex winners may still win Best Sova, etc.
     expect(standouts.bestFlex?.riotId).toBe("FullFlex#001");
     expect(standouts.byRole.Duelist?.riotId).not.toBe("FullFlex#001");
     expect(standouts.bestOverall?.riotId).toBe("FullFlex#001");
 
-    const sova = aggregateAgentStandouts(
-      flexGames,
-      elig,
-      1,
-      [statsPlayerKey("FullFlex#001")],
-    ).find((a) => a.agent === "Sova");
-    expect(sova?.bestPlayer?.riotId).not.toBe("FullFlex#001");
+    const sova = aggregateAgentStandouts(flexGames, elig).find(
+      (a) => a.agent === "Sova",
+    );
+    expect(sova?.bestPlayer?.riotId).toBe("FullFlex#001");
   });
 
   it("keeps Flex first; role cards take the next player; Overall may overlap", () => {
