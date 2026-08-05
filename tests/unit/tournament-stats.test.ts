@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  agentAwardGamesThreshold,
   aggregateAgentStandouts,
   aggregateMapMeta,
   aggregatePlayerStats,
@@ -9,6 +10,7 @@ import {
   distinctRolesPlayed,
   dynamicGamesThreshold,
   flexPriorityScore,
+  initiatorAssistBoost,
   isStatsAppearanceEligible,
   normalizeCompKey,
   qualifiesFlex,
@@ -170,6 +172,7 @@ function player(
   agent: string,
   acs: number,
   userId?: string,
+  assists = 5,
 ) {
   return {
     riotId,
@@ -178,7 +181,7 @@ function player(
     agent,
     kills: Math.round(acs / 10),
     deaths: 10,
-    assists: 5,
+    assists,
     acs,
     adr: 140,
     hsPercent: 20,
@@ -362,6 +365,18 @@ describe("tournament-stats meta aggregations", () => {
     // Clamped to the pool max, so a 1-game pool still yields a winner.
     expect(dynamicGamesThreshold([{ gamesPlayed: 1 }])).toBe(1);
     expect(dynamicGamesThreshold([])).toBe(0);
+  });
+
+  it("agentAwardGamesThreshold stays soft for rare agents and rises with picks", () => {
+    const pool = [{ gamesPlayed: 6 }, { gamesPlayed: 2 }, { gamesPlayed: 1 }];
+    // Rare: allow low GP even if the pool could support a higher floor.
+    expect(agentAwardGamesThreshold(4, pool)).toBe(2);
+    expect(agentAwardGamesThreshold(3, [{ gamesPlayed: 1 }])).toBe(1);
+    // Popular: pick volume pushes the floor above the pool-only rule.
+    expect(agentAwardGamesThreshold(30, pool)).toBe(6);
+    // Never above the busiest player on that agent.
+    expect(agentAwardGamesThreshold(40, [{ gamesPlayed: 3 }])).toBe(3);
+    expect(agentAwardGamesThreshold(20, [])).toBe(0);
   });
 
   it("ranks standouts fairly: not pure GP, not pure one-off ACS", () => {
@@ -576,7 +591,7 @@ describe("best flex eligibility", () => {
     expect(initCtrlSent).toBeGreaterThan(ctrlSentDuel);
   });
 
-  it("picks full-Flex player when present", () => {
+  it("picks full-Flex player when present and keeps them on Flex", () => {
     const elig: TournamentStatsEligibility = {
       byUserId: {
         u1: [{ teamId: "team-a", kind: "PRIMARY", since: null }],
@@ -619,8 +634,163 @@ describe("best flex eligibility", () => {
     }));
 
     const standouts = aggregateRoleStandouts(flexGames, elig);
+    // Flex is awarded first and kept; role cards take the next player.
     expect(standouts.bestFlex?.riotId).toBe("FullFlex#001");
-    expect(Object.keys(standouts.bestFlex!.agentCounts).length).toBe(8);
+    expect(standouts.byRole.Duelist?.riotId).not.toBe("FullFlex#001");
+    expect(standouts.bestOverall?.riotId).toBe("FullFlex#001");
+
+    const sova = aggregateAgentStandouts(
+      flexGames,
+      elig,
+      1,
+      [statsPlayerKey("FullFlex#001")],
+    ).find((a) => a.agent === "Sova");
+    expect(sova?.bestPlayer?.riotId).not.toBe("FullFlex#001");
+  });
+
+  it("keeps Flex first; role cards take the next player; Overall may overlap", () => {
+    const elig: TournamentStatsEligibility = {
+      byUserId: {
+        star: [{ teamId: "team-a", kind: "PRIMARY", since: null }],
+        flex2: [{ teamId: "team-a", kind: "PRIMARY", since: null }],
+        duel: [{ teamId: "team-a", kind: "PRIMARY", since: null }],
+        ctrl: [{ teamId: "team-a", kind: "PRIMARY", since: null }],
+        sent: [{ teamId: "team-a", kind: "PRIMARY", since: null }],
+        opp: [{ teamId: "team-b", kind: "PRIMARY", since: null }],
+      },
+      byRiotId: {},
+    };
+
+    // Star spans all four roles with elite Initiator ACS; Flex2 is a weaker
+    // full-flex backup. Star keeps Flex; Initiator falls to the next player.
+    const games: StatsGame[] = [
+      {
+        teamAId: "team-a",
+        teamBId: "team-b",
+        teamAName: "Alpha",
+        teamBName: "Bravo",
+        teamARounds: 13,
+        teamBRounds: 5,
+        mapName: "Ascent",
+        mvpRiotId: null,
+        players: [
+          player("Star#001", "team-a", "Sova", 320, "star"),
+          player("Flex2#001", "team-a", "Jett", 210, "flex2"),
+          player("Duel#001", "team-a", "Raze", 300, "duel"),
+          player("Ctrl#001", "team-a", "Omen", 280, "ctrl"),
+          player("Sent#001", "team-a", "Cypher", 275, "sent"),
+          player("Opp#001", "team-b", "Neon", 180, "opp"),
+        ],
+      },
+      {
+        teamAId: "team-a",
+        teamBId: "team-b",
+        teamAName: "Alpha",
+        teamBName: "Bravo",
+        teamARounds: 13,
+        teamBRounds: 5,
+        mapName: "Bind",
+        mvpRiotId: null,
+        players: [
+          player("Star#001", "team-a", "Jett", 250, "star"),
+          player("Flex2#001", "team-a", "Sova", 200, "flex2"),
+          player("Duel#001", "team-a", "Raze", 295, "duel"),
+          player("Ctrl#001", "team-a", "Viper", 270, "ctrl"),
+          player("Sent#001", "team-a", "Killjoy", 265, "sent"),
+          player("Opp#001", "team-b", "Reyna", 180, "opp"),
+        ],
+      },
+      {
+        teamAId: "team-a",
+        teamBId: "team-b",
+        teamAName: "Alpha",
+        teamBName: "Bravo",
+        teamARounds: 13,
+        teamBRounds: 5,
+        mapName: "Haven",
+        mvpRiotId: null,
+        players: [
+          player("Star#001", "team-a", "Omen", 240, "star"),
+          player("Flex2#001", "team-a", "Omen", 195, "flex2"),
+          player("Duel#001", "team-a", "Phoenix", 290, "duel"),
+          player("Ctrl#001", "team-a", "Astra", 275, "ctrl"),
+          player("Sent#001", "team-a", "Sage", 260, "sent"),
+          player("Opp#001", "team-b", "Yoru", 180, "opp"),
+        ],
+      },
+      {
+        teamAId: "team-a",
+        teamBId: "team-b",
+        teamAName: "Alpha",
+        teamBName: "Bravo",
+        teamARounds: 13,
+        teamBRounds: 5,
+        mapName: "Lotus",
+        mvpRiotId: null,
+        players: [
+          player("Star#001", "team-a", "Cypher", 245, "star"),
+          player("Flex2#001", "team-a", "Cypher", 190, "flex2"),
+          player("Duel#001", "team-a", "Neon", 285, "duel"),
+          player("Ctrl#001", "team-a", "Brimstone", 265, "ctrl"),
+          player("Sent#001", "team-a", "Chamber", 270, "sent"),
+          player("Opp#001", "team-b", "Jett", 180, "opp"),
+        ],
+      },
+    ];
+
+    const standouts = aggregateRoleStandouts(games, elig);
+    expect(standouts.bestFlex?.riotId).toBe("Star#001");
+    expect(standouts.byRole.Initiator?.riotId).toBe("Flex2#001");
+
+    const exclusive = [
+      standouts.byRole.Duelist?.riotId,
+      standouts.byRole.Initiator?.riotId,
+      standouts.byRole.Controller?.riotId,
+      standouts.byRole.Sentinel?.riotId,
+      standouts.bestFlex?.riotId,
+    ].filter(Boolean);
+    expect(new Set(exclusive).size).toBe(exclusive.length);
+  });
+
+  it("prefers higher assists when ranking Initiators (role and agent)", () => {
+    const elig: TournamentStatsEligibility = {
+      byUserId: {
+        frag: [{ teamId: "team-a", kind: "PRIMARY", since: null }],
+        setup: [{ teamId: "team-a", kind: "PRIMARY", since: null }],
+        fill: [{ teamId: "team-a", kind: "PRIMARY", since: null }],
+        opp: [{ teamId: "team-b", kind: "PRIMARY", since: null }],
+      },
+      byRiotId: {},
+    };
+
+    const games: StatsGame[] = [0, 1, 2, 3].map((i) => ({
+      teamAId: "team-a",
+      teamBId: "team-b",
+      teamAName: "Alpha",
+      teamBName: "Bravo",
+      teamARounds: 13,
+      teamBRounds: 5,
+      mapName: "Ascent",
+      mvpRiotId: null,
+      players: [
+        // Slightly higher ACS, low assists
+        player("FragInit#001", "team-a", "Sova", 255, "frag", 3),
+        // Slightly lower ACS, high assists — should win Initiator / Sova
+        player("SetupInit#001", "team-a", "Sova", 248, "setup", 14),
+        player("Fill#001", "team-a", "Jett", 200, "fill"),
+        player("Fill#002", "team-a", "Omen", 200, "fill"),
+        player("Fill#003", "team-a", "Cypher", 200, "fill"),
+        player("Opp#001", "team-b", "Raze", 180, "opp"),
+      ],
+    }));
+
+    expect(initiatorAssistBoost(14, 1)).toBeGreaterThan(initiatorAssistBoost(3, 1));
+
+    const standouts = aggregateRoleStandouts(games, elig);
+    expect(standouts.byRole.Initiator?.riotId).toBe("SetupInit#001");
+
+    const sova = aggregateAgentStandouts(games, elig).find((a) => a.agent === "Sova");
+    expect(sova?.bestPlayer?.riotId).toBe("SetupInit#001");
   });
 
   it("withholds the award from a 3-role player, however much they play", () => {

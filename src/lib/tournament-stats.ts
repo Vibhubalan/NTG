@@ -46,10 +46,26 @@ export const AWARD_GP_SHARE = 0.25;
 export const AWARD_GP_ABSOLUTE_FLOOR = 2;
 
 /**
+ * Agent awards: below this many tournament picks the agent is treated as rare,
+ * so 1–2 games on that agent can still win.
+ */
+export const AGENT_RARE_PICK_CEILING = 8;
+/**
+ * Popular agents require a larger on-agent sample. Floor scales with how often
+ * the agent was picked in the cup (clamped to the busiest player on that agent).
+ */
+export const AGENT_AWARD_PICK_SHARE = 0.2;
+
+/**
  * Best Flex: the player must have played every role — at least one agent in
  * each of Duelist, Initiator, Controller and Sentinel.
  */
 export const FLEX_MIN_ROLES = 4;
+/**
+ * Extra Rating points per assist/game when ranking Initiator role and
+ * Initiator agents — setup work should beat raw fragging in close races.
+ */
+export const INITIATOR_ASSIST_WEIGHT = 6;
 /** When ranking Flex candidates, prefer coverage in this order. */
 export const FLEX_ROLE_PRIORITY: AgentRole[] = [
   "Initiator",
@@ -130,6 +146,34 @@ export function dynamicGamesThreshold(pool: { gamesPlayed: number }[]): number {
     Math.floor(maxGp * AWARD_GP_SHARE),
   );
   return Math.min(maxGp, scaled);
+}
+
+/**
+ * Games required to win "best on this agent". Rare agents stay soft; heavily
+ * picked agents demand enough games that a 2-map spike cannot take the card.
+ */
+export function agentAwardGamesThreshold(
+  totalPicks: number,
+  pool: { gamesPlayed: number }[],
+): number {
+  let maxGp = 0;
+  for (const p of pool) {
+    if (p.gamesPlayed > maxGp) maxGp = p.gamesPlayed;
+  }
+  if (maxGp <= 0) return 0;
+
+  const poolFloor = dynamicGamesThreshold(pool);
+
+  if (totalPicks <= AGENT_RARE_PICK_CEILING) {
+    // Niche picks: allow a 1-game award when that is all anyone logged.
+    return Math.min(maxGp, Math.max(1, Math.min(poolFloor, 2)));
+  }
+
+  const popularityFloor = Math.max(
+    AWARD_GP_ABSOLUTE_FLOOR,
+    Math.floor(totalPicks * AGENT_AWARD_PICK_SHARE),
+  );
+  return Math.min(maxGp, Math.max(poolFloor, popularityFloor));
 }
 
 export type StatsTeamMembership = {
@@ -647,17 +691,25 @@ function toStandout(p: AggregatedPlayerStats): StandoutPlayer {
 
 /**
  * Rank by weighted (Bayesian) ACS against the pool's own baseline, then K/D,
- * then games.
+ * then games. Optional boost/tie-break hooks let role-specific preferences
+ * (e.g. Initiator assists) reshape close races without inventing a new formula.
  */
-function rankStandouts(
+function rankStandoutList(
   players: AggregatedPlayerStats[],
-  tieBreak?: (p: AggregatedPlayerStats) => number,
-): AggregatedPlayerStats | null {
-  if (players.length === 0) return null;
+  options?: {
+    tieBreak?: (p: AggregatedPlayerStats) => number;
+    ratingBoost?: (p: AggregatedPlayerStats) => number;
+  },
+): AggregatedPlayerStats[] {
+  if (players.length === 0) return [];
   const baseline = computeStandoutBaseline(players);
-  const sorted = [...players].sort((a, b) => {
-    const scoreA = weightedAcs(a.avgAcs, a.gamesPlayed, baseline);
-    const scoreB = weightedAcs(b.avgAcs, b.gamesPlayed, baseline);
+  const tieBreak = options?.tieBreak;
+  const ratingBoost = options?.ratingBoost;
+  return [...players].sort((a, b) => {
+    const scoreA =
+      weightedAcs(a.avgAcs, a.gamesPlayed, baseline) + (ratingBoost?.(a) ?? 0);
+    const scoreB =
+      weightedAcs(b.avgAcs, b.gamesPlayed, baseline) + (ratingBoost?.(b) ?? 0);
     if (scoreB !== scoreA) return scoreB - scoreA;
     if (tieBreak) {
       const tA = tieBreak(a);
@@ -670,7 +722,34 @@ function rankStandouts(
     if (b.gamesPlayed !== a.gamesPlayed) return b.gamesPlayed - a.gamesPlayed;
     return b.avgAcs - a.avgAcs;
   });
-  return sorted[0] ?? null;
+}
+
+function rankStandouts(
+  players: AggregatedPlayerStats[],
+  options?: {
+    tieBreak?: (p: AggregatedPlayerStats) => number;
+    ratingBoost?: (p: AggregatedPlayerStats) => number;
+  },
+): AggregatedPlayerStats | null {
+  return rankStandoutList(players, options)[0] ?? null;
+}
+
+/** Assists-per-game boost used for Initiator role / agent awards. */
+export function initiatorAssistBoost(totalAssists: number, gamesPlayed: number): number {
+  if (gamesPlayed <= 0) return 0;
+  return INITIATOR_ASSIST_WEIGHT * (totalAssists / gamesPlayed);
+}
+
+/** First ranked player who has not already taken an exclusive award. */
+function pickUnclaimedStandout(
+  ranked: AggregatedPlayerStats[],
+  claimed: Set<string>,
+): AggregatedPlayerStats | null {
+  for (const p of ranked) {
+    const key = statsPlayerKey(p.riotId);
+    if (!claimed.has(key)) return p;
+  }
+  return null;
 }
 
 /** Distinct agents played per role (from match agentCounts). */
@@ -734,7 +813,12 @@ export function flexPriorityScore(agentCounts: Record<string, number>): number {
  * Flex requires having played all four roles.
  *
  * Role boards count only appearances on that role's agents, and each board is
- * scored against its own baseline.
+ * scored against its own baseline. Initiator ranking also boosts assists/game.
+ *
+ * Best Flex is awarded first and kept. Duelist / Initiator / Controller /
+ * Sentinel then take the next-highest Rating player who is not already on Flex
+ * (or another exclusive role card). Best Overall is independent and may match
+ * any of them.
  */
 export function aggregateRoleStandouts(
   games: StatsGame[],
@@ -748,24 +832,40 @@ export function aggregateRoleStandouts(
   const overallEligible = overall.filter((p) => p.gamesPlayed >= awardFloor);
   const bestOverallRow = rankStandouts(overallEligible);
 
+  /** Exclusive award holders — Overall is intentionally not recorded here. */
+  const claimed = new Set<string>();
+
+  const flexCandidates = overallEligible.filter((p) => qualifiesFlex(p.agentCounts));
+  const flexRanked = rankStandoutList(flexCandidates, {
+    tieBreak: (p) => flexPriorityScore(p.agentCounts),
+  });
+  const bestFlexRow = pickUnclaimedStandout(flexRanked, claimed);
+  if (bestFlexRow) claimed.add(statsPlayerKey(bestFlexRow.riotId));
+
   const roles: AgentRole[] = ["Duelist", "Initiator", "Controller", "Sentinel"];
   const byRole: Partial<Record<AgentRole, StandoutPlayer | null>> = {};
+
   for (const role of roles) {
     const rolePlayers = aggregatePlayerStats(games, {
       eligibility,
       agentRoleFilter: (agent) => getAgentRole(agent) === role,
     }).filter((p) => p.gamesPlayed >= gpFloor);
     const roleFloor = dynamicGamesThreshold(rolePlayers);
-    const best = rankStandouts(
+    const ranked = rankStandoutList(
       rolePlayers.filter((p) => p.gamesPlayed >= roleFloor),
+      role === "Initiator"
+        ? {
+            ratingBoost: (p) =>
+              initiatorAssistBoost(p.totalAssists, p.gamesPlayed),
+            tieBreak: (p) =>
+              p.gamesPlayed > 0 ? p.totalAssists / p.gamesPlayed : 0,
+          }
+        : undefined,
     );
+    const best = pickUnclaimedStandout(ranked, claimed);
+    if (best) claimed.add(statsPlayerKey(best.riotId));
     byRole[role] = best ? toStandout(best) : null;
   }
-
-  const flexCandidates = overallEligible.filter((p) => qualifiesFlex(p.agentCounts));
-  const bestFlexRow = rankStandouts(flexCandidates, (p) =>
-    flexPriorityScore(p.agentCounts),
-  );
 
   return {
     bestOverall: bestOverallRow ? toStandout(bestOverallRow) : null,
@@ -795,11 +895,15 @@ export type AgentStandout = {
 /**
  * Aggregates performance stats for every agent played in the tournament,
  * and identifies the #1 player per agent via weighted ACS.
+ *
+ * Pass `excludePlayerKeys` (e.g. Best Flex) so that player keeps Flex and agent
+ * cards fall through to the next-ranked eligible player.
  */
 export function aggregateAgentStandouts(
   games: StatsGame[],
   eligibility?: TournamentStatsEligibility | null,
   gpFloor: number = STANDOUT_GP_FLOOR,
+  excludePlayerKeys?: Iterable<string>,
 ): AgentStandout[] {
   type AgentPlayerAcc = {
     riotId: string;
@@ -817,6 +921,9 @@ export function aggregateAgentStandouts(
     playersMap: Map<string, AgentPlayerAcc>;
   };
 
+  const excluded = new Set(
+    [...(excludePlayerKeys ?? [])].map((k) => k.toLowerCase()),
+  );
   const agentsMap = new Map<string, AgentAcc>();
 
   for (const game of games) {
@@ -886,14 +993,13 @@ export function aggregateAgentStandouts(
       });
     }
 
-    // Threshold comes from this agent's own pool, so a widely shared agent
-    // doesn't demand an unreachable game count (which is how a flat "share of
-    // total picks" rule ends up emptying the popular cards).
+    // Rare agents stay soft; popular agents raise the floor with pick volume
+    // so a 2-game spike cannot take a heavily contested agent card.
     const agentPool = playersList.map((p) => ({
       avgAcs: p.avgAcs,
       gamesPlayed: p.gamesPlayedOnAgent,
     }));
-    const agentFloor = dynamicGamesThreshold(agentPool);
+    const agentFloor = agentAwardGamesThreshold(acc.totalPicks, agentPool);
     const eligiblePlayers = playersList.filter(
       (p) => p.gamesPlayedOnAgent >= agentFloor,
     );
@@ -909,10 +1015,26 @@ export function aggregateAgentStandouts(
       })),
     );
 
+    const preferAssists = role === "Initiator";
     eligiblePlayers.sort((a, b) => {
-      const scoreA = weightedAcs(a.avgAcs, a.gamesPlayedOnAgent, baseline);
-      const scoreB = weightedAcs(b.avgAcs, b.gamesPlayedOnAgent, baseline);
+      const boostA = preferAssists
+        ? initiatorAssistBoost(a.totalAssists, a.gamesPlayedOnAgent)
+        : 0;
+      const boostB = preferAssists
+        ? initiatorAssistBoost(b.totalAssists, b.gamesPlayedOnAgent)
+        : 0;
+      const scoreA =
+        weightedAcs(a.avgAcs, a.gamesPlayedOnAgent, baseline) + boostA;
+      const scoreB =
+        weightedAcs(b.avgAcs, b.gamesPlayedOnAgent, baseline) + boostB;
       if (scoreB !== scoreA) return scoreB - scoreA;
+      if (preferAssists) {
+        const apaA =
+          a.gamesPlayedOnAgent > 0 ? a.totalAssists / a.gamesPlayedOnAgent : 0;
+        const apaB =
+          b.gamesPlayedOnAgent > 0 ? b.totalAssists / b.gamesPlayedOnAgent : 0;
+        if (apaB !== apaA) return apaB - apaA;
+      }
       if (b.kd !== a.kd) return b.kd - a.kd;
       if (b.gamesPlayedOnAgent !== a.gamesPlayedOnAgent) {
         return b.gamesPlayedOnAgent - a.gamesPlayedOnAgent;
@@ -920,11 +1042,15 @@ export function aggregateAgentStandouts(
       return b.avgAcs - a.avgAcs;
     });
 
+    const bestPlayer =
+      eligiblePlayers.find((p) => !excluded.has(statsPlayerKey(p.riotId))) ??
+      null;
+
     result.push({
       agent,
       role,
       totalPickCount: acc.totalPicks,
-      bestPlayer: eligiblePlayers[0] ?? null,
+      bestPlayer,
     });
   }
 
