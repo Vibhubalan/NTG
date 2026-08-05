@@ -325,6 +325,32 @@ function RoundHeaders({ rounds }: { rounds: BracketRoundView[] }) {
   );
 }
 
+/** Parse Challonge-style "W - L - T" match records. */
+function parseMatchRecord(record: string): { wins: number; losses: number; ties: number } {
+  const m = record.match(/(\d+)\s*[-–]\s*(\d+)\s*[-–]\s*(\d+)/);
+  if (!m) return { wins: 0, losses: 0, ties: 0 };
+  return { wins: Number(m[1]), losses: Number(m[2]), ties: Number(m[3]) };
+}
+
+/**
+ * Challonge RR default ranking: Match Wins (ties as +1), then TB, Pts Diff,
+ * Points Scored, Set Wins. Do NOT rank primarily by round-points (Pts) — that
+ * is what put undefeated teams below sides that simply played more maps.
+ */
+function compareChallongeStandings(a: GroupStandingView, b: GroupStandingView): number {
+  const aWl = parseMatchRecord(a.matchRecord);
+  const bWl = parseMatchRecord(b.matchRecord);
+  const aMatchPts = aWl.wins * 3 + aWl.ties;
+  const bMatchPts = bWl.wins * 3 + bWl.ties;
+  if (bMatchPts !== aMatchPts) return bMatchPts - aMatchPts;
+  if (bWl.wins !== aWl.wins) return bWl.wins - aWl.wins;
+  if ((b.tb ?? 0) !== (a.tb ?? 0)) return (b.tb ?? 0) - (a.tb ?? 0);
+  if (b.ptsDiff !== a.ptsDiff) return b.ptsDiff - a.ptsDiff;
+  if (b.pts !== a.pts) return b.pts - a.pts;
+  if (b.setWins !== a.setWins) return b.setWins - a.setWins;
+  return a.name.localeCompare(b.name);
+}
+
 function computeGroupHistoryAndStats(group: GroupView): GroupStandingView[] {
   const standings = group.standings.map((s) => {
     const history: ("W" | "L" | "T")[] = [];
@@ -379,7 +405,9 @@ function computeGroupHistoryAndStats(group: GroupView): GroupStandingView[] {
       });
     });
 
-    const calculatedPts = s.pts > 0 ? s.pts : totalScore > 0 ? totalScore : wins * 3 + ties * 1;
+    // Pts column = points scored (round totals), same as Challonge's Pts.
+    // Ranking must not treat this as the primary sort key.
+    const calculatedPts = s.pts > 0 ? s.pts : totalScore > 0 ? totalScore : 0;
     const matchRecord =
       wins > 0 || losses > 0 || ties > 0
         ? `${wins} - ${losses} - ${ties}`
@@ -396,19 +424,12 @@ function computeGroupHistoryAndStats(group: GroupView): GroupStandingView[] {
     };
   });
 
-  standings.sort((a, b) => {
-    if (a.rank > 0 && b.rank > 0 && a.rank !== b.rank) {
-      return a.rank - b.rank;
-    }
-    if (a.rank > 0 && (!b.rank || b.rank === 0)) return -1;
-    if (b.rank > 0 && (!a.rank || a.rank === 0)) return 1;
-    if (b.pts !== a.pts) return b.pts - a.pts;
-    if (b.ptsDiff !== a.ptsDiff) return b.ptsDiff - a.ptsDiff;
-    if (b.setWins !== a.setWins) return b.setWins - a.setWins;
-    return 0;
-  });
+  // Always rank like Challonge RR default (Match Wins first). Source `rank`
+  // values are often invented 1..n from API participant order and must not
+  // override — and Pts (rounds scored) must never be the primary key.
+  standings.sort(compareChallongeStandings);
 
-  return standings.map((s, idx) => ({ ...s, rank: s.rank > 0 ? s.rank : idx + 1 }));
+  return standings.map((s, idx) => ({ ...s, rank: idx + 1 }));
 }
 
 function extractParticipantsFromBracket(
