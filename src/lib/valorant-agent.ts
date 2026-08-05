@@ -32,6 +32,7 @@ const LOCAL_AGENT_FILES: Record<string, string> = {
   sova: "/images/agents/sova.png",
   viper: "/images/agents/viper.png",
   tejo: "/images/agents/tejo.png",
+  veto: "/images/agents/veto.png",
   vyse: "/images/agents/vyse.png",
   waylay: "/images/agents/waylay.png",
   yoru: "/images/agents/yoru.png",
@@ -62,7 +63,8 @@ const AGENT_MEDIA_IDS: Record<string, string> = {
   skye: "6f2a04ca-43e0-be17-7f36-b05608693427",
   sova: "320b2a48-4d9b-a7d6-164e-9617d91f24d4",
   viper: "70773516-4015-804d-a5d3-4384c35299e8",
-  vyse: "601d3b66-4b8b-b4d4-ac45-459d8066e29e",
+  veto: "92eeef5d-43b5-1d4a-8d03-b3927a09034b",
+  vyse: "efba5359-4016-a1e5-7626-b1ae76895940",
   yoru: "7f54914f-40d0-4413-88b3-198b1c5b5459",
 };
 
@@ -170,6 +172,8 @@ export function getAgentColorHex(agentName: string | null | undefined): string {
       return "#ef4444";
     case "chamber":
       return "#d97706";
+    case "veto":
+      return "#1a5d65";
     default:
       return "#3b82f6";
   }
