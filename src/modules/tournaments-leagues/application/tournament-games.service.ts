@@ -685,7 +685,7 @@ export async function listPublishedTournamentGames(slug: string): Promise<{
   try {
     const cached = await unstable_cache(
       () => fetchPublishedTournamentGames(slug),
-      ["tournament-published-games", slug],
+      ["tournament-published-games-v6", slug],
       // revalidateTag on publish/status-change covers the common case instantly;
       // this time-based revalidate is just a backstop against any missed path.
       { revalidate: 60, tags: [tournamentGamesTag(slug), tournamentCupTag(slug)] },

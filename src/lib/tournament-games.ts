@@ -80,6 +80,8 @@ export type HenrikKillEvent = {
   kill_time_in_round?: number;
   killer_puuid?: string;
   victim_puuid?: string;
+  killer_team?: string;
+  victim_team?: string;
 };
 
 export type FirstKillDeathCounts = {
@@ -87,25 +89,59 @@ export type FirstKillDeathCounts = {
   firstDeaths: number;
 };
 
+function matchPayloadData(payload: unknown): Record<string, unknown> | null {
+  if (!payload || typeof payload !== "object") return null;
+  const root = payload as Record<string, unknown>;
+  if (root.data && typeof root.data === "object") {
+    return root.data as Record<string, unknown>;
+  }
+  return root;
+}
+
+function readKillEvent(ev: Record<string, unknown>, fallbacks?: {
+  round?: number | null;
+  killer_puuid?: string;
+}): HenrikKillEvent {
+  return {
+    round:
+      typeof ev.round === "number"
+        ? ev.round
+        : fallbacks?.round ?? undefined,
+    kill_time_in_round:
+      typeof ev.kill_time_in_round === "number"
+        ? ev.kill_time_in_round
+        : undefined,
+    killer_puuid:
+      typeof ev.killer_puuid === "string"
+        ? ev.killer_puuid
+        : fallbacks?.killer_puuid,
+    victim_puuid:
+      typeof ev.victim_puuid === "string" ? ev.victim_puuid : undefined,
+    killer_team:
+      typeof ev.killer_team === "string" ? ev.killer_team : undefined,
+    victim_team:
+      typeof ev.victim_team === "string" ? ev.victim_team : undefined,
+  };
+}
+
 /**
  * Pull kill events from a stored Henrik match payload.
  * Accepts either the API envelope `{ data: {...} }` or the inner `data` object.
  */
 export function extractKillEventsFromMatchPayload(payload: unknown): HenrikKillEvent[] {
-  if (!payload || typeof payload !== "object") return [];
-  const root = payload as Record<string, unknown>;
-  const data =
-    root.data && typeof root.data === "object"
-      ? (root.data as Record<string, unknown>)
-      : root;
+  const data = matchPayloadData(payload);
+  if (!data) return [];
 
   if (Array.isArray(data.kills)) {
-    return data.kills as HenrikKillEvent[];
+    return (data.kills as Record<string, unknown>[]).map((ev) =>
+      readKillEvent(ev && typeof ev === "object" ? ev : {}),
+    );
   }
 
   const rounds = Array.isArray(data.rounds) ? data.rounds : [];
   const kills: HenrikKillEvent[] = [];
-  for (const raw of rounds) {
+  for (let idx = 0; idx < rounds.length; idx++) {
+    const raw = rounds[idx];
     if (!raw || typeof raw !== "object") continue;
     const round = raw as Record<string, unknown>;
     const roundNum =
@@ -113,7 +149,7 @@ export function extractKillEventsFromMatchPayload(payload: unknown): HenrikKillE
         ? round.round
         : typeof round.round_num === "number"
           ? round.round_num
-          : null;
+          : idx;
     const playerStats = Array.isArray(round.player_stats) ? round.player_stats : [];
     for (const psRaw of playerStats) {
       if (!psRaw || typeof psRaw !== "object") continue;
@@ -121,25 +157,13 @@ export function extractKillEventsFromMatchPayload(payload: unknown): HenrikKillE
       const events = Array.isArray(ps.kill_events) ? ps.kill_events : [];
       for (const evRaw of events) {
         if (!evRaw || typeof evRaw !== "object") continue;
-        const ev = evRaw as Record<string, unknown>;
-        kills.push({
-          round:
-            typeof ev.round === "number"
-              ? ev.round
-              : roundNum ?? undefined,
-          kill_time_in_round:
-            typeof ev.kill_time_in_round === "number"
-              ? ev.kill_time_in_round
-              : undefined,
-          killer_puuid:
-            typeof ev.killer_puuid === "string"
-              ? ev.killer_puuid
-              : typeof ps.player_puuid === "string"
-                ? ps.player_puuid
-                : undefined,
-          victim_puuid:
-            typeof ev.victim_puuid === "string" ? ev.victim_puuid : undefined,
-        });
+        kills.push(
+          readKillEvent(evRaw as Record<string, unknown>, {
+            round: roundNum,
+            killer_puuid:
+              typeof ps.player_puuid === "string" ? ps.player_puuid : undefined,
+          }),
+        );
       }
     }
   }

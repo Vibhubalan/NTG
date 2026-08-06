@@ -50,7 +50,14 @@ type Props = {
   initialGames?: PublicGame[];
 };
 
-type SortField = "acs" | "kills" | "kd" | "adr" | "hsPercent" | "firstKills" | "firstDeaths";
+type SortField =
+  | "acs"
+  | "kills"
+  | "kd"
+  | "adr"
+  | "hsPercent"
+  | "firstKills"
+  | "firstDeaths";
 
 function formatDuration(sec: number | null): string {
   if (!sec || sec <= 0) return "";
@@ -197,6 +204,8 @@ export default function TournamentGamesSection({ slug, initialGames }: Props) {
         case "firstDeaths":
           valA = a.firstDeaths ?? 0;
           valB = b.firstDeaths ?? 0;
+          break;
+        default:
           break;
       }
       return sortAsc ? valA - valB : valB - valA;
@@ -722,21 +731,23 @@ export default function TournamentGamesSection({ slug, initialGames }: Props) {
                                             )}
                                           </div>
                                           <div className="min-w-0 flex-1">
-                                            <div className="flex flex-wrap items-center gap-1.5">
+                                            <div className="flex items-baseline gap-1.5 min-w-0">
                                               <span className="truncate text-sm font-bold text-white transition-colors group-hover:text-emerald-300">
                                                 {name}
                                               </span>
                                               {tag ? (
-                                                <span className="shrink-0 text-xs font-medium text-white/40">
+                                                <span className="shrink-0 font-mono text-xs font-medium text-white/40">
                                                   {tag}
                                                 </span>
                                               ) : null}
-                                              {isMvp ? (
-                                                <span className="inline-flex items-center gap-0.5 rounded bg-amber-400/20 px-1.5 py-0.5 text-[9px] font-black text-amber-300 uppercase ring-1 ring-amber-400/40 shadow-[0_0_10px_rgba(245,158,11,0.25)]">
+                                            </div>
+                                            {isMvp ? (
+                                              <div className="mt-1 flex flex-wrap items-center gap-1.5">
+                                                <span className="inline-flex items-center gap-0.5 rounded border border-amber-400/40 bg-gradient-to-r from-amber-500/20 to-yellow-500/10 px-1.5 py-0.5 text-[9px] font-black text-amber-300 uppercase shadow-[0_0_10px_rgba(245,158,11,0.25)]">
                                                   👑 MVP
                                                 </span>
-                                              ) : null}
-                                            </div>
+                                              </div>
+                                            ) : null}
                                           </div>
                                         </div>
                                       </td>

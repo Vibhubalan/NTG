@@ -1,5 +1,5 @@
 /**
- * Backfill TournamentGamePlayer.firstKills / firstDeaths from stored payloadJson.
+ * Backfill TournamentGamePlayer.firstKills / firstDeaths from payloadJson.
  * Safe: no deletes. Re-runnable.
  *
  *   npx dotenv -e .env.local -o -- tsx scripts/backfill-first-kills.ts

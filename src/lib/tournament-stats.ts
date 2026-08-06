@@ -1,6 +1,12 @@
 /** Pure helpers for tournament stats aggregation. */
 
 import { getAgentRole, type AgentRole } from "@/lib/valorant-agent";
+import {
+  AWARD_CONFIG,
+  agentAwardMinGames,
+  pickAwardWinner,
+  weightsForRole,
+} from "@/lib/tournament-awards";
 
 export type StatsGamePlayer = {
   riotId: string;
@@ -205,6 +211,8 @@ export type AggregatedPlayerStats = {
   riotId: string;
   userName: string | null;
   gamesPlayed: number;
+  /** Sum of map rounds across counted appearances (for KAST proxy / rates). */
+  totalRounds: number;
   totalKills: number;
   totalDeaths: number;
   totalAssists: number;
@@ -280,9 +288,14 @@ export function aggregatePlayerStats(
   games: StatsGame[],
   opts?: {
     agentRoleFilter?: (agent: string) => boolean;
+    /** Only count appearances on this agent (case-insensitive). */
+    agentNameFilter?: string;
     eligibility?: TournamentStatsEligibility | null;
   },
 ): AggregatedPlayerStats[] {
+  const agentNameKey = opts?.agentNameFilter
+    ? opts.agentNameFilter.trim().toLowerCase()
+    : null;
   const map = new Map<
     string,
     {
@@ -296,6 +309,7 @@ export function aggregatePlayerStats(
       acsSum: number;
       adrSum: number;
       hsSum: number;
+      rounds: number;
       agentCounts: Record<string, number>;
       teamNames: Set<string>;
       games: number;
@@ -322,10 +336,12 @@ export function aggregatePlayerStats(
       [game.teamAId, game.teamAName],
       [game.teamBId, game.teamBName],
     ]);
+    const mapRounds = Math.max(0, (game.teamARounds ?? 0) + (game.teamBRounds ?? 0));
 
     for (const p of game.players) {
       if (!p.agent) continue;
       if (opts?.agentRoleFilter && !opts.agentRoleFilter(p.agent)) continue;
+      if (agentNameKey && p.agent.trim().toLowerCase() !== agentNameKey) continue;
       if (!isStatsAppearanceEligible(p, game, opts?.eligibility)) continue;
 
       const key = statsPlayerKey(p.riotId);
@@ -342,6 +358,7 @@ export function aggregatePlayerStats(
           acsSum: 0,
           adrSum: 0,
           hsSum: 0,
+          rounds: 0,
           agentCounts: {},
           teamNames: new Set(),
           games: 0,
@@ -359,6 +376,7 @@ export function aggregatePlayerStats(
       entry.acsSum += p.acs;
       entry.adrSum += p.adr;
       entry.hsSum += p.hsPercent;
+      entry.rounds += mapRounds;
       entry.games += 1;
       entry.agentCounts[p.agent] = (entry.agentCounts[p.agent] ?? 0) + 1;
       if (p.teamId) {
@@ -382,6 +400,7 @@ export function aggregatePlayerStats(
       riotId: e.riotId,
       userName: e.userName,
       gamesPlayed: g,
+      totalRounds: e.rounds,
       totalKills: e.kills,
       totalDeaths: e.deaths,
       totalAssists: e.assists,
@@ -821,18 +840,9 @@ export function flexPriorityScore(agentCounts: Record<string, number>): number {
 /**
  * Best overall + best per role + best Flex.
  *
- * Eligibility and Flex requirements are both derived from the tournament's own
- * data, so nothing needs retuning between a short cup and a long one.
- *
- * Flex requires having played all four roles.
- *
- * Role boards count only appearances on that role's agents, and each board is
- * scored against its own baseline. Initiator ranking also boosts assists/game.
- *
- * Best Flex is awarded first and kept. Duelist / Initiator / Controller /
- * Sentinel then take the next-highest Rating player who is not already on Flex
- * (or another exclusive role card). Best Overall is independent and may match
- * any of them.
+ * Role / overall awards use the weighted percentile + Bayesian engine in
+ * `tournament-awards.ts`. Flex is awarded first and kept; other role cards
+ * take the next player. Best Overall is independent and may overlap.
  */
 export function aggregateRoleStandouts(
   games: StatsGame[],
@@ -842,14 +852,24 @@ export function aggregateRoleStandouts(
   const overall = aggregatePlayerStats(games, { eligibility }).filter(
     (p) => p.gamesPlayed >= gpFloor,
   );
-  const awardFloor = dynamicGamesThreshold(overall);
-  const overallEligible = overall.filter((p) => p.gamesPlayed >= awardFloor);
-  const bestOverallRow = rankStandouts(overallEligible);
+
+  const bestOverallRow = pickAwardWinner(
+    overall,
+    AWARD_CONFIG.overallWeights,
+    AWARD_CONFIG.minGames,
+  );
 
   /** Exclusive award holders — Overall is intentionally not recorded here. */
   const claimed = new Set<string>();
 
-  const flexCandidates = overallEligible.filter((p) => qualifiesFlex(p.agentCounts));
+  // Flex still uses overall ACS Rating (span of roles is the main requirement).
+  const flexFloor = Math.min(
+    AWARD_CONFIG.minGames,
+    dynamicGamesThreshold(overall) || AWARD_CONFIG.minGames,
+  );
+  const flexCandidates = overall.filter(
+    (p) => p.gamesPlayed >= flexFloor && qualifiesFlex(p.agentCounts),
+  );
   const flexRanked = rankStandoutList(flexCandidates, {
     tieBreak: (p) => flexPriorityScore(p.agentCounts),
   });
@@ -864,20 +884,14 @@ export function aggregateRoleStandouts(
       eligibility,
       agentRoleFilter: (agent) => getAgentRole(agent) === role,
     }).filter((p) => p.gamesPlayed >= gpFloor);
-    const roleFloor = dynamicGamesThreshold(rolePlayers);
-    const ranked = rankStandoutList(
-      rolePlayers.filter((p) => p.gamesPlayed >= roleFloor),
-      role === "Initiator"
-        ? {
-            ratingBoost: (p) =>
-              initiatorAssistBoost(p.totalAssists, p.gamesPlayed),
-            tieBreak: (p) =>
-              p.gamesPlayed > 0 ? p.totalAssists / p.gamesPlayed : 0,
-          }
-        : undefined,
+
+    const best = pickAwardWinner(
+      rolePlayers,
+      weightsForRole(role),
+      AWARD_CONFIG.minGames,
+      claimed,
     );
-    const best = pickUnclaimedStandout(ranked, claimed);
-    if (best) claimed.add(statsPlayerKey(best.riotId));
+    if (best) claimed.add(best.key);
     byRole[role] = best ? toStandout(best) : null;
   }
 
@@ -907,12 +921,9 @@ export type AgentStandout = {
 };
 
 /**
- * Aggregates performance stats for every agent played in the tournament,
- * and identifies the #1 player per agent via weighted ACS.
- *
- * Optional `excludePlayerKeys` skips named players when picking a winner.
- * Role exclusivity (Flex / Duelist / …) is handled only in role standouts —
- * Flex winners are still eligible for Best by Agents.
+ * Aggregates performance stats for every agent played in the tournament.
+ * Winner = role-model award score on that agent only (same formula as the
+ * agent's role board), with Bayesian tempering. Flex winners may also win agents.
  */
 export function aggregateAgentStandouts(
   games: StatsGame[],
@@ -920,158 +931,60 @@ export function aggregateAgentStandouts(
   gpFloor: number = STANDOUT_GP_FLOOR,
   excludePlayerKeys?: Iterable<string>,
 ): AgentStandout[] {
-  type AgentPlayerAcc = {
-    riotId: string;
-    userName: string | null;
-    games: number;
-    kills: number;
-    deaths: number;
-    assists: number;
-    acsSum: number;
-  };
-
-  type AgentAcc = {
-    agent: string;
-    totalPicks: number;
-    playersMap: Map<string, AgentPlayerAcc>;
-  };
-
   const excluded = new Set(
     [...(excludePlayerKeys ?? [])].map((k) => k.toLowerCase()),
   );
-  const agentsMap = new Map<string, AgentAcc>();
 
+  const pickCounts = new Map<string, number>();
   for (const game of games) {
     for (const p of game.players) {
       if (!p.agent) continue;
       if (!isStatsAppearanceEligible(p, game, eligibility)) continue;
-
-      const agentKey = p.agent.trim();
-      let agentEntry = agentsMap.get(agentKey);
-      if (!agentEntry) {
-        agentEntry = {
-          agent: agentKey,
-          totalPicks: 0,
-          playersMap: new Map(),
-        };
-        agentsMap.set(agentKey, agentEntry);
-      }
-
-      agentEntry.totalPicks += 1;
-
-      const pKey = statsPlayerKey(p.riotId);
-      let playerEntry = agentEntry.playersMap.get(pKey);
-      if (!playerEntry) {
-        playerEntry = {
-          riotId: p.riotId,
-          userName: p.userName ?? null,
-          games: 0,
-          kills: 0,
-          deaths: 0,
-          assists: 0,
-          acsSum: 0,
-        };
-        agentEntry.playersMap.set(pKey, playerEntry);
-      }
-
-      if (!playerEntry.userName && p.userName) {
-        playerEntry.userName = p.userName;
-      }
-
-      playerEntry.games += 1;
-      playerEntry.kills += p.kills;
-      playerEntry.deaths += p.deaths;
-      playerEntry.assists += p.assists;
-      playerEntry.acsSum += p.acs;
+      const agent = p.agent.trim();
+      pickCounts.set(agent, (pickCounts.get(agent) ?? 0) + 1);
     }
   }
 
   const result: AgentStandout[] = [];
 
-  for (const [agent, acc] of agentsMap.entries()) {
+  for (const [agent, totalPickCount] of pickCounts.entries()) {
     const role = getAgentRole(agent);
+    const players = aggregatePlayerStats(games, {
+      eligibility,
+      agentNameFilter: agent,
+    }).filter((p) => p.gamesPlayed >= gpFloor);
 
-    const playersList: AgentStandoutPlayer[] = [];
-    for (const [, p] of acc.playersMap.entries()) {
-      if (p.games < gpFloor) continue;
-      const avgAcs = Math.round(p.acsSum / p.games);
-      const kd = p.deaths > 0 ? Math.round((p.kills / p.deaths) * 100) / 100 : p.kills;
-      playersList.push({
-        riotId: p.riotId,
-        userName: p.userName,
-        gamesPlayedOnAgent: p.games,
-        avgAcs,
-        kd,
-        totalKills: p.kills,
-        totalDeaths: p.deaths,
-        totalAssists: p.assists,
-      });
-    }
-
-    // Rare agents stay soft; popular agents raise the floor with pick volume
-    // so a 2-game spike cannot take a heavily contested agent card.
-    const agentPool = playersList.map((p) => ({
-      avgAcs: p.avgAcs,
-      gamesPlayed: p.gamesPlayedOnAgent,
-    }));
-    const agentFloor = agentAwardGamesThreshold(acc.totalPicks, agentPool);
-    const eligiblePlayers = playersList.filter(
-      (p) => p.gamesPlayedOnAgent >= agentFloor,
-    );
-    // Baseline is measured over the qualified players only, matching the
-    // overall and per-role boards (see rankStandouts). Including one-game
-    // players here would let them drag the benchmark that the contenders are
-    // scored against, so the same performance ranked differently depending on
-    // which board you looked at.
-    const baseline = computeStandoutBaseline(
-      eligiblePlayers.map((p) => ({
-        avgAcs: p.avgAcs,
-        gamesPlayed: p.gamesPlayedOnAgent,
-      })),
-    );
-
-    const preferAssists = role === "Initiator";
-    eligiblePlayers.sort((a, b) => {
-      const boostA = preferAssists
-        ? initiatorAssistBoost(a.totalAssists, a.gamesPlayedOnAgent)
-        : 0;
-      const boostB = preferAssists
-        ? initiatorAssistBoost(b.totalAssists, b.gamesPlayedOnAgent)
-        : 0;
-      const scoreA =
-        weightedAcs(a.avgAcs, a.gamesPlayedOnAgent, baseline) + boostA;
-      const scoreB =
-        weightedAcs(b.avgAcs, b.gamesPlayedOnAgent, baseline) + boostB;
-      if (scoreB !== scoreA) return scoreB - scoreA;
-      if (preferAssists) {
-        const apaA =
-          a.gamesPlayedOnAgent > 0 ? a.totalAssists / a.gamesPlayedOnAgent : 0;
-        const apaB =
-          b.gamesPlayedOnAgent > 0 ? b.totalAssists / b.gamesPlayedOnAgent : 0;
-        if (apaB !== apaA) return apaB - apaA;
-      }
-      if (b.kd !== a.kd) return b.kd - a.kd;
-      if (b.avgAcs !== a.avgAcs) return b.avgAcs - a.avgAcs;
-      if (b.gamesPlayedOnAgent !== a.gamesPlayedOnAgent) {
-        return b.gamesPlayedOnAgent - a.gamesPlayedOnAgent;
-      }
-      return 0;
-    });
-
-    const bestPlayer =
-      eligiblePlayers.find((p) => !excluded.has(statsPlayerKey(p.riotId))) ??
-      null;
+    const maxGp = players.reduce((m, p) => Math.max(m, p.gamesPlayed), 0);
+    const minGames = agentAwardMinGames(totalPickCount, maxGp);
+    const weights = role ? weightsForRole(role) : AWARD_CONFIG.overallWeights;
+    const exclude = excluded.size > 0 ? excluded : undefined;
+    const winner = pickAwardWinner(players, weights, minGames, exclude);
 
     result.push({
       agent,
       role,
-      totalPickCount: acc.totalPicks,
-      bestPlayer,
+      totalPickCount,
+      bestPlayer: winner
+        ? {
+            riotId: winner.riotId,
+            userName: winner.userName,
+            gamesPlayedOnAgent: winner.gamesPlayed,
+            avgAcs: winner.avgAcs,
+            kd:
+              winner.totalDeaths > 0
+                ? Math.round((winner.totalKills / winner.totalDeaths) * 100) / 100
+                : winner.totalKills,
+            totalKills: winner.totalKills,
+            totalDeaths: winner.totalDeaths,
+            totalAssists: winner.totalAssists,
+          }
+        : null,
     });
   }
 
-  result.sort((a, b) => b.totalPickCount - a.totalPickCount || a.agent.localeCompare(b.agent));
-
+  result.sort(
+    (a, b) => b.totalPickCount - a.totalPickCount || a.agent.localeCompare(b.agent),
+  );
   return result;
 }
 

@@ -49,9 +49,17 @@ export default async function TournamentDetailPage({ params }: Props) {
   const [admin, registrationPreview, registrationProfileCard, publishedGamesResult, statsEligibility] =
     await Promise.all([
       requireAdmin(),
-      userId ? getRegistrationEligibility(slug, userId) : Promise.resolve(null),
+      userId
+        ? getRegistrationEligibility(slug, userId).catch((error) => {
+            console.error(`[tournament] registration eligibility failed for ${slug}:`, error);
+            return null;
+          })
+        : Promise.resolve(null),
       userId && tournament.game === "VALORANT" && tournament.userRegistered
-        ? getValorantRegistrationProfileCard(slug, userId)
+        ? getValorantRegistrationProfileCard(slug, userId).catch((error) => {
+            console.error(`[tournament] registration profile card failed for ${slug}:`, error);
+            return null;
+          })
         : Promise.resolve(null),
       listPublishedTournamentGames(slug).catch(() => ({
         ok: false as const,

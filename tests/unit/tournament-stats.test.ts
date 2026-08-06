@@ -705,82 +705,33 @@ describe("best flex eligibility", () => {
       byRiotId: {},
     };
 
-    // Star spans all four roles with elite Initiator ACS; Flex2 is a weaker
-    // full-flex backup. Star keeps Flex; Initiator falls to the next player.
-    const games: StatsGame[] = [
-      {
-        teamAId: "team-a",
-        teamBId: "team-b",
-        teamAName: "Alpha",
-        teamBName: "Bravo",
-        teamARounds: 13,
-        teamBRounds: 5,
-        mapName: "Ascent",
-        mvpRiotId: null,
-        players: [
-          player("Star#001", "team-a", "Sova", 320, "star"),
-          player("Flex2#001", "team-a", "Jett", 210, "flex2"),
-          player("Duel#001", "team-a", "Raze", 300, "duel"),
-          player("Ctrl#001", "team-a", "Omen", 280, "ctrl"),
-          player("Sent#001", "team-a", "Cypher", 275, "sent"),
-          player("Opp#001", "team-b", "Neon", 180, "opp"),
-        ],
-      },
-      {
-        teamAId: "team-a",
-        teamBId: "team-b",
-        teamAName: "Alpha",
-        teamBName: "Bravo",
-        teamARounds: 13,
-        teamBRounds: 5,
-        mapName: "Bind",
-        mvpRiotId: null,
-        players: [
-          player("Star#001", "team-a", "Jett", 250, "star"),
-          player("Flex2#001", "team-a", "Sova", 200, "flex2"),
-          player("Duel#001", "team-a", "Raze", 295, "duel"),
-          player("Ctrl#001", "team-a", "Viper", 270, "ctrl"),
-          player("Sent#001", "team-a", "Killjoy", 265, "sent"),
-          player("Opp#001", "team-b", "Reyna", 180, "opp"),
-        ],
-      },
-      {
-        teamAId: "team-a",
-        teamBId: "team-b",
-        teamAName: "Alpha",
-        teamBName: "Bravo",
-        teamARounds: 13,
-        teamBRounds: 5,
-        mapName: "Haven",
-        mvpRiotId: null,
-        players: [
-          player("Star#001", "team-a", "Omen", 240, "star"),
-          player("Flex2#001", "team-a", "Omen", 195, "flex2"),
-          player("Duel#001", "team-a", "Phoenix", 290, "duel"),
-          player("Ctrl#001", "team-a", "Astra", 275, "ctrl"),
-          player("Sent#001", "team-a", "Sage", 260, "sent"),
-          player("Opp#001", "team-b", "Yoru", 180, "opp"),
-        ],
-      },
-      {
-        teamAId: "team-a",
-        teamBId: "team-b",
-        teamAName: "Alpha",
-        teamBName: "Bravo",
-        teamARounds: 13,
-        teamBRounds: 5,
-        mapName: "Lotus",
-        mvpRiotId: null,
-        players: [
-          player("Star#001", "team-a", "Cypher", 245, "star"),
-          player("Flex2#001", "team-a", "Cypher", 190, "flex2"),
-          player("Duel#001", "team-a", "Neon", 285, "duel"),
-          player("Ctrl#001", "team-a", "Brimstone", 265, "ctrl"),
-          player("Sent#001", "team-a", "Chamber", 270, "sent"),
-          player("Opp#001", "team-b", "Jett", 180, "opp"),
-        ],
-      },
+    // Star spans all four roles (keeps Flex). Flex2 is a full-flex backup with
+    // ≥3 Initiator maps so they take Best Initiator after Star is claimed.
+    const maps: Array<{ star: string; flex2: string; duel: string; ctrl: string; sent: string }> = [
+      { star: "Jett", flex2: "Sova", duel: "Raze", ctrl: "Omen", sent: "Cypher" },
+      { star: "Sova", flex2: "Sova", duel: "Raze", ctrl: "Viper", sent: "Killjoy" },
+      { star: "Omen", flex2: "Fade", duel: "Phoenix", ctrl: "Astra", sent: "Sage" },
+      { star: "Cypher", flex2: "Breach", duel: "Neon", ctrl: "Brimstone", sent: "Chamber" },
     ];
+
+    const games: StatsGame[] = maps.map((m, i) => ({
+      teamAId: "team-a",
+      teamBId: "team-b",
+      teamAName: "Alpha",
+      teamBName: "Bravo",
+      teamARounds: 13,
+      teamBRounds: 5,
+      mapName: ["Ascent", "Bind", "Haven", "Lotus"][i]!,
+      mvpRiotId: null,
+      players: [
+        player("Star#001", "team-a", m.star, 300, "star"),
+        player("Flex2#001", "team-a", m.flex2, 220, "flex2"),
+        player("Duel#001", "team-a", m.duel, 290, "duel"),
+        player("Ctrl#001", "team-a", m.ctrl, 270, "ctrl"),
+        player("Sent#001", "team-a", m.sent, 265, "sent"),
+        player("Opp#001", "team-b", "Reyna", 180, "opp"),
+      ],
+    }));
 
     const standouts = aggregateRoleStandouts(games, elig);
     expect(standouts.bestFlex?.riotId).toBe("Star#001");
@@ -807,7 +758,7 @@ describe("best flex eligibility", () => {
       byRiotId: {},
     };
 
-    const games: StatsGame[] = [0, 1, 2, 3].map((i) => ({
+    const games: StatsGame[] = [0, 1, 2, 3].map(() => ({
       teamAId: "team-a",
       teamBId: "team-b",
       teamAName: "Alpha",
@@ -819,8 +770,8 @@ describe("best flex eligibility", () => {
       players: [
         // Slightly higher ACS, low assists
         player("FragInit#001", "team-a", "Sova", 255, "frag", 3),
-        // Slightly lower ACS, high assists — should win Initiator / Sova
-        player("SetupInit#001", "team-a", "Sova", 248, "setup", 14),
+        // Slightly lower ACS, high assists — Initiator model favors setup
+        player("SetupInit#001", "team-a", "Sova", 248, "setup", 16),
         player("Fill#001", "team-a", "Jett", 200, "fill"),
         player("Fill#002", "team-a", "Omen", 200, "fill"),
         player("Fill#003", "team-a", "Cypher", 200, "fill"),
@@ -828,7 +779,7 @@ describe("best flex eligibility", () => {
       ],
     }));
 
-    expect(initiatorAssistBoost(14, 1)).toBeGreaterThan(initiatorAssistBoost(3, 1));
+    expect(initiatorAssistBoost(16, 1)).toBeGreaterThan(initiatorAssistBoost(3, 1));
 
     const standouts = aggregateRoleStandouts(games, elig);
     expect(standouts.byRole.Initiator?.riotId).toBe("SetupInit#001");

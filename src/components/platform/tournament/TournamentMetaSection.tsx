@@ -29,7 +29,6 @@ function MetaCollapsible({
   onToggle,
   accentDotClass,
   title,
-  description,
   headerExtra,
   children,
 }: {
@@ -37,7 +36,6 @@ function MetaCollapsible({
   onToggle: () => void;
   accentDotClass: string;
   title: string;
-  description: string;
   headerExtra?: ReactNode;
   children: ReactNode;
 }) {
@@ -57,9 +55,6 @@ function MetaCollapsible({
                 {title}
               </h3>
             </div>
-            <p className="mt-1 text-[11px] leading-relaxed text-white/50 sm:text-xs">
-              {description}
-            </p>
           </div>
           <span
             className={`mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-white/10 bg-black/30 text-white/60 transition-transform duration-200 ${
@@ -399,7 +394,6 @@ export default function TournamentMetaSection({ games, eligibility }: Props) {
         onToggle={() => toggleSection("teamMaps")}
         accentDotClass="bg-emerald-400 animate-pulse"
         title="Team Map Performance"
-        description="Detailed win rates, map frequency, and agent compositions executed by each team"
       >
         {teamMaps.length === 0 ? (
           <p className="text-sm text-white/40">No team map data available yet.</p>
@@ -566,7 +560,6 @@ export default function TournamentMetaSection({ games, eligibility }: Props) {
         onToggle={() => toggleSection("roleStandouts")}
         accentDotClass="bg-amber-400 animate-pulse"
         title="Best Players by Roles"
-        description="Highest Rating per role — Flex kept first, then other roles take the next player. Initiator favors assists."
       >
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           <StandoutCard roleKey="bestOverall" player={standouts.bestOverall} />
@@ -584,7 +577,6 @@ export default function TournamentMetaSection({ games, eligibility }: Props) {
         onToggle={() => toggleSection("agentMasters")}
         accentDotClass="bg-cyan-400 animate-pulse"
         title="Best Players by Agents"
-        description="Top Rating per agent — quality over empty volume; Initiators favor assists"
         headerExtra={agentRoleFilters}
       >
         {filteredAgentStandouts.length === 0 ? (

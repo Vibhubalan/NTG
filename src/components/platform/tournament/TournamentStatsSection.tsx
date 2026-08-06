@@ -72,7 +72,7 @@ function rowStyles(idx: number, mvps: number) {
     : "border-b border-white/[0.04] transition-colors hover:bg-white/[0.04]";
   const mvpBadgeClass =
     mvps > 0
-      ? "inline-flex items-center gap-1 rounded-md border border-amber-300/40 bg-amber-400/15 px-1.5 py-0.5 text-[10px] font-black tracking-wide text-amber-200 uppercase"
+      ? "inline-flex items-center gap-1 rounded-md border border-amber-400/40 bg-gradient-to-r from-amber-500/20 to-yellow-500/10 px-1.5 py-0.5 text-[10px] font-black tracking-wide text-amber-300 uppercase shadow-[0_0_10px_rgba(245,158,11,0.15)]"
       : "";
   const nameColorClass = "text-white font-bold";
   const rankClass =
@@ -206,11 +206,10 @@ export default function TournamentStatsSection({ games, eligibility }: Props) {
 
   const sortChips: { field: SortField; label: string }[] = [
     { field: "rating", label: "Rating" },
-    { field: "totalKills", label: "KDA" },
+    { field: "mvpCount", label: "MVP" },
     { field: "avgAcs", label: "ACS" },
     { field: "kd", label: "K/D" },
-    { field: "totalFirstKills", label: "FK" },
-    { field: "gamesPlayed", label: "GP" },
+    { field: "totalKills", label: "KDA" },
   ];
 
   return (
@@ -389,20 +388,22 @@ export default function TournamentStatsSection({ games, eligibility }: Props) {
                               </div>
                             )}
                             <div className="min-w-0">
-                              <div className="flex items-center gap-1">
+                              <div className="flex items-baseline gap-1 min-w-0">
                                 <span className="truncate text-[13px] font-bold text-white">
                                   {name}
                                 </span>
-                                {p.mvpCount > 0 ? (
-                                  <span className="shrink-0 text-[9px] font-black text-amber-300">
-                                    {p.mvpCount}★
+                                {tag ? (
+                                  <span className="shrink-0 font-mono text-[10px] text-white/35">
+                                    #{tag}
                                   </span>
                                 ) : null}
                               </div>
-                              {tag ? (
-                                <span className="block truncate font-mono text-[10px] text-white/35">
-                                  #{tag}
-                                </span>
+                              {p.mvpCount > 0 ? (
+                                <div className="mt-0.5 flex flex-wrap items-center gap-1">
+                                  <span className="inline-flex items-center gap-0.5 rounded border border-amber-400/40 bg-amber-400/20 px-1 py-0.5 text-[8px] font-black text-amber-300 uppercase shadow-[0_0_6px_rgba(245,158,11,0.2)]">
+                                    👑 {p.mvpCount}x MVP
+                                  </span>
+                                </div>
                               ) : null}
                             </div>
                           </div>
@@ -598,18 +599,22 @@ export default function TournamentStatsSection({ games, eligibility }: Props) {
                               )}
                             </div>
                             <div className="min-w-0 flex-1">
-                              <div className="flex min-w-0 items-center gap-2">
+                              <div className="flex items-baseline gap-1.5 min-w-0">
                                 <span className={`truncate text-base ${nameColorClass}`}>
                                   {name}
                                 </span>
-                                {p.mvpCount > 0 ? (
-                                  <span className={`shrink-0 ${mvpBadgeClass}`}>
-                                    👑 {p.mvpCount}x MVP
+                                {tag ? (
+                                  <span className="shrink-0 font-mono text-xs text-white/40">
+                                    #{tag}
                                   </span>
                                 ) : null}
                               </div>
-                              {tag ? (
-                                <div className="text-xs text-white/40">#{tag}</div>
+                              {p.mvpCount > 0 ? (
+                                <div className="mt-1 flex flex-wrap items-center gap-1.5">
+                                  <span className={`shrink-0 ${mvpBadgeClass}`}>
+                                    👑 {p.mvpCount}x MVP
+                                  </span>
+                                </div>
                               ) : null}
                             </div>
                           </div>
