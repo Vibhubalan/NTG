@@ -91,11 +91,38 @@ function rowStyles(idx: number, mvps: number) {
 const DEFAULT_SORT: SortField = "rating";
 
 type Props = {
+  slug?: string;
   games: PublicGame[];
   eligibility?: TournamentStatsEligibility;
+  /** ADMIN / ADMIN_EMAILS — shows stats CSV download. */
+  isAdmin?: boolean;
 };
 
-export default function TournamentStatsSection({ games, eligibility }: Props) {
+function DownloadIcon({ className }: { className?: string }) {
+  return (
+    <svg
+      className={className}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={2}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden
+    >
+      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+      <polyline points="7 10 12 15 17 10" />
+      <line x1="12" y1="15" x2="12" y2="3" />
+    </svg>
+  );
+}
+
+export default function TournamentStatsSection({
+  slug,
+  games,
+  eligibility,
+  isAdmin = false,
+}: Props) {
   const [subTab, setSubTab] = useState<StatsSubTab>("players");
   const [sortBy, setSortBy] = useState<SortField>(DEFAULT_SORT);
   const [sortDir, setSortDir] = useState<SortDir>("desc");
@@ -265,19 +292,32 @@ export default function TournamentStatsSection({ games, eligibility }: Props) {
                   one hot match can&apos;t beat a full tournament run.
                 </p>
               </div>
-              <button
-                type="button"
-                onClick={cycleRoleFilter}
-                className={`inline-flex h-8 w-[8.75rem] shrink-0 items-center justify-center rounded-lg px-2 text-[10px] font-black tracking-wider uppercase transition-all md:hidden ${
-                  selectedRole === "ALL"
-                    ? "bg-white/10 text-white/55 ring-1 ring-white/10"
-                    : "bg-emerald-400 text-[#070a12]"
-                }`}
-              >
-                <span className="truncate">
-                  Role: {selectedRole === "ALL" ? "All" : selectedRole}
-                </span>
-              </button>
+              <div className="flex shrink-0 items-center gap-2">
+                {isAdmin && slug ? (
+                  <a
+                    href={`/api/admin/tournaments/${encodeURIComponent(slug)}/stats/export`}
+                    download
+                    title="Download player stats (Excel)"
+                    aria-label="Download player stats"
+                    className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-white/10 bg-white/[0.04] text-white/55 transition-colors hover:border-emerald-400/40 hover:bg-emerald-400/10 hover:text-emerald-300 md:hidden"
+                  >
+                    <DownloadIcon className="h-4 w-4" />
+                  </a>
+                ) : null}
+                <button
+                  type="button"
+                  onClick={cycleRoleFilter}
+                  className={`inline-flex h-8 w-[8.75rem] items-center justify-center rounded-lg px-2 text-[10px] font-black tracking-wider uppercase transition-all md:hidden ${
+                    selectedRole === "ALL"
+                      ? "bg-white/10 text-white/55 ring-1 ring-white/10"
+                      : "bg-emerald-400 text-[#070a12]"
+                  }`}
+                >
+                  <span className="truncate">
+                    Role: {selectedRole === "ALL" ? "All" : selectedRole}
+                  </span>
+                </button>
+              </div>
             </div>
 
             <div className="relative w-full">
@@ -485,7 +525,18 @@ export default function TournamentStatsSection({ games, eligibility }: Props) {
           </div>
 
           {/* ── Desktop table ── */}
-          <div className="hidden overflow-x-auto rounded-2xl border border-white/10 bg-[#080d16] shadow-2xl md:block">
+          <div className="relative hidden overflow-x-auto rounded-2xl border border-white/10 bg-[#080d16] shadow-2xl md:block">
+            {isAdmin && slug ? (
+              <a
+                href={`/api/admin/tournaments/${encodeURIComponent(slug)}/stats/export`}
+                download
+                title="Download player stats (Excel)"
+                aria-label="Download player stats"
+                className="absolute top-3 right-3 z-10 inline-flex h-8 w-8 items-center justify-center rounded-lg border border-white/10 bg-black/50 text-white/55 backdrop-blur-sm transition-colors hover:border-emerald-400/40 hover:bg-emerald-400/15 hover:text-emerald-300"
+              >
+                <DownloadIcon className="h-4 w-4" />
+              </a>
+            ) : null}
             <table className="w-full min-w-[900px] text-sm sm:text-base">
               <thead>
                 <tr className="border-b border-white/10 bg-black/50 text-xs font-black tracking-wider text-white/60 uppercase">

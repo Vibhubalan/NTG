@@ -43,6 +43,8 @@ type Props = {
   tournament: TournamentDetail;
   brackets: { url: string; name?: string | null; isFinal?: boolean; bracket: TournamentBracketView | null }[];
   isLoggedIn: boolean;
+  /** ADMIN / ADMIN_EMAILS — gates Stats export control. */
+  isAdmin?: boolean;
   registrationPreview?: RegistrationPreview | null;
   registrationProfileCard?: ValorantRegistrationProfileCard | null;
   auctionHref?: string | null;
@@ -59,6 +61,7 @@ export default function TournamentDetailView({
   tournament,
   brackets: initialBrackets,
   isLoggedIn,
+  isAdmin = false,
   registrationPreview,
   registrationProfileCard,
   auctionHref,
@@ -532,8 +535,10 @@ export default function TournamentDetailView({
             </div>
           ) : (
             <TournamentStatsSection
+              slug={tournament.slug}
               games={statsGames}
               eligibility={statsEligibility}
+              isAdmin={isAdmin}
             />
           )}
         </section>

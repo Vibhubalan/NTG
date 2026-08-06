@@ -418,6 +418,89 @@ export function aggregatePlayerStats(
   return result;
 }
 
+function csvEscape(value: string | number | null | undefined): string {
+  if (value == null) return "";
+  const s = String(value);
+  if (/[",\n\r]/.test(s)) return `"${s.replace(/"/g, '""')}"`;
+  return s;
+}
+
+/** Agent names with game counts, e.g. "Jett (3); Omen (1)". */
+export function formatAgentsPlayed(agentCounts: Record<string, number>): string {
+  return Object.entries(agentCounts)
+    .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+    .map(([agent, count]) => `${agent} (${count})`)
+    .join("; ");
+}
+
+/**
+ * CSV for admin player-stats export (opens in Excel).
+ * Includes Teams (primary + poach appearances) and Agents Played as names.
+ */
+export function buildPlayerStatsCsv(players: AggregatedPlayerStats[]): string {
+  const baseline = computeStandoutBaseline(players);
+  const headers = [
+    "Rank",
+    "Player",
+    "Riot ID",
+    "Teams",
+    "Agents Played",
+    "Most Played Agent",
+    "GP",
+    "Rating",
+    "ACS",
+    "Kills",
+    "Deaths",
+    "Assists",
+    "K/D",
+    "FK",
+    "FD",
+    "HS%",
+    "ADR",
+    "MVPs",
+  ];
+
+  const ranked = [...players].sort((a, b) => {
+    const ratingDiff =
+      weightedAcs(b.avgAcs, b.gamesPlayed, baseline) -
+      weightedAcs(a.avgAcs, a.gamesPlayed, baseline);
+    if (ratingDiff !== 0) return ratingDiff;
+    if (b.mvpCount !== a.mvpCount) return b.mvpCount - a.mvpCount;
+    return b.totalKills - a.totalKills;
+  });
+
+  const rows = ranked.map((p, idx) => {
+    const rating = weightedAcs(p.avgAcs, p.gamesPlayed, baseline);
+    const kd =
+      p.totalDeaths > 0
+        ? (p.totalKills / p.totalDeaths).toFixed(2)
+        : p.totalKills.toFixed(2);
+    const displayName = p.userName?.trim() || p.riotId.split("#")[0] || p.riotId;
+    return [
+      idx + 1,
+      csvEscape(displayName),
+      csvEscape(p.riotId),
+      csvEscape(p.teamNames.join("; ")),
+      csvEscape(formatAgentsPlayed(p.agentCounts)),
+      csvEscape(p.mostPlayedAgent),
+      p.gamesPlayed,
+      rating.toFixed(1),
+      p.avgAcs,
+      p.totalKills,
+      p.totalDeaths,
+      p.totalAssists,
+      kd,
+      p.totalFirstKills,
+      p.totalFirstDeaths,
+      p.avgHsPercent,
+      p.avgAdr,
+      p.mvpCount,
+    ].join(",");
+  });
+
+  return [headers.join(","), ...rows].join("\n");
+}
+
 /** @deprecated Use aggregatePlayerStats */
 export const aggregateTeamScopedPlayerStats = aggregatePlayerStats;
 

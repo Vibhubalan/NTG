@@ -106,6 +106,7 @@ export default async function TournamentDetailPage({ params }: Props) {
         tournament={tournament}
         brackets={brackets}
         isLoggedIn={!!userId}
+        isAdmin={admin.ok}
         registrationPreview={registrationPreview}
         registrationProfileCard={registrationProfileCard}
         auctionHref={auctionHref}

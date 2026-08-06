@@ -48,6 +48,8 @@ export default function RouteProgressBar() {
 
       const next = new URL(anchor.href, window.location.href);
       if (next.origin !== window.location.origin) return;
+      // File/API downloads never change the route — don't start the top bar.
+      if (next.pathname.startsWith("/api/")) return;
 
       const nextPath = `${next.pathname}${next.search}`;
       const currentPath = `${window.location.pathname}${window.location.search}`;

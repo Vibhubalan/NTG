@@ -7,10 +7,12 @@ import {
   aggregatePlayerStats,
   aggregateRoleStandouts,
   aggregateTeamMapStats,
+  buildPlayerStatsCsv,
   computeStandoutBaseline,
   distinctRolesPlayed,
   dynamicGamesThreshold,
   flexPriorityScore,
+  formatAgentsPlayed,
   initiatorAssistBoost,
   isStatsAppearanceEligible,
   normalizeCompKey,
@@ -832,5 +834,83 @@ describe("best flex eligibility", () => {
       longCup.push(makeGame(fallbackAgents[i % fallbackAgents.length], i));
     }
     expect(aggregateRoleStandouts(longCup, elig).bestFlex).toBeNull();
+  });
+});
+
+describe("buildPlayerStatsCsv", () => {
+  it("exports agent names and teams (including poach), not icons", () => {
+    const players = aggregatePlayerStats(
+      [
+        {
+          teamAId: "team-a",
+          teamBId: "team-b",
+          teamAName: "Alpha",
+          teamBName: "Bravo",
+          teamARounds: 13,
+          teamBRounds: 7,
+          mapName: "Ascent",
+          mvpRiotId: "poach#001",
+          playedAt: "2026-07-20T12:00:00.000Z",
+          players: [
+            {
+              riotId: "poach#001",
+              userId: "user-1",
+              userName: "Poach Player",
+              teamId: "team-a",
+              agent: "Jett",
+              kills: 20,
+              deaths: 10,
+              assists: 5,
+              acs: 280,
+              adr: 160,
+              hsPercent: 30,
+              firstKills: 2,
+              firstDeaths: 1,
+            },
+          ],
+        },
+        {
+          teamAId: "team-a",
+          teamBId: "team-b",
+          teamAName: "Alpha",
+          teamBName: "Bravo",
+          teamARounds: 13,
+          teamBRounds: 9,
+          mapName: "Bind",
+          mvpRiotId: null,
+          playedAt: "2026-08-02T12:00:00.000Z",
+          players: [
+            {
+              riotId: "poach#001",
+              userId: "user-1",
+              userName: "Poach Player",
+              teamId: "team-b",
+              agent: "Omen",
+              kills: 15,
+              deaths: 12,
+              assists: 8,
+              acs: 220,
+              adr: 140,
+              hsPercent: 25,
+              firstKills: 1,
+              firstDeaths: 2,
+            },
+          ],
+        },
+      ],
+      { eligibility },
+    );
+
+    expect(formatAgentsPlayed(players[0]!.agentCounts)).toContain("Jett");
+    expect(formatAgentsPlayed(players[0]!.agentCounts)).toContain("Omen");
+
+    const csv = buildPlayerStatsCsv(players);
+    expect(csv).toContain("Teams");
+    expect(csv).toContain("Agents Played");
+    expect(csv).toContain("Alpha");
+    expect(csv).toContain("Bravo");
+    expect(csv).toMatch(/Jett \(\d+\)/);
+    expect(csv).not.toContain("http");
+    expect(csv).not.toContain(".png");
   });
 });
