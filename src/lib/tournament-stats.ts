@@ -235,6 +235,14 @@ export function statsPlayerKey(riotId: string): string {
   return riotId.toLowerCase();
 }
 
+/** Prefer linked account so Riot renames don't split one player into two rows. */
+export function aggregateStatsPlayerKey(
+  player: Pick<StatsGamePlayer, "riotId" | "userId">,
+): string {
+  if (player.userId) return `user:${player.userId}`;
+  return statsPlayerKey(player.riotId);
+}
+
 function membershipsForPlayer(
   player: Pick<StatsGamePlayer, "riotId" | "userId">,
   eligibility?: TournamentStatsEligibility | null,
@@ -281,8 +289,9 @@ export function isStatsAppearanceEligible(
 }
 
 /**
- * Aggregate published appearances into one row per Riot ID.
+ * Aggregate published appearances into one row per linked user (else Riot ID).
  * Only official team games count (primary + post-poach).
+ * When games are newest-first, the first seen riotId is kept as the display name.
  */
 export function aggregatePlayerStats(
   games: StatsGame[],
@@ -320,16 +329,24 @@ export function aggregatePlayerStats(
   for (const game of games) {
     let gameMvpKey: string | null = null;
     if (game.mvpRiotId) {
-      gameMvpKey = statsPlayerKey(game.mvpRiotId);
+      const mvpRiotKey = statsPlayerKey(game.mvpRiotId);
+      const mvpPlayer = game.players.find(
+        (p) => statsPlayerKey(p.riotId) === mvpRiotKey,
+      );
+      gameMvpKey = mvpPlayer
+        ? aggregateStatsPlayerKey(mvpPlayer)
+        : mvpRiotKey;
     }
     if (!gameMvpKey && game.players.length > 0) {
       let maxAcs = -1;
+      let mvpPlayer: StatsGamePlayer | null = null;
       for (const p of game.players) {
         if (p.acs > maxAcs && p.riotId && p.agent) {
           maxAcs = p.acs;
-          gameMvpKey = statsPlayerKey(p.riotId);
+          mvpPlayer = p;
         }
       }
+      if (mvpPlayer) gameMvpKey = aggregateStatsPlayerKey(mvpPlayer);
     }
 
     const teamNameById = new Map<string, string>([
@@ -344,7 +361,7 @@ export function aggregatePlayerStats(
       if (agentNameKey && p.agent.trim().toLowerCase() !== agentNameKey) continue;
       if (!isStatsAppearanceEligible(p, game, opts?.eligibility)) continue;
 
-      const key = statsPlayerKey(p.riotId);
+      const key = aggregateStatsPlayerKey(p);
       let entry = map.get(key);
       if (!entry) {
         entry = {
@@ -862,8 +879,7 @@ function pickUnclaimedStandout(
   claimed: Set<string>,
 ): AggregatedPlayerStats | null {
   for (const p of ranked) {
-    const key = statsPlayerKey(p.riotId);
-    if (!claimed.has(key)) return p;
+    if (!claimed.has(p.key)) return p;
   }
   return null;
 }
@@ -957,7 +973,7 @@ export function aggregateRoleStandouts(
     tieBreak: (p) => flexPriorityScore(p.agentCounts),
   });
   const bestFlexRow = pickUnclaimedStandout(flexRanked, claimed);
-  if (bestFlexRow) claimed.add(statsPlayerKey(bestFlexRow.riotId));
+  if (bestFlexRow) claimed.add(bestFlexRow.key);
 
   const roles: AgentRole[] = ["Duelist", "Initiator", "Controller", "Sentinel"];
   const byRole: Partial<Record<AgentRole, StandoutPlayer | null>> = {};

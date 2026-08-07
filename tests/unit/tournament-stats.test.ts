@@ -48,8 +48,78 @@ const eligibility: TournamentStatsEligibility = {
 };
 
 describe("tournament-stats membership filtering", () => {
-  it("keys appearances by riotId only", () => {
+  it("normalizes riotId keys", () => {
     expect(statsPlayerKey("Player#TAG")).toBe("player#tag");
+  });
+
+  it("merges rename appearances for the same linked userId", () => {
+    const open: TournamentStatsEligibility = {
+      byUserId: {
+        "user-ghost": [{ teamId: "team-a", kind: "PRIMARY", since: null }],
+      },
+      byRiotId: {},
+    };
+    const merged = aggregatePlayerStats(
+      [
+        {
+          teamAId: "team-a",
+          teamBId: "team-x",
+          teamAName: "Zenith",
+          teamBName: "X",
+          // Newest first — display name should stay GHOSTY神#MEOW
+          startedAt: "2026-08-07T00:00:00.000Z",
+          mvpRiotId: "GHOSTY神#MEOW",
+          players: [
+            {
+              riotId: "GHOSTY神#MEOW",
+              userId: "user-ghost",
+              teamId: "team-a",
+              agent: "Jett",
+              kills: 39,
+              deaths: 34,
+              assists: 5,
+              acs: 280,
+              adr: 188,
+              hsPercent: 26,
+              firstKills: 8,
+              firstDeaths: 6,
+            },
+          ],
+        },
+        {
+          teamAId: "team-a",
+          teamBId: "team-x",
+          teamAName: "Zenith",
+          teamBName: "X",
+          startedAt: "2026-08-05T00:00:00.000Z",
+          mvpRiotId: "BayesianWhiff#PFC",
+          players: [
+            {
+              riotId: "BayesianWhiff#PFC",
+              userId: "user-ghost",
+              teamId: "team-a",
+              agent: "Jett",
+              kills: 20,
+              deaths: 10,
+              assists: 2,
+              acs: 250,
+              adr: 160,
+              hsPercent: 30,
+              firstKills: 5,
+              firstDeaths: 3,
+            },
+          ],
+        },
+      ],
+      { eligibility: open },
+    );
+
+    expect(merged).toHaveLength(1);
+    expect(merged[0]!.riotId).toBe("GHOSTY神#MEOW");
+    expect(merged[0]!.gamesPlayed).toBe(2);
+    expect(merged[0]!.totalKills).toBe(59);
+    expect(merged[0]!.mvpCount).toBe(2);
+    expect(merged[0]!.key).toBe("user:user-ghost");
   });
 
   it("rejects appearances for teams the player was never added to", () => {
