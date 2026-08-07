@@ -526,17 +526,38 @@ export async function updateTournamentFull(
   await prisma.tournament.update({ where: { id: tournament.id }, data });
 
   if (clearWinnersAfterSave) {
-    await clearAutoSyncedChampions(tournament.id);
+    await clearAutoSyncedChampions(tournament.id).catch((err) => {
+      console.error(
+        "[admin] clearAutoSyncedChampions failed:",
+        err instanceof Error ? err.message : err,
+      );
+    });
   } else if (syncWinnerLinks && syncWinnerLinks.some((l) => l.isFinal)) {
     // Persist winners immediately on save so Preview / cups list update without waiting for a page visit.
+    // Never let a Challonge scrape failure turn the admin save into an HTML error page.
     const brackets = await Promise.all(
       syncWinnerLinks.map(async (link) => ({
         url: link.url,
         isFinal: link.isFinal,
-        bracket: link.isFinal ? await fetchChallongeBracket(link.url) : null,
+        bracket: link.isFinal
+          ? await fetchChallongeBracket(link.url).catch((err) => {
+              console.error(
+                `[admin] Challonge fetch failed for ${link.url}:`,
+                err instanceof Error ? err.message : err,
+              );
+              return null;
+            })
+          : null,
       })),
     );
-    await syncBracketChampionsToPlacements(tournament.id, brackets).catch(() => {});
+    // Omit status so an explicit admin "Use for Winners" save can persist
+    // champs even before the cup is marked COMPLETED.
+    await syncBracketChampionsToPlacements(tournament.id, brackets).catch((err) => {
+      console.error(
+        "[admin] syncBracketChampionsToPlacements failed:",
+        err instanceof Error ? err.message : err,
+      );
+    });
   }
 
   if (

@@ -240,13 +240,33 @@ function savePayloadsEqual(
   return JSON.stringify(a) === JSON.stringify(b);
 }
 
-async function readJsonResponse(res: Response): Promise<Record<string, unknown>> {
+async function readJsonResponse(
+  res: Response,
+): Promise<Record<string, unknown> & { __nonJson?: boolean }> {
   const text = await res.text();
   if (!text) return {};
+  const trimmed = text.trim();
+  // Auth redirects / Next soft-404s often return the full app HTML shell.
+  if (
+    trimmed.startsWith("<!DOCTYPE") ||
+    trimmed.startsWith("<html") ||
+    trimmed.startsWith("<!doctype")
+  ) {
+    return {
+      __nonJson: true,
+      error:
+        res.status === 401 || res.status === 403
+          ? "Admin session expired — refresh and sign in again."
+          : `Save failed (got a web page instead of JSON, HTTP ${res.status}).`,
+    };
+  }
   try {
     return JSON.parse(text) as Record<string, unknown>;
   } catch {
-    return { error: text.slice(0, 200) || `Request failed (${res.status})` };
+    return {
+      __nonJson: true,
+      error: `Save failed — invalid server response (HTTP ${res.status}).`,
+    };
   }
 }
 
@@ -327,6 +347,12 @@ export default function AdminTournamentEditor({
   }, [form, mvpEnabled, selectedMvp]);
   const [savedStatus, setSavedStatus] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
+  const [messageTone, setMessageTone] = useState<"success" | "error">("success");
+
+  function showMessage(text: string, tone: "success" | "error" = "success") {
+    setMessageTone(tone);
+    setMessage(text);
+  }
   const [newTeamName, setNewTeamName] = useState("");
   const [editingTeamId, setEditingTeamId] = useState<string | null>(null);
   const [editingTeamName, setEditingTeamName] = useState<string>("");
@@ -528,14 +554,14 @@ export default function AdminTournamentEditor({
       body: JSON.stringify(fields),
     });
     const data = await readJsonResponse(res);
-    if (!res.ok) {
-      setMessage(String(data.error ?? "Save failed."));
+    if (!res.ok || data.__nonJson) {
+      showMessage(String(data.error ?? "Save failed."), "error");
       return false;
     }
     if (data.tournament) {
       applySavedCupFields(data.tournament as CupFields);
     }
-    setMessage(successMsg);
+    showMessage(successMsg, "success");
     return true;
   }
 
@@ -563,8 +589,10 @@ export default function AdminTournamentEditor({
         body: JSON.stringify({ bypass: bypassAuctionSavedLock }),
       });
       const data = await readJsonResponse(res);
-      setMessage(res.ok ? "Auction created." : String(data.error ?? "Failed to create auction."));
-      if (res.ok) {
+      if (!res.ok || data.__nonJson) {
+        showMessage(String(data.error ?? "Failed to create auction."), "error");
+      } else {
+        showMessage("Auction created.", "success");
         setConfirmCreateAuction(false);
         setBypassAuctionSavedLock(false);
       }
@@ -579,12 +607,15 @@ export default function AdminTournamentEditor({
 
     if (form.autoManageStatus) {
       if (!form.registrationOpensAt || !form.startsAt || !form.endsAt) {
-        setMessage("Auto-manage requires registration open, cup start, and cup end dates.");
+        showMessage(
+          "Auto-manage requires registration open, cup start, and cup end dates.",
+          "error",
+        );
         setLoading(false);
         return false;
       }
       if (isAuctionFormat && (!form.auctionStartsAt || !form.auctionEndsAt)) {
-        setMessage("Auction cups require auction start and auction end dates.");
+        showMessage("Auction cups require auction start and auction end dates.", "error");
         setLoading(false);
         return false;
       }
@@ -597,36 +628,43 @@ export default function AdminTournamentEditor({
       const auctionEnd = isAuctionFormat ? new Date(form.auctionEndsAt!).getTime() : null;
       const starts = new Date(form.startsAt).getTime();
       if (opens >= closes) {
-        setMessage(
+        showMessage(
           isAuctionFormat
             ? "Registration must open before it closes (1 minute before auction starts)."
             : "Registration must open before it closes (1 minute before cup start).",
+          "error",
         );
         setLoading(false);
         return false;
       }
       if (isAuctionFormat && auctionEnd !== null) {
         if (closes >= new Date(form.auctionStartsAt!).getTime()) {
-          setMessage("Auction must start after registration closes.");
+          showMessage("Auction must start after registration closes.", "error");
           setLoading(false);
           return false;
         }
         if (new Date(form.auctionStartsAt!).getTime() >= auctionEnd) {
-          setMessage("Auction end must be after auction start.");
+          showMessage("Auction end must be after auction start.", "error");
           setLoading(false);
           return false;
         }
         if (auctionEnd >= starts) {
-          setMessage("Cup start must be after the auction ends.");
+          showMessage("Cup start must be after the auction ends.", "error");
           setLoading(false);
           return false;
         }
       }
       if (isAuctionFormat ? starts >= ends : closes >= ends) {
-        setMessage("Cup end must be after cup start.");
+        showMessage("Cup end must be after cup start.", "error");
         setLoading(false);
         return false;
       }
+    }
+
+    if (mvpEnabled && !selectedMvp && mvpSearch.trim()) {
+      showMessage("Select an MVP from the search results before saving.", "error");
+      setLoading(false);
+      return false;
     }
 
     try {
@@ -670,8 +708,8 @@ export default function AdminTournamentEditor({
         }),
       });
       const data = await readJsonResponse(res);
-      if (!res.ok) {
-        setMessage(String(data.error ?? "Save failed."));
+      if (!res.ok || data.__nonJson) {
+        showMessage(String(data.error ?? "Save failed."), "error");
         return false;
       }
 
@@ -694,19 +732,19 @@ export default function AdminTournamentEditor({
           body: JSON.stringify({ placements, clearRoles }),
         });
         const d = await readJsonResponse(pRes);
-        if (!pRes.ok) {
-          setMessage(String(d.error ?? "MVP save failed."));
+        if (!pRes.ok || d.__nonJson) {
+          showMessage(String(d.error ?? "MVP save failed."), "error");
           return false;
         }
         savedMvpRef.current = { enabled: mvpEnabled, userId: selectedMvp?.id ?? null };
       }
 
-      setMessage("All changes successfully saved.");
+      showMessage("All changes successfully saved.", "success");
       setSavedStatus(true);
       setTimeout(() => setSavedStatus(false), 2500);
       return true;
     } catch (err) {
-      setMessage(err instanceof Error ? err.message : "Something went wrong.");
+      showMessage(err instanceof Error ? err.message : "Something went wrong.", "error");
       return false;
     } finally {
       setLoading(false);
@@ -1054,25 +1092,33 @@ export default function AdminTournamentEditor({
     <div className="space-y-6">
       {/* Save Notification alert */}
       {message ? (
-        (() => {
-          const isError =
-            message.toLowerCase().includes("fail") ||
-            message.toLowerCase().includes("error") ||
-            message.toLowerCase().includes("wrong");
-          return (
-            <div className={`rounded-xl px-4 py-3 text-sm flex items-center justify-between shadow-md ${
-              isError 
-                ? "bg-rose-500/10 border border-rose-500/30 text-rose-200" 
-                : "bg-emerald-500/10 border border-emerald-500/30 text-emerald-200"
-            }`}>
-              <span className="flex items-center gap-2">
-                <span className={`h-1.5 w-1.5 rounded-full ${isError ? "bg-rose-400" : "bg-emerald-400"}`} />
-                {message}
-              </span>
-              <button type="button" onClick={() => setMessage(null)} className={isError ? "text-rose-400/50 hover:text-rose-400" : "text-emerald-400/50 hover:text-emerald-400"}>✕</button>
-            </div>
-          );
-        })()
+        <div
+          className={`rounded-xl px-4 py-3 text-sm flex items-center justify-between shadow-md ${
+            messageTone === "error"
+              ? "bg-rose-500/10 border border-rose-500/30 text-rose-200"
+              : "bg-emerald-500/10 border border-emerald-500/30 text-emerald-200"
+          }`}
+        >
+          <span className="flex min-w-0 items-center gap-2">
+            <span
+              className={`h-1.5 w-1.5 shrink-0 rounded-full ${
+                messageTone === "error" ? "bg-rose-400" : "bg-emerald-400"
+              }`}
+            />
+            <span className="break-words">{message}</span>
+          </span>
+          <button
+            type="button"
+            onClick={() => setMessage(null)}
+            className={
+              messageTone === "error"
+                ? "text-rose-400/50 hover:text-rose-400"
+                : "text-emerald-400/50 hover:text-emerald-400"
+            }
+          >
+            ✕
+          </button>
+        </div>
       ) : null}
 
       {/* Sticky Top Editor Header bar */}
@@ -1931,7 +1977,7 @@ export default function AdminTournamentEditor({
                         ...form,
                         bracketLinks: [
                           ...(form.bracketLinks ?? []),
-                          { name: "", url: "", isFinal: true },
+                          { name: "", url: "", isFinal: false },
                         ],
                       })
                     }

@@ -34,10 +34,15 @@ export async function POST(req: Request, { params }: Props) {
     return NextResponse.json({ error: "placements or clearRoles required" }, { status: 400 });
   }
 
-  const result = await setTournamentPlacements(slug, placements, { clearRoles });
-  if (!result.ok) {
-    return NextResponse.json({ error: result.error }, { status: 400 });
+  try {
+    const result = await setTournamentPlacements(slug, placements, { clearRoles });
+    if (!result.ok) {
+      return NextResponse.json({ error: result.error }, { status: 400 });
+    }
+    return NextResponse.json({ ok: true });
+  } catch (err) {
+    console.error("[admin/placements POST]", err);
+    const message = err instanceof Error ? err.message : "MVP save failed.";
+    return NextResponse.json({ error: message }, { status: 500 });
   }
-
-  return NextResponse.json({ ok: true });
 }

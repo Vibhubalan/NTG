@@ -114,30 +114,36 @@ export async function PATCH(req: Request, { params }: Props) {
     return NextResponse.json({ error: result.error }, { status: 400 });
   }
 
-  if (body.publicAuction !== undefined) {
-    const isPublic = !!body.publicAuction;
-    await prisma.tournament.update({
-      where: { slug },
-      data: { publicAuction: isPublic },
+  try {
+    if (body.publicAuction !== undefined) {
+      const isPublic = !!body.publicAuction;
+      await prisma.tournament.update({
+        where: { slug },
+        data: { publicAuction: isPublic },
+      });
+      (result.tournament as { publicAuction?: boolean }).publicAuction = isPublic;
+    }
+
+    if (body.yourGamesEnabled !== undefined) {
+      const enabled = !!body.yourGamesEnabled;
+      await prisma.tournament.update({
+        where: { slug },
+        data: { yourGamesEnabled: enabled },
+      });
+      (result.tournament as { yourGamesEnabled?: boolean }).yourGamesEnabled = enabled;
+    }
+
+    await logAdminAction(auth.userId, "tournament.update", slug, {
+      fields: Object.keys(body),
+      tournamentName: result.tournament.name,
     });
-    (result.tournament as { publicAuction?: boolean }).publicAuction = isPublic;
+
+    return NextResponse.json({ ok: true, tournament: result.tournament });
+  } catch (err) {
+    console.error("[admin/tournaments PATCH post-save]", err);
+    const message = err instanceof Error ? err.message : "Save failed.";
+    return NextResponse.json({ error: message }, { status: 500 });
   }
-
-  if (body.yourGamesEnabled !== undefined) {
-    const enabled = !!body.yourGamesEnabled;
-    await prisma.tournament.update({
-      where: { slug },
-      data: { yourGamesEnabled: enabled },
-    });
-    (result.tournament as { yourGamesEnabled?: boolean }).yourGamesEnabled = enabled;
-  }
-
-  await logAdminAction(auth.userId, "tournament.update", slug, {
-    fields: Object.keys(body),
-    tournamentName: result.tournament.name,
-  });
-
-  return NextResponse.json({ ok: true, tournament: result.tournament });
 }
 
 export async function DELETE(_req: Request, { params }: Props) {
