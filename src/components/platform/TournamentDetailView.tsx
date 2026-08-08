@@ -177,6 +177,94 @@ export default function TournamentDetailView({
 
   const posterSrc = tournament.posterUrl ?? "/images/tournament_poster.png";
 
+  const championsFullWidth = showChampion;
+  const useSingleColOverview = championsFullWidth || isCompleted;
+  const showMetaSidebar = !championsFullWidth && !isCompleted;
+
+  // Auction rank only until the auction window ends (then the cup is "live").
+  const showAuctionRank = (() => {
+    if (tournament.registrationFormat !== "AUCTION") return false;
+    if (tournament.status === "COMPLETED" || tournament.status === "CANCELLED") return false;
+    const end = tournament.auctionEndsAt ? new Date(tournament.auctionEndsAt) : null;
+    if (end && !Number.isNaN(end.getTime())) return Date.now() < end.getTime();
+    // No end date: hide once cup start has passed
+    const start = tournament.startsAt ? new Date(tournament.startsAt) : null;
+    if (start && !Number.isNaN(start.getTime())) return Date.now() < start.getTime();
+    return true;
+  })();
+
+  const auctionBlock = auctionHref ? (
+    <div className="group relative min-w-0 overflow-hidden rounded-[1.25rem] p-[1px] shadow-xl transition-all duration-300 hover:shadow-[0_0_30px_rgba(6,182,212,0.35)]">
+      <div className="absolute inset-0 bg-gradient-to-r from-cyan-500 via-indigo-500 to-purple-600 opacity-90 transition-all duration-300 group-hover:opacity-100" />
+      <a
+        href={auctionHref}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="relative block w-full rounded-[19px] bg-[#0c0c0e]/95 px-4 py-4 text-center text-[11px] font-bold tracking-[0.14em] text-white uppercase transition-all duration-300 group-hover:bg-[#0c0c0e]/75 sm:px-6 sm:py-4.5 sm:text-xs sm:tracking-[0.25em]"
+      >
+        <span className="relative z-10 flex items-center justify-center gap-2.5">
+          <span className="h-2 w-2 shrink-0 rounded-full bg-cyan-400" />
+          Enter Live Auction
+        </span>
+      </a>
+    </div>
+  ) : auctionEnded ? (
+    <div className="rounded-[1.25rem] border border-white/[0.06] bg-[#0c0c0e]/40 p-4 text-center">
+      <span className="text-[10px] font-bold tracking-[0.2em] text-white/30 uppercase">
+        Auction Ended
+      </span>
+    </div>
+  ) : null;
+
+  const prizeBlock =
+    tournament.prizePool || tournament.prizeNotes ? (
+      <div className="min-w-0 rounded-2xl border border-white/[0.08] bg-[#0A0A0A]/80 p-4 shadow-2xl backdrop-blur-xl sm:p-5">
+        <p className="text-[10px] font-medium tracking-[0.2em] text-white/40 uppercase">
+          Prizepool
+        </p>
+        {tournament.prizePool ? (
+          <p className="mt-1.5 break-words font-display text-2xl font-black tracking-tight text-white drop-shadow-md sm:text-3xl">
+            ₹{Number(tournament.prizePool).toLocaleString("en-IN")}
+          </p>
+        ) : null}
+        {tournament.prizeNotes ? (
+          <p className="mt-2 text-[13px] leading-snug font-medium break-words text-white/50">
+            {tournament.prizeNotes}
+          </p>
+        ) : null}
+
+        {prizeSplit.length > 0 ? (
+          <div className="mt-3.5 border-t border-white/[0.06] pt-3.5">
+            <p className="mb-2 text-[10px] font-bold tracking-[0.2em] text-white/30 uppercase">
+              Prize Split
+            </p>
+            <div className="space-y-2">
+              {prizeSplit.map((row, i) => (
+                <div
+                  key={row.place}
+                  className="flex min-w-0 items-center justify-between gap-3"
+                >
+                  <span
+                    className={`flex min-w-0 items-center gap-2 text-[13px] font-medium ${splitColors[i] ?? "text-white/70"}`}
+                  >
+                    <span
+                      className={`flex h-5 w-5 shrink-0 items-center justify-center rounded text-[10px] font-bold ${splitBadgeColors[i] ?? "bg-white/10 text-white/70"}`}
+                    >
+                      {row.place}
+                    </span>
+                    <span className="truncate">{row.label}</span>
+                  </span>
+                  <span className="shrink-0 font-display text-sm font-bold text-white/90">
+                    ₹{row.amount.toLocaleString("en-IN")}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+        ) : null}
+      </div>
+    ) : null;
+
   // Warm the heavy bracket UI chunk while the user is still on Overview.
   useEffect(() => {
     void import("@/components/platform/tournament/TournamentBracket");
@@ -263,8 +351,8 @@ export default function TournamentDetailView({
 
   return (
     <article className="min-w-0 max-w-full overflow-x-clip pb-24">
-      <div className="relative mb-8 flex min-h-[18rem] flex-col justify-end overflow-hidden rounded-[1.5rem] border border-white/[0.08] p-5 shadow-2xl sm:mb-12 sm:min-h-[30rem] sm:rounded-[2rem] sm:p-8 md:p-12">
-        <div className="absolute inset-0 z-0">
+      <div className="relative mb-8 flex min-h-[18rem] flex-col justify-end isolate overflow-hidden rounded-[1.5rem] border border-white/[0.08] p-5 shadow-2xl sm:mb-12 sm:min-h-[30rem] sm:rounded-[2rem] sm:p-8 md:p-12">
+        <div className="absolute inset-0 z-0 overflow-hidden rounded-[inherit]">
           <Image
             src={posterSrc}
             alt=""
@@ -274,7 +362,7 @@ export default function TournamentDetailView({
             className="object-cover object-center opacity-80"
           />
         </div>
-        <div className="absolute inset-0 z-0 bg-gradient-to-t from-[#050505] via-[#050505]/60 to-transparent" />
+        <div className="absolute inset-0 z-0 rounded-[inherit] bg-gradient-to-t from-[#050505] via-[#050505]/60 to-transparent" />
 
         <div className="relative z-10 flex min-w-0 flex-col gap-4 sm:flex-row sm:items-end sm:justify-between sm:gap-6">
           <div className="flex min-w-0 flex-col items-start gap-3 sm:gap-4">
@@ -311,7 +399,7 @@ export default function TournamentDetailView({
 
       <div className="mb-8 min-w-0 border-b border-white/[0.08] pb-4 sm:mb-10">
         <div
-          className={`grid w-full gap-1 rounded-2xl border border-white/[0.06] bg-white/[0.03] p-1 sm:flex sm:w-fit sm:flex-wrap sm:items-center sm:gap-1.5 sm:p-1.5 ${
+          className={`grid w-full gap-1 overflow-hidden rounded-2xl border border-white/[0.06] bg-white/[0.03] p-1 sm:flex sm:w-fit sm:flex-wrap sm:items-center sm:gap-1.5 sm:p-1.5 ${
             showMatchesTab ? "grid-cols-4" : "grid-cols-2"
           }`}
         >
@@ -367,8 +455,8 @@ export default function TournamentDetailView({
       </div>
 
       {activeTab === "overview" ? (
-        <div className={`grid min-w-0 gap-10 sm:gap-12 lg:items-start ${isCompleted ? "lg:grid-cols-1" : "lg:grid-cols-[1fr_24rem]"}`}>
-          <div className="order-1 min-w-0 space-y-12 sm:space-y-16 lg:col-start-1 lg:row-start-1">
+        <div className={`grid min-w-0 gap-6 sm:gap-8 lg:items-start ${useSingleColOverview ? "lg:grid-cols-1" : "lg:grid-cols-[1fr_22rem]"}`}>
+          <div className="order-1 min-w-0 space-y-8 sm:space-y-10 lg:col-start-1 lg:row-start-1">
             {showResultsBlock ? (
               <section className="min-w-0 space-y-6 sm:space-y-8">
                 <div className="flex min-w-0 items-center gap-2 sm:gap-4">
@@ -387,15 +475,13 @@ export default function TournamentDetailView({
                 </div>
 
                 {showChampion && championData ? (
-                  <div className={isCompleted ? "max-w-7xl" : ""}>
-                    <TournamentChampionSection
-                      championData={championData}
-                      game={tournament.game}
-                      accentHex={meta.hex}
-                      mvp={mvp}
-                      allTeams={tournament.teamDetails}
-                    />
-                  </div>
+                  <TournamentChampionSection
+                    championData={championData}
+                    game={tournament.game}
+                    accentHex={meta.hex}
+                    mvp={mvp}
+                    allTeams={tournament.teamDetails}
+                  />
                 ) : null}
 
                 {showMvpOnly && !showChampion ? (
@@ -412,6 +498,16 @@ export default function TournamentDetailView({
               </section>
             ) : null}
 
+            {championsFullWidth ? (
+              <div className="grid min-w-0 gap-8 md:grid-cols-2">
+                <TournamentScheduleCard schedule={scheduleCard} />
+                <div className="min-w-0 space-y-8">
+                  {auctionBlock}
+                  {prizeBlock}
+                </div>
+              </div>
+            ) : null}
+
             {showRegistrationSection ? (
               <TournamentRegisterForm
                 layout="featured"
@@ -426,90 +522,23 @@ export default function TournamentDetailView({
                 coCaptainSlots={tournament.coCaptainSlots}
                 registrationProfileCard={registrationProfileCard ?? null}
                 userParticipantRole={tournament.userParticipantRole}
+                showAuctionRank={showAuctionRank}
+                tournamentGames={statsGames ?? publishedGames ?? null}
+                statsEligibility={statsEligibility ?? null}
               />
             ) : null}
           </div>
 
-          {!isCompleted && (
-            <aside className="order-2 min-w-0 space-y-8 lg:col-start-2 lg:row-span-2 lg:row-start-1">
+          {showMetaSidebar ? (
+            <aside className="order-2 min-w-0 space-y-4 lg:col-start-2 lg:row-span-2 lg:row-start-1">
               <TournamentScheduleCard schedule={scheduleCard} />
-
-            {auctionHref ? (
-              <div className="group relative min-w-0 overflow-hidden rounded-[1.25rem] p-[1px] shadow-xl transition-all duration-300 hover:shadow-[0_0_30px_rgba(6,182,212,0.35)]">
-                <div className="absolute inset-0 bg-gradient-to-r from-cyan-500 via-indigo-500 to-purple-600 opacity-90 transition-all duration-300 group-hover:opacity-100" />
-                
-                <a
-                  href={auctionHref}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="relative block w-full rounded-[19px] bg-[#0c0c0e]/95 px-4 py-4 text-center text-[11px] font-bold tracking-[0.14em] text-white uppercase transition-all duration-300 group-hover:bg-[#0c0c0e]/75 sm:px-6 sm:py-4.5 sm:text-xs sm:tracking-[0.25em]"
-                >
-                  <span className="relative z-10 flex items-center justify-center gap-2.5">
-                    <span className="h-2 w-2 shrink-0 rounded-full bg-cyan-400" />
-                    Enter Live Auction
-                  </span>
-                </a>
-              </div>
-            ) : auctionEnded ? (
-              <div className="rounded-[1.25rem] border border-white/[0.06] bg-[#0c0c0e]/40 p-4 text-center">
-                <span className="text-[10px] font-bold tracking-[0.2em] text-white/30 uppercase">
-                  Auction Ended
-                </span>
-              </div>
-            ) : null}
-
-            {(tournament.prizePool || tournament.prizeNotes) && (
-              <div className="min-w-0 rounded-[1.5rem] border border-white/[0.08] bg-[#0A0A0A]/80 p-5 shadow-2xl backdrop-blur-xl sm:p-8">
-                <p className="text-[10px] font-medium tracking-[0.2em] text-white/40 uppercase sm:tracking-[0.3em]">
-                  Prizepool
-                </p>
-                {tournament.prizePool ? (
-                  <p className="mt-2 break-words font-display text-3xl font-black tracking-tight text-white drop-shadow-md sm:text-4xl">
-                    ₹{Number(tournament.prizePool).toLocaleString("en-IN")}
-                  </p>
-                ) : null}
-                {tournament.prizeNotes ? (
-                  <p className="mt-3 text-sm leading-relaxed font-medium break-words text-white/50">
-                    {tournament.prizeNotes}
-                  </p>
-                ) : null}
-
-                {prizeSplit.length > 0 ? (
-                  <div className="mt-6 border-t border-white/[0.06] pt-6">
-                    <p className="mb-3 text-[10px] font-bold tracking-[0.2em] text-white/30 uppercase">
-                      Prize Split
-                    </p>
-                    <div className="space-y-3">
-                      {prizeSplit.map((row, i) => (
-                        <div
-                          key={row.place}
-                          className="flex min-w-0 items-center justify-between gap-3"
-                        >
-                          <span
-                            className={`flex min-w-0 items-center gap-2 text-sm font-medium ${splitColors[i] ?? "text-white/70"}`}
-                          >
-                            <span
-                              className={`flex h-5 w-5 shrink-0 items-center justify-center rounded text-[10px] font-bold ${splitBadgeColors[i] ?? "bg-white/10 text-white/70"}`}
-                            >
-                              {row.place}
-                            </span>
-                            <span className="truncate">{row.label}</span>
-                          </span>
-                          <span className="shrink-0 font-display font-bold text-white/90">
-                            ₹{row.amount.toLocaleString("en-IN")}
-                          </span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                ) : null}
-              </div>
-            )}
-          </aside>
-          )}
+              {auctionBlock}
+              {prizeBlock}
+            </aside>
+          ) : null}
 
           {showTeams ? (
-            <div className="order-3 min-w-0 lg:col-start-1 lg:row-start-2">
+            <div className={`order-3 min-w-0 ${showMetaSidebar ? "lg:col-start-1 lg:row-start-2" : ""}`}>
               <TournamentTeamsList
                 teams={tournament.teams}
                 teamDetails={tournament.teamDetails}

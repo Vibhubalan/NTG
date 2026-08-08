@@ -83,6 +83,15 @@ function mvpDataToPlayerView(mvp: MvpData): TournamentTeamPlayerView {
   };
 }
 
+function chunkRows<T>(items: T[], size: number): T[][] {
+  if (size <= 0) return [items];
+  const rows: T[][] = [];
+  for (let i = 0; i < items.length; i += size) {
+    rows.push(items.slice(i, i + size));
+  }
+  return rows;
+}
+
 function RosterPlayerCard({
   player,
   game,
@@ -100,7 +109,7 @@ function RosterPlayerCard({
 
   return (
     <li
-      className={`group relative aspect-[268/640] w-[100px] shrink-0 overflow-hidden rounded-2xl border-2 transition-[border-color,box-shadow] duration-300 sm:w-[155px] md:w-[180px] ${
+      className={`group relative aspect-[268/640] w-full max-w-[92px] shrink-0 overflow-hidden rounded-xl border-2 transition-[border-color,box-shadow] duration-300 sm:w-[140px] sm:max-w-none sm:rounded-2xl md:w-[160px] lg:w-[180px] ${
         isMvp
           ? "border-violet-400/60 shadow-[0_0_20px_rgba(139,92,246,0.3)] hover:border-violet-300 hover:shadow-[0_0_52px_rgba(139,92,246,0.7)]"
           : "border-amber-500/40 shadow-[0_0_16px_rgba(245,158,11,0.12)] hover:border-amber-400/75 hover:shadow-[0_0_44px_rgba(245,158,11,0.4)]"
@@ -122,9 +131,9 @@ function RosterPlayerCard({
       <div className="absolute inset-0 bg-gradient-to-t from-black via-black/55 to-transparent" />
 
       {isMvp ? (
-        <div className="absolute left-3 top-3 z-20 sm:left-4 sm:top-4">
-          <span className="inline-flex items-center gap-1 rounded-full border border-violet-300/40 bg-violet-600/90 px-2 py-0.5 text-[8px] font-black uppercase tracking-[0.18em] text-white shadow-[0_0_16px_rgba(139,92,246,0.6)] sm:px-2.5 sm:py-1 sm:text-[9px]">
-            <svg className="h-2.5 w-2.5 sm:h-3 sm:w-3" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
+        <div className="absolute left-1.5 top-1.5 z-20 sm:left-4 sm:top-4">
+          <span className="inline-flex items-center gap-0.5 rounded-full border border-violet-300/40 bg-violet-600/90 px-1.5 py-0.5 text-[7px] font-black uppercase tracking-[0.14em] text-white shadow-[0_0_16px_rgba(139,92,246,0.6)] sm:gap-1 sm:px-2.5 sm:py-1 sm:text-[9px] sm:tracking-[0.18em]">
+            <svg className="h-2 w-2 sm:h-3 sm:w-3" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
               <path d="M12 2l2.4 7.4H22l-6 4.6 2.3 7-6.3-4.6L5.7 21l2.3-7-6-4.6h7.6L12 2z" />
             </svg>
             MVP
@@ -132,24 +141,24 @@ function RosterPlayerCard({
         </div>
       ) : null}
 
-      <div className="relative z-10 flex h-full flex-col items-center justify-end p-2 text-center sm:p-4">
+      <div className="relative z-10 flex h-full flex-col items-center justify-end p-1.5 text-center sm:p-4">
         {isValorant && rankIcon ? (
-          <div className="mb-2 flex h-10 w-10 items-center justify-center sm:mb-3 sm:h-14 sm:w-14">
+          <div className="mb-1 flex h-7 w-7 items-center justify-center sm:mb-3 sm:h-14 sm:w-14">
             <img src={rankIcon} alt="" className="h-full w-full object-contain drop-shadow-md" />
           </div>
         ) : null}
 
-        <h3 className="max-w-full truncate font-display text-[10px] font-black leading-tight text-white drop-shadow-md sm:text-base">
+        <h3 className="max-w-full truncate font-display text-[9px] font-black leading-tight text-white drop-shadow-md sm:text-base">
           {player.displayName}
         </h3>
         {secondary ? (
-          <p className="mt-0.5 max-w-full truncate text-[7px] font-medium text-white/50 sm:mt-1 sm:text-[10px]">
+          <p className="mt-0.5 hidden max-w-full truncate text-[10px] font-medium text-white/50 sm:mt-1 sm:block">
             {secondary}
           </p>
         ) : null}
 
         <span
-          className="mt-2 rounded-full border px-2 py-0.5 text-[7px] font-black uppercase tracking-widest sm:mt-3 sm:px-3 sm:py-1 sm:text-[9px]"
+          className="mt-1 rounded-full border px-1.5 py-0.5 text-[6px] font-black uppercase tracking-wider sm:mt-3 sm:px-3 sm:py-1 sm:text-[9px] sm:tracking-widest"
           style={{
             background: isMvp ? "#a78bfa22" : `${badge.color}22`,
             color: isMvp ? "#ddd6fe" : badge.color,
@@ -194,49 +203,69 @@ export default function TournamentChampionSection({
       : null;
 
   return (
-    <section className="relative min-w-0 overflow-x-clip rounded-[1.75rem] border border-white/10 bg-[#06080f]/95 p-4 shadow-[0_40px_100px_-50px_rgba(0,0,0,0.9)] sm:rounded-[2.5rem] sm:p-10 lg:p-12">
+    <section className="relative isolate min-w-0 overflow-hidden rounded-2xl border border-white/10 bg-[#06080f]/95 p-3 shadow-[0_40px_100px_-50px_rgba(0,0,0,0.9)] sm:rounded-[2.5rem] sm:p-10 lg:p-12">
       <div className="pointer-events-none absolute -left-[15%] -top-[35%] h-[70%] w-[55%] rounded-full bg-amber-500/15 blur-[130px]" />
       <div className="pointer-events-none absolute -bottom-[35%] -right-[15%] h-[70%] w-[55%] rounded-full bg-violet-600/15 blur-[130px]" />
 
-      <div className="relative z-10 flex min-w-0 flex-col items-center px-1 text-center sm:px-6">
-        <p className="text-[10px] font-black tracking-[0.16em] text-amber-300/80 uppercase sm:text-xs sm:tracking-[0.28em]">
+      <div className="relative z-10 flex min-w-0 flex-col items-center px-0.5 text-center sm:px-6">
+        <p className="text-[9px] font-black tracking-[0.14em] text-amber-300/80 uppercase sm:text-xs sm:tracking-[0.28em]">
           Tournament Champions
         </p>
 
-        <h2 className="mt-3 max-w-full break-words font-display text-[clamp(1.75rem,8vw,5rem)] font-black uppercase leading-[0.92] tracking-tight text-transparent bg-clip-text bg-gradient-to-b from-amber-100 via-white to-amber-200/75">
+        <h2 className="mt-1.5 max-w-full break-words font-display text-[clamp(1.45rem,7.5vw,5rem)] font-black uppercase leading-[0.92] tracking-tight text-transparent bg-clip-text bg-gradient-to-b from-amber-100 via-white to-amber-200/75 sm:mt-3">
           {championTeam.name}
         </h2>
 
         {runnerUpTeam ? (
-          <p className="mt-4 max-w-full break-words px-1 text-[10px] font-medium tracking-[0.12em] text-white/40 uppercase sm:tracking-[0.18em]">
+          <p className="mt-2 max-w-full break-words px-1 text-[9px] font-medium tracking-[0.1em] text-white/40 uppercase sm:mt-4 sm:text-[10px] sm:tracking-[0.18em]">
             Runner up · {runnerUpTeam.name}
           </p>
         ) : null}
 
         {players.length > 0 ? (
-          <div className="mt-10 w-full max-w-6xl">
-            <p className="mb-5 text-[10px] font-bold uppercase tracking-[0.22em] text-white/40">
+          <div className="mt-5 w-full sm:mt-10">
+            <p className="mb-2.5 text-[9px] font-bold uppercase tracking-[0.18em] text-white/40 sm:mb-5 sm:text-[10px] sm:tracking-[0.22em]">
               Championship Roster
             </p>
-            <ul className="flex flex-wrap items-end justify-center gap-3 py-2 sm:gap-5">
-              {players.map((player) => (
-                <RosterPlayerCard
-                  key={player.id}
-                  player={player}
-                  game={game}
-                  isMvp={isMvpPlayer(player, mvpObj)}
-                />
+            {/* Mobile: 3 per row, centered leftovers */}
+            <div className="space-y-2 sm:hidden">
+              {chunkRows(players, 3).map((row, rowIdx) => (
+                <ul key={`m-${rowIdx}`} className="flex justify-center gap-2">
+                  {row.map((player) => (
+                    <RosterPlayerCard
+                      key={player.id}
+                      player={player}
+                      game={game}
+                      isMvp={isMvpPlayer(player, mvpObj)}
+                    />
+                  ))}
+                </ul>
               ))}
-            </ul>
+            </div>
+            {/* Desktop: 5 per row, centered leftovers on the next line */}
+            <div className="hidden space-y-5 sm:block">
+              {chunkRows(players, 5).map((row, rowIdx) => (
+                <ul key={`d-${rowIdx}`} className="flex justify-center gap-3 md:gap-5">
+                  {row.map((player) => (
+                    <RosterPlayerCard
+                      key={player.id}
+                      player={player}
+                      game={game}
+                      isMvp={isMvpPlayer(player, mvpObj)}
+                    />
+                  ))}
+                </ul>
+              ))}
+            </div>
           </div>
         ) : null}
 
         {standaloneMvpPlayer ? (
-          <div className="mt-10 w-full max-w-6xl">
-            <p className="mb-5 text-[10px] font-bold uppercase tracking-[0.22em] text-violet-200/70">
+          <div className="mt-5 w-full max-w-6xl sm:mt-10">
+            <p className="mb-2.5 text-[9px] font-bold uppercase tracking-[0.18em] text-violet-200/70 sm:mb-5 sm:text-[10px] sm:tracking-[0.22em]">
               Tournament MVP
             </p>
-            <ul className="flex flex-wrap items-end justify-center gap-3 py-2 sm:gap-5">
+            <ul className="flex flex-wrap items-end justify-center gap-2 py-1 sm:gap-5 sm:py-2">
               <RosterPlayerCard player={standaloneMvpPlayer} game={game} isMvp />
             </ul>
           </div>

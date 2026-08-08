@@ -233,10 +233,11 @@ export default function TournamentStatsSection({
 
   const sortChips: { field: SortField; label: string }[] = [
     { field: "rating", label: "Rating" },
-    { field: "mvpCount", label: "MVP" },
     { field: "avgAcs", label: "ACS" },
     { field: "kd", label: "K/D" },
     { field: "totalKills", label: "KDA" },
+    { field: "totalFirstKills", label: "FK" },
+    { field: "totalFirstDeaths", label: "FD" },
   ];
 
   return (
@@ -250,7 +251,7 @@ export default function TournamentStatsSection({
           {(
             [
               { id: "players" as const, label: "Players" },
-              { id: "meta" as const, label: "Meta" },
+              { id: "meta" as const, label: "Maps & Agents" },
             ] as const
           ).map((tab) => (
             <button
@@ -259,7 +260,7 @@ export default function TournamentStatsSection({
               role="tab"
               aria-selected={subTab === tab.id}
               onClick={() => setSubTab(tab.id)}
-              className={`min-w-[5.5rem] rounded-lg px-4 py-2.5 text-[11px] font-black tracking-[0.14em] uppercase transition-all ${
+              className={`min-w-[5.5rem] rounded-lg px-4 py-2.5 text-[11px] font-black tracking-[0.14em] uppercase transition-all sm:min-w-[7.5rem] ${
                 subTab === tab.id
                   ? "bg-emerald-400 text-[#070a12] shadow-[0_0_16px_rgba(52,211,153,0.35)]"
                   : "bg-transparent text-white/50 hover:bg-white/[0.06] hover:text-white/80"

@@ -74,6 +74,14 @@ function computeMatchY(rounds: BracketRoundView[]): Record<string, number> {
           } else {
             computedY[match.id] = destY + defaultH / 2;
           }
+        } else if (
+          destMatch.player1PrereqMatchId === match.id ||
+          destMatch.player2PrereqMatchId === match.id
+        ) {
+          // Single feeder (bye on the other slot): sit on the dest match band,
+          // slightly toward the slot that receives this winner.
+          const intoSlot1 = destMatch.player1PrereqMatchId === match.id;
+          computedY[match.id] = destY + (intoSlot1 ? -defaultH / 4 : defaultH / 4);
         } else {
           computedY[match.id] = destY;
         }
@@ -95,6 +103,97 @@ function findMatchCoords(rounds: BracketRoundView[], matchId: string) {
     }
   }
   return null;
+}
+
+/**
+ * Resolve which previous-round match feeds each slot of a destination match.
+ * Prefer Challonge prereq IDs when they resolve in this bracket; otherwise infer
+ * from winner name in the slot. Classic 2× pairing only when prev is twice dest.
+ * Equal counts (e.g. losers 1→1) get a single same-side advance line. Never invent
+ * a second feeder for bye rounds via 2×i pairing.
+ */
+function resolveFeeders(
+  prevRound: BracketRoundView | null | undefined,
+  destMatch: BracketMatchView,
+  destMatchIndex: number,
+  destMatchCount: number,
+  allRounds: BracketRoundView[],
+): { slot1Id?: string; slot2Id?: string } {
+  if (!prevRound?.matches.length) return {};
+
+  const resolveId = (raw: string | null | undefined): string | undefined => {
+    if (!raw) return undefined;
+    return findMatchCoords(allRounds, raw) ? raw : undefined;
+  };
+
+  const byWinnerInSlot = (slotIndex: 0 | 1): string | undefined => {
+    const slotName = destMatch.slots[slotIndex]?.name?.trim().toLowerCase();
+    if (!slotName || slotName === "tbd") return undefined;
+    for (const prev of prevRound.matches) {
+      const winner = prev.slots.find((s) => s.isWinner);
+      const winnerName = (winner?.name ?? "").trim().toLowerCase();
+      if (winnerName && winnerName === slotName) return prev.id;
+      // Pending / unfinished: also accept if the team simply played in that match
+      if (
+        prev.slots.some((s) => (s.name ?? "").trim().toLowerCase() === slotName)
+      ) {
+        return prev.id;
+      }
+    }
+    return undefined;
+  };
+
+  let slot1Id = resolveId(destMatch.player1PrereqMatchId) ?? byWinnerInSlot(0);
+  let slot2Id = resolveId(destMatch.player2PrereqMatchId) ?? byWinnerInSlot(1);
+
+  const prevCount = prevRound.matches.length;
+  if (prevCount === destMatchCount * 2) {
+    // Classic single-elim pairing (4→2→1)
+    slot1Id = slot1Id ?? prevRound.matches[2 * destMatchIndex]?.id;
+    slot2Id = slot2Id ?? prevRound.matches[2 * destMatchIndex + 1]?.id;
+  } else if (prevCount === destMatchCount) {
+    // Same-size advance (common in losers: L2→L3 both have 1 match).
+    // Other slot is usually a winners drop — don't invent a second feeder.
+    const prevId = prevRound.matches[destMatchIndex]?.id;
+    if (prevId && slot1Id !== prevId && slot2Id !== prevId) {
+      const p1raw = destMatch.player1PrereqMatchId;
+      const p2raw = destMatch.player2PrereqMatchId;
+      if (!slot1Id && !slot2Id) {
+        // If Challonge marked only one slot as having a prereq, the empty
+        // raw slot is the same-side advance; otherwise default to slot 1.
+        if (p1raw && !p2raw) slot2Id = prevId;
+        else if (p2raw && !p1raw) slot1Id = prevId;
+        else slot1Id = prevId;
+      } else if (!slot1Id) {
+        slot1Id = prevId;
+      } else if (!slot2Id) {
+        slot2Id = prevId;
+      }
+    }
+  }
+
+  // Same source must not feed both slots of one match
+  if (slot1Id && slot2Id && slot1Id === slot2Id) {
+    // Keep the slot that actually has that winner's name
+    const w = prevRound.matches
+      .find((m) => m.id === slot1Id)
+      ?.slots.find((s) => s.isWinner)
+      ?.name?.trim()
+      .toLowerCase();
+    const s1 = destMatch.slots[0]?.name?.trim().toLowerCase();
+    const s2 = destMatch.slots[1]?.name?.trim().toLowerCase();
+    if (w && s1 === w) slot2Id = undefined;
+    else if (w && s2 === w) slot1Id = undefined;
+    else slot1Id = undefined;
+  }
+
+  return { slot1Id, slot2Id };
+}
+
+/** Attach feeder lines to the top/bottom slot of the destination card, not the midpoint. */
+function destSlotCenterY(destMatchCenterY: number, isSlot1: boolean): number {
+  const slotOffset = CARD_H / 4;
+  return isSlot1 ? destMatchCenterY - slotOffset : destMatchCenterY + slotOffset;
 }
 
 function getBracketSectionHeight(rounds: BracketRoundView[], computedY: Record<string, number>) {
@@ -126,32 +225,34 @@ function MatchCard({
 
   return (
     <div
-      className={`relative select-none overflow-hidden rounded-xl border border-white/[0.08] bg-[#0c101b] shadow-xl transition-all duration-300 hover:border-white/20 ${
+      className={`relative isolate select-none overflow-hidden rounded-xl border border-white/[0.08] bg-[#0c101b] shadow-xl transition-all duration-300 hover:border-white/20 ${
         fluid ? "w-full" : ""
       }`}
       style={{
         width: fluid ? undefined : CARD_W,
         height: CARD_H,
         opacity: dim ? 0.45 : 1,
+        // Extra clip so winner score fills can't paint past the card radius
+        clipPath: "inset(0 round 0.75rem)",
       }}
     >
       {/* Horizontal divider between slots */}
       <div className="absolute left-2 right-8 top-[38px] h-px bg-white/[0.06]" />
 
-      {/* Slots wrapper */}
-      <div className="flex h-full flex-col">
+      {/* Slots wrapper — clip score paints to the card radius */}
+      <div className="flex h-full flex-col overflow-hidden rounded-[inherit]">
         {match.slots.map((slot, idx) => {
           const winner = !pending && slot.isWinner;
           return (
             <div key={idx} className="relative flex h-[38px] items-center pl-2.5 pr-0">
               {/* Seed pill */}
-              <span className="flex h-[16px] w-[16px] shrink-0 items-center justify-center rounded bg-white/[0.06] text-[8px] font-bold text-white/40 tabular-nums mr-1.5">
+              <span className="mr-1.5 flex h-[16px] w-[16px] shrink-0 items-center justify-center rounded bg-white/[0.06] text-[8px] font-bold text-white/40 tabular-nums">
                 {slot.seed ?? "·"}
               </span>
 
               {/* Team name */}
               <span
-                className={`min-w-0 flex-1 text-[10px] sm:text-[11px] leading-snug uppercase tracking-wide pr-1.5 line-clamp-2 ${
+                className={`min-w-0 flex-1 pr-1.5 text-[10px] leading-snug tracking-wide uppercase line-clamp-2 sm:text-[11px] ${
                   winner
                     ? "font-extrabold text-white"
                     : pending
@@ -163,11 +264,9 @@ function MatchCard({
                 {slot.name || "TBD"}
               </span>
 
-              {/* Score Box */}
+              {/* Score box — no own radius; parent overflow clips to card corners */}
               <div
-                className={`flex h-full w-8 shrink-0 items-center justify-center text-xs sm:text-sm font-black tabular-nums ${
-                  idx === 0 ? "rounded-tr-xl" : "rounded-br-xl"
-                } ${
+                className={`flex h-full w-8 shrink-0 items-center justify-center text-xs font-black tabular-nums sm:text-sm ${
                   winner ? "bg-[#22c55e] text-[#070a12]" : "bg-white/[0.04] text-white/30"
                 }`}
               >
@@ -194,65 +293,76 @@ function Connectors({
 }) {
   const svgW = rounds.length * (CARD_W + COL_GAP) - COL_GAP;
   const lines: React.ReactNode[] = [];
+  const drawn = new Set<string>();
+
+  const pushLine = (
+    keySuffix: string,
+    srcX: number,
+    srcCY: number,
+    midX: number,
+    endY: number,
+    destX: number,
+  ) => {
+    lines.push(
+      <path
+        key={`glow-${keySuffix}`}
+        d={`M ${srcX} ${srcCY} H ${midX} V ${endY} H ${destX}`}
+        fill="none"
+        stroke="#22c55e"
+        strokeWidth={4}
+        opacity={0.15}
+      />,
+      <path
+        key={`line-${keySuffix}`}
+        d={`M ${srcX} ${srcCY} H ${midX} V ${endY} H ${destX}`}
+        fill="none"
+        stroke="#22c55e"
+        strokeWidth={2}
+        opacity={0.85}
+      />,
+    );
+  };
 
   rounds.forEach((round, ci) => {
+    if (ci === 0) return;
+    const prevRound = rounds[ci - 1];
+
     round.matches.forEach((match, mi) => {
       const destCY = computedY[match.id] ?? 0;
       const destX = ci * (CARD_W + COL_GAP);
+      const { slot1Id, slot2Id } = resolveFeeders(
+        prevRound,
+        match,
+        mi,
+        round.matches.length,
+        rounds,
+      );
 
-      const checkPrereq = (
-        prereqId: string | null | undefined,
-        isSlot1: boolean,
-        fallbackMatchId?: string,
-      ) => {
-        let targetId = prereqId || fallbackMatchId;
-        let src = targetId ? findMatchCoords(rounds, targetId) : null;
-
-        if (!src && fallbackMatchId) {
-          targetId = fallbackMatchId;
-          src = findMatchCoords(rounds, targetId);
-        }
-
-        if (!src || !targetId) return;
+      ([
+        [slot1Id, true],
+        [slot2Id, false],
+      ] as const).forEach(([targetId, isSlot1]) => {
+        if (!targetId) return;
+        // One outgoing line per source match (avoids double-draw / wrong merge)
+        const dedupe = `${targetId}->${match.id}`;
+        if (drawn.has(dedupe)) return;
+        const src = findMatchCoords(rounds, targetId);
+        if (!src) return;
+        drawn.add(dedupe);
 
         const srcX = src.col * (CARD_W + COL_GAP) + CARD_W;
         const srcCY = computedY[targetId] ?? 0;
         const midX = srcX + (destX - srcX) / 2;
-
-        const keySuffix = `${match.id}-${targetId}-${isSlot1 ? "s1" : "s2"}`;
-
-        lines.push(
-          <path
-            key={`glow-${keySuffix}`}
-            d={`M ${srcX} ${srcCY} H ${midX} V ${destCY} H ${destX}`}
-            fill="none"
-            stroke="#22c55e"
-            strokeWidth={4}
-            opacity={0.15}
-          />,
-          <path
-            key={`line-${keySuffix}`}
-            d={`M ${srcX} ${srcCY} H ${midX} V ${destCY} H ${destX}`}
-            fill="none"
-            stroke="#22c55e"
-            strokeWidth={2}
-            opacity={0.85}
-          />,
+        const endY = destSlotCenterY(destCY, isSlot1);
+        pushLine(
+          `${match.id}-${targetId}-${isSlot1 ? "s1" : "s2"}`,
+          srcX,
+          srcCY,
+          midX,
+          endY,
+          destX,
         );
-      };
-
-      const prevRound = ci > 0 ? rounds[ci - 1] : null;
-      const fallbackP1Id =
-        prevRound && round.side !== "losers"
-          ? prevRound.matches[2 * mi]?.id
-          : undefined;
-      const fallbackP2Id =
-        prevRound && round.side !== "losers"
-          ? prevRound.matches[2 * mi + 1]?.id
-          : undefined;
-
-      checkPrereq(match.player1PrereqMatchId, true, fallbackP1Id);
-      checkPrereq(match.player2PrereqMatchId, false, fallbackP2Id);
+      });
     });
   });
 
@@ -898,6 +1008,63 @@ function UnifiedConnectors({
   const winnersRounds = rounds.filter((r) => r.side === "winners");
   const losersRounds = rounds.filter((r) => r.side === "losers");
   const lines: React.ReactNode[] = [];
+  const drawn = new Set<string>();
+
+  const pushLine = (
+    keySuffix: string,
+    srcX: number,
+    srcCY: number,
+    midX: number,
+    endY: number,
+    destX: number,
+  ) => {
+    lines.push(
+      <path
+        key={`glow-${keySuffix}`}
+        d={`M ${srcX} ${srcCY} H ${midX} V ${endY} H ${destX}`}
+        fill="none"
+        stroke="#22c55e"
+        strokeWidth={4}
+        opacity={0.15}
+      />,
+      <path
+        key={`line-${keySuffix}`}
+        d={`M ${srcX} ${srcCY} H ${midX} V ${endY} H ${destX}`}
+        fill="none"
+        stroke="#22c55e"
+        strokeWidth={2}
+        opacity={0.85}
+      />,
+    );
+  };
+
+  const drawSlot = (
+    match: BracketMatchView,
+    targetId: string | undefined,
+    isSlot1: boolean,
+    destCY: number,
+    destX: number,
+  ) => {
+    if (!targetId) return;
+    const dedupe = `${targetId}->${match.id}`;
+    if (drawn.has(dedupe)) return;
+    const srcPos = posMap[targetId];
+    if (!srcPos) return;
+    drawn.add(dedupe);
+
+    const srcX = srcPos.col * (CARD_W + COL_GAP) + CARD_W;
+    const srcCY = srcPos.cy;
+    const midX = srcX + (destX - srcX) / 2;
+    const endY = destSlotCenterY(destCY, isSlot1);
+    pushLine(
+      `${match.id}-${targetId}-${isSlot1 ? "s1" : "s2"}`,
+      srcX,
+      srcCY,
+      midX,
+      endY,
+      destX,
+    );
+  };
 
   rounds.forEach((round) => {
     round.matches.forEach((match, mi) => {
@@ -906,64 +1073,50 @@ function UnifiedConnectors({
       const destCY = destPos.cy;
       const destX = destPos.col * (CARD_W + COL_GAP);
 
-      const checkPrereq = (
-        prereqId: string | null | undefined,
-        isSlot1: boolean,
-        fallbackMatchId?: string,
-      ) => {
-        let targetId = prereqId || fallbackMatchId;
-        let srcPos = targetId ? posMap[targetId] : null;
-
-        if (!srcPos && fallbackMatchId) {
-          targetId = fallbackMatchId;
-          srcPos = targetId ? posMap[targetId] : null;
-        }
-
-        if (!srcPos || !targetId) return;
-
-        const srcX = srcPos.col * (CARD_W + COL_GAP) + CARD_W;
-        const srcCY = srcPos.cy;
-        const midX = srcX + (destX - srcX) / 2;
-
-        const keySuffix = `${match.id}-${targetId}-${isSlot1 ? "s1" : "s2"}`;
-
-        lines.push(
-          <path
-            key={`glow-${keySuffix}`}
-            d={`M ${srcX} ${srcCY} H ${midX} V ${destCY} H ${destX}`}
-            fill="none"
-            stroke="#22c55e"
-            strokeWidth={4}
-            opacity={0.15}
-          />,
-          <path
-            key={`line-${keySuffix}`}
-            d={`M ${srcX} ${srcCY} H ${midX} V ${destCY} H ${destX}`}
-            fill="none"
-            stroke="#22c55e"
-            strokeWidth={2}
-            opacity={0.85}
-          />,
-        );
-      };
-
       if (round.side === "final") {
         const fallbackP1Id = winnersRounds[winnersRounds.length - 1]?.matches[0]?.id;
         const fallbackP2Id = losersRounds[losersRounds.length - 1]?.matches[0]?.id;
-        checkPrereq(match.player1PrereqMatchId, true, fallbackP1Id);
-        checkPrereq(match.player2PrereqMatchId, false, fallbackP2Id);
-      } else {
-        const prevRoundSameSide =
-          round.side === "winners"
-            ? winnersRounds[winnersRounds.indexOf(round) - 1]
-            : losersRounds[losersRounds.indexOf(round) - 1];
-
-        const fallbackP1Id = prevRoundSameSide?.matches[2 * mi]?.id;
-        const fallbackP2Id = prevRoundSameSide?.matches[2 * mi + 1]?.id;
-
-        checkPrereq(match.player1PrereqMatchId, true, fallbackP1Id);
-        checkPrereq(match.player2PrereqMatchId, false, fallbackP2Id);
+        const slot1 =
+          (match.player1PrereqMatchId && posMap[match.player1PrereqMatchId]
+            ? match.player1PrereqMatchId
+            : undefined) ?? fallbackP1Id;
+        const slot2 =
+          (match.player2PrereqMatchId && posMap[match.player2PrereqMatchId]
+            ? match.player2PrereqMatchId
+            : undefined) ?? fallbackP2Id;
+        drawSlot(match, slot1, true, destCY, destX);
+        drawSlot(match, slot2, false, destCY, destX);
+        return;
       }
+
+      const prevRoundSameSide =
+        round.side === "winners"
+          ? winnersRounds[winnersRounds.indexOf(round) - 1]
+          : losersRounds[losersRounds.indexOf(round) - 1];
+
+      const { slot1Id, slot2Id } = resolveFeeders(
+        prevRoundSameSide,
+        match,
+        mi,
+        round.matches.length,
+        rounds,
+      );
+
+      // Prefer resolved feeders; if Challonge prereq IDs exist in the layout,
+      // use them even when not in the previous same-side round (e.g. drop-downs).
+      const p1 =
+        slot1Id ??
+        (match.player1PrereqMatchId && posMap[match.player1PrereqMatchId]
+          ? match.player1PrereqMatchId
+          : undefined);
+      const p2 =
+        slot2Id ??
+        (match.player2PrereqMatchId && posMap[match.player2PrereqMatchId]
+          ? match.player2PrereqMatchId
+          : undefined);
+
+      drawSlot(match, p1, true, destCY, destX);
+      drawSlot(match, p2, false, destCY, destX);
     });
   });
 

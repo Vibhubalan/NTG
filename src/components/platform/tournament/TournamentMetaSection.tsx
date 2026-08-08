@@ -519,7 +519,7 @@ export default function TournamentMetaSection({ games, eligibility }: Props) {
                               <p className="text-xs italic text-white/30">No comp data recorded</p>
                             ) : (
                               <div className="space-y-2">
-                                {m.comps.slice(0, 2).map((c) => (
+                                {m.comps.map((c) => (
                                   <div
                                     key={c.key}
                                     className="flex items-center justify-between gap-2 rounded-lg bg-black/40 p-2 ring-1 ring-white/[0.06]"

@@ -8,6 +8,7 @@ import RegistrationTermsAgreement from "@/components/platform/RegistrationTermsA
 import ValorantRegistrationProfileCard from "@/components/platform/tournament/ValorantRegistrationProfileCard";
 import { profileRequirementFix } from "@/lib/profile-requirements";
 import type { ValorantRegistrationProfileCard as ValorantRegistrationProfileCardData } from "@core/contracts/registration-profile";
+import type { StatsGame, TournamentStatsEligibility } from "@/lib/tournament-stats";
 
 export type RegistrationPreview = {
   displayName: string | null;
@@ -40,6 +41,10 @@ type Props = {
   layout?: "sidebar" | "featured";
   registrationProfileCard?: ValorantRegistrationProfileCardData | null;
   userParticipantRole?: "CAPTAIN" | "CO_CAPTAIN" | "PLAYER" | null;
+  /** Auction rank is only relevant until the auction ends / cup goes live. */
+  showAuctionRank?: boolean;
+  tournamentGames?: StatsGame[] | null;
+  statsEligibility?: TournamentStatsEligibility | null;
 };
 
 type Step = "role" | "captain" | "confirm" | "switch-captain";
@@ -59,10 +64,12 @@ function RegisterShell({
 }) {
   if (layout === "featured") {
     return (
-      <section className="relative min-w-0 overflow-hidden rounded-2xl border border-white/[0.08] bg-gradient-to-br from-[#080e1c]/98 via-[#0c1428]/95 to-[#140a20]/98 p-3 shadow-[0_16px_48px_-20px_rgba(0,0,0,0.75)] sm:p-6">
-        <div className="pointer-events-none absolute -top-20 -right-20 h-48 w-48 rounded-full bg-[var(--color-brand)]/8 blur-3xl" />
-        <div className="relative min-w-0">
-          <div className="mb-3 border-b border-white/[0.06] pb-3 sm:mb-4 sm:min-h-[4.75rem] sm:pb-4">
+      <section className="relative isolate min-w-0 overflow-hidden rounded-2xl border border-white/[0.08] bg-gradient-to-br from-[#080e1c]/98 via-[#0c1428]/95 to-[#140a20]/98 p-3.5 shadow-[0_16px_48px_-20px_rgba(0,0,0,0.75)] sm:p-5">
+        <div className="pointer-events-none absolute inset-0 overflow-hidden rounded-[inherit]">
+          <div className="absolute -top-20 -right-20 h-40 w-40 rounded-full bg-[var(--color-brand)]/8 blur-3xl" />
+        </div>
+        <div className="relative z-10 min-w-0">
+          <div className="mb-3 border-b border-white/[0.06] pb-2.5 sm:mb-3.5 sm:pb-3">
             <p className="text-[10px] font-bold tracking-[0.16em] text-[var(--color-brand)] uppercase sm:tracking-[0.32em]">
               {eyebrow}
             </p>
@@ -177,6 +184,9 @@ export default function TournamentRegisterForm({
   layout = "sidebar",
   registrationProfileCard = null,
   userParticipantRole = null,
+  showAuctionRank = false,
+  tournamentGames = null,
+  statsEligibility = null,
 }: Props) {
   const router = useRouter();
   const submitting = useRef(false);
@@ -297,9 +307,15 @@ export default function TournamentRegisterForm({
     const showSwitchForm = step === "switch-captain";
 
     return (
-      <RegisterShell layout={layout} eyebrow="Registration" title="You're in" subtitle="See you on match day.">
+      <RegisterShell layout={layout} eyebrow="Registration" title="You're in">
         {game === "VALORANT" && profileCard ? (
-          <ValorantRegistrationProfileCard profile={profileCard} />
+          <ValorantRegistrationProfileCard
+            profile={profileCard}
+            showAuctionRank={showAuctionRank}
+            games={tournamentGames}
+            statsEligibility={statsEligibility}
+            participantRole={effectiveRole}
+          />
         ) : (
           <div className="rounded-2xl border border-[var(--color-brand)]/25 bg-[var(--color-brand)]/[0.08] px-6 py-8 text-center">
             <p className="font-display text-2xl font-bold text-white">Registered</p>
