@@ -636,6 +636,10 @@ model PlayerBadge {
   userId       String
   user         User        @relation(fields: [userId], references: [id], onDelete: Cascade)
   label        String
+  /** PLACEMENT = cup winner/runner-up; CUSTOM = unique fun/role awards. */
+  kind         String      @default("PLACEMENT")
+  /** Preset icon key for CUSTOM badges (e.g. best_initiator). */
+  iconKey      String?
   tournamentId String?
   tournament   Tournament? @relation(fields: [tournamentId], references: [id], onDelete: SetNull)
   awardedAt    DateTime    @default(now())
@@ -643,6 +647,7 @@ model PlayerBadge {
 
   @@unique([userId, tournamentId, label])
   @@index([userId])
+  @@index([kind, iconKey])
 }
 
 model LeaderboardEntry {

@@ -7,7 +7,11 @@ export type {
   TournamentTeamView,
   TournamentTeamPlayerView,
 } from "./tournament-detail";
-export type { LeaderboardPreview, LeaderboardPreviewEntry } from "./leaderboard-preview";
+export type {
+  LeaderboardPreview,
+  LeaderboardPreviewEntry,
+  LeaderboardPreviewBadge,
+} from "./leaderboard-preview";
 export type { PublicProfile, PublicGameIdentity } from "./profile-public";
 export type { RegistrationResult } from "./registration";
 export type { ValorantRegistrationProfileCard } from "./registration-profile";

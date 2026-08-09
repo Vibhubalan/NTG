@@ -3,6 +3,7 @@
 import Image from "next/image";
 import { useMemo, useState } from "react";
 import { getAgentIconUrl, getAgentRole, type AgentRole } from "@/lib/valorant-agent";
+import ValorantRoleIcon from "@/components/icons/ValorantRoleIcon";
 import {
   aggregatePlayerStats,
   computeStandoutBaseline,
@@ -308,12 +309,15 @@ export default function TournamentStatsSection({
                 <button
                   type="button"
                   onClick={cycleRoleFilter}
-                  className={`inline-flex h-8 w-[8.75rem] items-center justify-center rounded-lg px-2 text-[10px] font-black tracking-wider uppercase transition-all md:hidden ${
+                  className={`inline-flex h-8 w-[8.75rem] items-center justify-center gap-1.5 rounded-lg px-2 text-[10px] font-black tracking-wider uppercase transition-all md:hidden ${
                     selectedRole === "ALL"
                       ? "bg-white/10 text-white/55 ring-1 ring-white/10"
                       : "bg-emerald-400 text-[#070a12]"
                   }`}
                 >
+                  {selectedRole !== "ALL" ? (
+                    <ValorantRoleIcon role={selectedRole} className="h-3.5 w-3.5" />
+                  ) : null}
                   <span className="truncate">
                     Role: {selectedRole === "ALL" ? "All" : selectedRole}
                   </span>
@@ -605,12 +609,15 @@ export default function TournamentStatsSection({
                     <div className="inline-flex items-center justify-center gap-2">
                       <span>Agents</span>
                       <span
-                        className={`rounded-lg px-2 py-0.5 text-[10px] font-black uppercase transition-all ${
+                        className={`inline-flex items-center gap-1 rounded-lg px-2 py-0.5 text-[10px] font-black uppercase transition-all ${
                           selectedRole === "ALL"
                             ? "bg-white/10 text-white/50"
                             : "bg-[#22c55e] text-[#070a12] shadow-sm"
                         }`}
                       >
+                        {selectedRole !== "ALL" ? (
+                          <ValorantRoleIcon role={selectedRole} className="h-3 w-3" />
+                        ) : null}
                         {selectedRole === "ALL" ? "All" : selectedRole}
                       </span>
                     </div>

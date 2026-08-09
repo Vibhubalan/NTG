@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useMemo, type ReactNode } from "react";
 import type { ValorantRegistrationProfileCard } from "@core/contracts/registration-profile";
@@ -81,11 +81,11 @@ function StatChip({
 }) {
   return (
     <div className="min-w-0 flex-1 text-center">
-      <p className="text-[8px] font-bold tracking-[0.14em] text-white/35 uppercase">
+      <p className="text-[7px] font-bold tracking-[0.12em] text-white/35 uppercase sm:text-[8px] sm:tracking-[0.14em]">
         {label}
       </p>
       <div
-        className={`mt-0.5 font-display text-[13px] font-bold tabular-nums leading-none sm:text-lg ${
+        className={`mt-0.5 font-display text-[11px] font-bold tabular-nums leading-none sm:text-lg ${
           accent ? "text-[var(--color-brand)]" : "text-white"
         }`}
       >
@@ -150,15 +150,15 @@ function AgentsPlayedRow({ agentCounts }: { agentCounts: Record<string, number> 
 
   return (
     <div className="relative">
-      <p className="mb-1.5 text-[8px] font-bold tracking-[0.16em] text-white/35 uppercase">
+      <p className="mb-1 text-[7px] font-bold tracking-[0.14em] text-white/35 uppercase sm:mb-1.5 sm:text-[8px] sm:tracking-[0.16em]">
         Agents played
       </p>
-      <div className="flex flex-wrap items-center gap-2 sm:gap-2.5">
+      <div className="flex flex-wrap items-center gap-1 sm:gap-2.5">
         {agents.map(([agent]) => {
           const icon = getAgentIconUrl(agent);
           return (
             <div key={agent} title={agent} className="flex flex-col items-center gap-0.5">
-              <div className="relative flex h-9 w-9 items-center justify-center overflow-hidden rounded-full bg-white/[0.06] ring-1 ring-white/15 sm:h-10 sm:w-10">
+              <div className="relative flex h-6 w-6 items-center justify-center overflow-hidden rounded-full bg-white/[0.06] ring-1 ring-white/15 sm:h-10 sm:w-10">
                 {icon ? (
                   <img
                     src={icon}
@@ -166,7 +166,7 @@ function AgentsPlayedRow({ agentCounts }: { agentCounts: Record<string, number> 
                     className="h-full w-full scale-110 object-cover object-top"
                   />
                 ) : (
-                  <span className="text-[9px] font-bold text-white/45">
+                  <span className="text-[8px] font-bold text-white/45 sm:text-[9px]">
                     {agent.slice(0, 2)}
                   </span>
                 )}
@@ -186,41 +186,43 @@ function TournamentStatsBlock({ stats }: { stats: AggregatedPlayerStats }) {
       : stats.totalKills.toFixed(2);
 
   return (
-    <div className="relative w-full min-w-0 space-y-2.5 rounded-xl border border-white/[0.07] bg-gradient-to-b from-white/[0.04] to-transparent px-3 py-2.5 sm:space-y-3.5 sm:rounded-2xl sm:px-4 sm:py-4">
+    <div className="relative w-full min-w-0 space-y-1.5 rounded-xl border border-white/[0.07] bg-gradient-to-b from-white/[0.04] to-transparent px-2.5 py-2 sm:space-y-3.5 sm:rounded-2xl sm:px-4 sm:py-4">
       <div className="flex items-center justify-between gap-2">
-        <p className="text-[8px] font-bold tracking-[0.18em] text-white/40 uppercase">
+        <p className="text-[7px] font-bold tracking-[0.16em] text-white/40 uppercase sm:text-[8px] sm:tracking-[0.18em]">
           Tournament stats
         </p>
         {stats.mvpCount > 0 ? (
-          <span className="rounded-full border border-amber-300/25 bg-amber-400/10 px-2 py-0.5 text-[8px] font-bold tracking-wide text-amber-200/90 uppercase">
+          <span className="rounded-full border border-amber-300/25 bg-amber-400/10 px-1.5 py-0.5 text-[7px] font-bold tracking-wide text-amber-200/90 uppercase sm:px-2 sm:text-[8px]">
             {stats.mvpCount}
             {TIMES} MVP
           </span>
         ) : null}
       </div>
 
-      <div className="flex items-end justify-between gap-3">
+      <div className="flex items-end justify-between gap-2 sm:gap-3">
         <div className="min-w-0">
-          <p className="text-[8px] font-bold tracking-[0.16em] text-white/35 uppercase">
+          <p className="text-[7px] font-bold tracking-[0.14em] text-white/35 uppercase sm:text-[8px] sm:tracking-[0.16em]">
             K / D / A
           </p>
-          <p className="mt-1 font-display text-[1.35rem] font-black tabular-nums leading-none tracking-tight sm:text-3xl">
+          <p className="mt-0.5 font-display text-base font-black tabular-nums leading-none tracking-tight sm:mt-1 sm:text-3xl">
             <span className="text-emerald-300">{stats.totalKills}</span>
-            <span className="mx-1 text-white/20">/</span>
+            <span className="mx-0.5 text-white/20 sm:mx-1">/</span>
             <span className="text-rose-300/90">{stats.totalDeaths}</span>
-            <span className="mx-1 text-white/20">/</span>
+            <span className="mx-0.5 text-white/20 sm:mx-1">/</span>
             <span className="text-sky-300/90">{stats.totalAssists}</span>
           </p>
         </div>
         <div className="shrink-0 text-right">
-          <p className="text-[8px] font-bold tracking-[0.16em] text-white/35 uppercase">K/D</p>
-          <p className="mt-1 font-display text-[1.35rem] font-black tabular-nums leading-none text-white sm:text-3xl">
+          <p className="text-[7px] font-bold tracking-[0.14em] text-white/35 uppercase sm:text-[8px] sm:tracking-[0.16em]">
+            K/D
+          </p>
+          <p className="mt-0.5 font-display text-base font-black tabular-nums leading-none text-white sm:mt-1 sm:text-3xl">
             {kd}
           </p>
         </div>
       </div>
 
-      <div className="flex w-full items-stretch divide-x divide-white/[0.08] rounded-lg bg-black/25 px-1 py-2 sm:py-2.5">
+      <div className="flex w-full items-stretch divide-x divide-white/[0.08] rounded-lg bg-black/25 px-0.5 py-1.5 sm:px-1 sm:py-2.5">
         <StatChip label="GP">{stats.gamesPlayed}</StatChip>
         <StatChip label="ACS" accent>
           {stats.avgAcs}

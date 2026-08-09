@@ -13,8 +13,162 @@ import {
   msUntilNextRefresh,
 } from "@/lib/leaderboard-schedule";
 import BrandIcon from "@/components/ui/BrandIcon";
+import CustomBadgeIcon from "@/components/badges/CustomBadgeIcon";
 import LeaderboardPlayerCardBackdrop from "@/components/platform/LeaderboardPlayerCardBackdrop";
 import { gameMetaFor } from "@/lib/tournament-display";
+import {
+  getCustomBadgePreset,
+  isBestRoleBadgeKey,
+} from "@/lib/player-badge-presets";
+
+export type LeaderboardBoardVariant = "ranks" | "tournaments";
+
+function formatBoardScore(
+  mmr: number | null | undefined,
+  variant: LeaderboardBoardVariant,
+): string {
+  if (mmr == null) return "--";
+  if (variant === "tournaments") return mmr.toFixed(1);
+  return formatLeaderboardRr(mmr);
+}
+
+function isRunnerUpBadge(label: string): boolean {
+  return /RUNNER-UP$/i.test(label);
+}
+
+function isPlacementWinnerBadge(label: string): boolean {
+  return /\sWINNER$/i.test(label);
+}
+
+function LeaderboardBadgePills({
+  badges,
+  compact = false,
+}: {
+  badges: { id: string; label: string; kind?: string; iconKey?: string | null }[];
+  compact?: boolean;
+}) {
+  if (badges.length === 0) return null;
+
+  const placement = badges.filter(
+    (b) =>
+      b.kind !== "CUSTOM" &&
+      !isBestRoleBadgeKey(b.iconKey) &&
+      (isPlacementWinnerBadge(b.label) || isRunnerUpBadge(b.label)),
+  );
+  // Custom awards (admin). Best role keys always count even if kind was omitted.
+  const custom = badges.filter(
+    (b) =>
+      Boolean(b.iconKey) &&
+      (b.kind === "CUSTOM" || isBestRoleBadgeKey(b.iconKey)),
+  );
+  const roleBadges = custom.filter((b) => isBestRoleBadgeKey(b.iconKey));
+  const otherCustom = custom.filter((b) => !isBestRoleBadgeKey(b.iconKey));
+
+  let gold = 0;
+  let silver = 0;
+  for (const b of placement) {
+    if (isRunnerUpBadge(b.label)) silver += 1;
+    else gold += 1;
+  }
+
+  const summary = [
+    gold > 0
+      ? {
+          key: "gold",
+          count: gold,
+          runnerUp: false,
+          title: placement
+            .filter((b) => !isRunnerUpBadge(b.label))
+            .map((b) => b.label)
+            .join(" · "),
+        }
+      : null,
+    silver > 0
+      ? {
+          key: "silver",
+          count: silver,
+          runnerUp: true,
+          title: placement
+            .filter((b) => isRunnerUpBadge(b.label))
+            .map((b) => b.label)
+            .join(" · "),
+        }
+      : null,
+  ].filter(Boolean) as {
+    key: string;
+    count: number;
+    runnerUp: boolean;
+    title: string;
+  }[];
+
+  if (summary.length === 0 && roleBadges.length === 0 && otherCustom.length === 0) {
+    return null;
+  }
+
+  const roleIconClass = compact
+    ? "h-3.5 w-3.5 sm:h-5 sm:w-5"
+    : "h-3.5 w-3.5 sm:h-4 sm:w-4";
+  const otherIconClass = compact
+    ? "h-3 w-3 sm:h-3.5 sm:w-3.5"
+    : "h-3.5 w-3.5 sm:h-4 sm:w-4";
+
+  return (
+    <div
+      className={`flex flex-wrap items-center gap-x-2.5 gap-y-1 ${
+        compact ? "justify-center mt-1 max-w-full" : "mt-1"
+      }`}
+    >
+      {summary.map((pill) => (
+        <span
+          key={pill.key}
+          title={pill.title}
+          className={`inline-flex items-center font-black tracking-tight ${
+            compact ? "text-[10px] sm:text-xs" : "text-xs sm:text-sm"
+          } ${pill.runnerUp ? "text-slate-300" : "text-amber-300"}`}
+        >
+          <span
+            className="shrink-0"
+            style={pill.runnerUp ? { filter: "grayscale(1) brightness(1.5)" } : undefined}
+          >
+            🏆
+          </span>
+          <span className="ml-0.5">×{pill.count}</span>
+        </span>
+      ))}
+      {roleBadges.map((b) => {
+        const preset = getCustomBadgePreset(b.iconKey!);
+        return (
+          <span
+            key={b.id}
+            title={b.label || preset?.label || b.iconKey!}
+            className="inline-flex items-center leading-none drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]"
+          >
+            <CustomBadgeIcon
+              iconKey={b.iconKey!}
+              className={roleIconClass}
+              accent={preset?.accent ?? "#c4b5fd"}
+              boostFlex={false}
+            />
+          </span>
+        );
+      })}
+      {otherCustom.map((b) => (
+        <span
+          key={b.id}
+          title={b.label}
+          className="inline-flex items-center leading-none"
+        >
+          <CustomBadgeIcon
+            iconKey={b.iconKey!}
+            className={otherIconClass}
+            accent="#c4b5fd"
+            boostFlex={false}
+          />
+        </span>
+      ))}
+    </div>
+  );
+}
 
 function PodiumCard({
   entry,
@@ -24,6 +178,7 @@ function PodiumCard({
   glowColor,
   pillBg,
   ringColor,
+  variant,
 }: {
   entry: LeaderboardViewEntry | undefined;
   rank: number;
@@ -32,6 +187,7 @@ function PodiumCard({
   glowColor: string;
   pillBg: string;
   ringColor: string;
+  variant: LeaderboardBoardVariant;
 }) {
   if (!entry) {
     return (
@@ -42,7 +198,8 @@ function PodiumCard({
     );
   }
 
-  const icon = rankIconUrl(entry.viewRankTierId);
+  const icon = variant === "ranks" ? rankIconUrl(entry.viewRankTierId) : null;
+  const metricLabel = variant === "tournaments" ? "Rating" : "RR";
   const cardImg = entry.riotPlayerCard ?? "https://media.valorant-api.com/playercards/1711d20d-4b1c-c64a-14be-d4ae58a457c6/largeart.png";
 
   return (
@@ -101,14 +258,15 @@ function PodiumCard({
 
       {/* Content */}
       <div className="relative z-10 flex flex-col items-center text-center">
-        {/* Rank Icon (No Circle) */}
-        <div className="h-10 w-10 sm:h-16 sm:w-16 flex items-center justify-center mb-2 sm:mb-4">
-          {icon ? (
-            <img src={icon} alt="" className="h-10 w-10 sm:h-16 sm:w-16 object-contain drop-shadow-md" />
-          ) : (
-            <div className="h-10 w-10 sm:h-16 sm:w-16 rounded-xl bg-white/10" />
-          )}
-        </div>
+        {variant === "ranks" && (
+          <div className="h-10 w-10 sm:h-16 sm:w-16 flex items-center justify-center mb-2 sm:mb-4">
+            {icon ? (
+              <img src={icon} alt="" className="h-10 w-10 sm:h-16 sm:w-16 object-contain drop-shadow-md" />
+            ) : (
+              <div className="h-10 w-10 sm:h-16 sm:w-16 rounded-xl bg-white/10" />
+            )}
+          </div>
+        )}
 
         {/* Username */}
         <h3 className="font-display text-[10px] sm:text-xl font-black text-white leading-tight drop-shadow-md truncate max-w-full">
@@ -120,9 +278,13 @@ function PodiumCard({
           {entry.riotId ?? "No Riot ID"}
         </p>
 
-        {/* RR Pill Badge */}
+        {variant === "tournaments" && entry.badges && entry.badges.length > 0 && (
+          <LeaderboardBadgePills badges={entry.badges} compact />
+        )}
+
+        {/* Score pill */}
         <div className={`mt-2 sm:mt-4 rounded-full px-2 sm:px-5 py-0.5 sm:py-1.5 text-[8px] sm:text-xs font-black tracking-widest text-white shadow-md uppercase ${pillBg}`}>
-          {formatLeaderboardRr(entry.viewMmr)} RR
+          {formatBoardScore(entry.viewMmr, variant)} {metricLabel}
         </div>
       </div>
     </div>
@@ -165,9 +327,19 @@ function PaginationBtn({
   );
 }
 
-type Props = { data: LeaderboardPreview };
+type Props = {
+  data: LeaderboardPreview;
+  variant?: LeaderboardBoardVariant;
+  activeTab?: LeaderboardBoardVariant;
+  onTabChange?: (tab: LeaderboardBoardVariant) => void;
+};
 
-export default function ValorantRankingsBoard({ data }: Props) {
+export default function ValorantRankingsBoard({
+  data,
+  variant = "ranks",
+  activeTab = "ranks",
+  onTabChange,
+}: Props) {
   const { data: session } = useSession();
   const [query, setQuery] = useState("");
   const [page, setPage] = useState(1);
@@ -176,6 +348,9 @@ export default function ValorantRankingsBoard({ data }: Props) {
   const [isFlashing, setIsFlashing] = useState(false);
   const [showRest, setShowRest] = useState(false);
   const [introComplete, setIntroComplete] = useState(false);
+  const isTournaments = variant === "tournaments";
+  const metricLabel = isTournaments ? "Rating" : "RR";
+  const gridColumns = isTournaments ? "80px 1fr 120px" : "80px 220px 1fr 100px";
 
   const sorted = useMemo(() => buildLeaderboardView(data.entries), [data.entries]);
 
@@ -203,6 +378,12 @@ export default function ValorantRankingsBoard({ data }: Props) {
   useEffect(() => {
     setPage(1);
   }, [query]);
+
+  // Tab switch: reset search/page without remounting (avoids replaying the podium intro).
+  useEffect(() => {
+    setQuery("");
+    setPage(1);
+  }, [variant]);
 
   useEffect(() => {
     if (page > totalPages) setPage(totalPages);
@@ -357,7 +538,7 @@ export default function ValorantRankingsBoard({ data }: Props) {
               TOP 3 PLAYERS
             </h1>
             <p className="text-white/40 text-[10px] sm:text-xs font-bold uppercase tracking-[0.25em] mt-2">
-              NTG Competitive Leaderboard
+              {isTournaments ? "NTG Tournament Leaderboard" : "NTG Competitive Leaderboard"}
             </p>
           </div>
 
@@ -372,6 +553,7 @@ export default function ValorantRankingsBoard({ data }: Props) {
               glowColor="shadow-[0_0_20px_rgba(203,213,225,0.1)]"
               ringColor="border-[#cbd5e1]"
               pillBg="bg-rose-600"
+              variant={variant}
             />
             {/* 1st Place */}
             <PodiumCard
@@ -382,6 +564,7 @@ export default function ValorantRankingsBoard({ data }: Props) {
               glowColor="shadow-[0_0_30px_rgba(245,158,11,0.25)]"
               ringColor="border-amber-500"
               pillBg="bg-amber-500"
+              variant={variant}
             />
             {/* 3rd Place */}
             <PodiumCard
@@ -392,6 +575,7 @@ export default function ValorantRankingsBoard({ data }: Props) {
               glowColor="shadow-[0_0_20px_rgba(180,132,100,0.1)]"
               ringColor="border-[#b48464]"
               pillBg="bg-cyan-600"
+              variant={variant}
             />
           </div>
         </div>
@@ -427,19 +611,71 @@ export default function ValorantRankingsBoard({ data }: Props) {
           
           <div className="relative z-10">
             <p className="mb-3 text-xs font-black uppercase tracking-[0.3em] text-[#FF4655] drop-shadow-md">
-              Competitive Ranked
+              {isTournaments ? "Valorant Cups" : "Competitive Ranked"}
             </p>
             <h2 className="font-display text-4xl sm:text-5xl font-black tracking-tight text-white drop-shadow-lg uppercase">
-              WHO RULES MANGALURU?
+              {isTournaments ? "WHO RULES THE CUPS?" : "WHO RULES MANGALURU?"}
             </h2>
             <p className="mt-4 max-w-2xl text-sm sm:text-base font-medium text-white/50 leading-relaxed">
-            The official valorant competitive leaderboard for Mangaluru. Link your Riot ID to claim your rank and earn your place among the city&apos;s best.
+              {isTournaments
+                ? "The official NTG Valorant cup leaderboard. Rating is built from published tournament game stats and updates as every cup is played."
+                : "The official valorant competitive leaderboard for Mangaluru. Link your Riot ID to claim your rank and earn your place among the city's best."}
             </p>
           </div>
         </div>
 
-        {/* Search & Meta */}
-        <div className="mb-8 sm:px-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+        {/* Tabs + Search & Meta */}
+        <div className="mb-8 sm:px-4 flex flex-col gap-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            {onTabChange && (
+              <div className="flex shrink-0 gap-2">
+                {(
+                  [
+                    { id: "ranks" as const, label: "Ranked" },
+                    { id: "tournaments" as const, label: "Tournaments" },
+                  ] as const
+                ).map((tab) => {
+                  const active = activeTab === tab.id;
+                  return (
+                    <button
+                      key={tab.id}
+                      type="button"
+                      onClick={() => onTabChange(tab.id)}
+                      className={`rounded-lg border px-4 py-2.5 text-[11px] font-black uppercase tracking-[0.2em] transition-colors ${
+                        active
+                          ? "border-[#FF4655]/60 bg-[#FF4655]/15 text-white"
+                          : "border-white/10 bg-black/30 text-white/45 hover:border-white/20 hover:text-white/80"
+                      }`}
+                    >
+                      {tab.label}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+            <div className="flex flex-col items-start text-left sm:items-end sm:text-right">
+              <div className="text-xs font-bold uppercase tracking-[0.2em] text-white/40">
+                {filtered.length} Players on the board
+              </div>
+              {isTournaments ? (
+                <p className="mt-1 max-w-[20rem] space-y-0.5 text-[11px] font-medium leading-snug text-white/35 sm:ml-auto">
+                  <span className="block">Ratings start from AUC Cup IV.</span>
+                  <span className="block">
+                    Future events will continue to update these ratings.
+                  </span>
+                </p>
+              ) : (
+                <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[10px] font-bold uppercase tracking-widest text-white/30">
+                  <span>Last Refreshed: {lastRefreshedStr}</span>
+                  <span className="hidden text-white/10 sm:inline">|</span>
+                  <span className="text-white/60">
+                    Next refresh in {timeLeftStr}
+                    <span className="text-white/35"> · 2:30 AM IST</span>
+                  </span>
+                </div>
+              )}
+            </div>
+          </div>
           <div className="relative w-full sm:w-[400px]">
             <svg
               className="pointer-events-none absolute left-5 top-1/2 h-5 w-5 -translate-y-1/2 text-white/40"
@@ -458,20 +694,6 @@ export default function ValorantRankingsBoard({ data }: Props) {
               className="w-full rounded-lg border border-white/10 bg-black/40 py-4 pl-12 pr-5 text-base text-white placeholder:text-white/40 focus:border-cyan-500/50 focus:bg-[#0f1923]/90 focus:outline-none transition-colors backdrop-blur-md shadow-lg"
             />
           </div>
-          <div className="flex flex-col items-start sm:items-end text-left sm:text-right mt-4 sm:mt-0">
-            <div className="text-xs font-bold text-white/40 uppercase tracking-[0.2em] mb-1.5">
-               {filtered.length} Players on the board
-            </div>
-            {/* Refresh Timer */}
-            <div className="text-[10px] font-bold text-white/30 uppercase tracking-widest flex flex-wrap items-center gap-2">
-              <span>Last Refreshed: {lastRefreshedStr}</span>
-              <span className="text-white/10 hidden sm:inline">|</span>
-              <span className="text-white/60">
-                Next refresh in {timeLeftStr}
-                <span className="text-white/35"> · 2:30 AM IST</span>
-              </span>
-            </div>
-          </div>
         </div>
 
         {/* Transparent Tile Leaderboard */}
@@ -480,12 +702,12 @@ export default function ValorantRankingsBoard({ data }: Props) {
           {/* Column headers (Visible on large screens) */}
           <div
             className="mb-4 hidden items-center px-8 text-xs font-bold uppercase tracking-[0.2em] text-white/30 lg:grid border-b border-white/5 pb-4 gap-x-6"
-            style={{ gridTemplateColumns: "80px 220px 1fr 100px" }}
+            style={{ gridTemplateColumns: gridColumns }}
           >
             <div className="text-center">Rank</div>
-            <div className="pl-2">Tier</div>
-            <div>Player</div>
-            <div className="text-right">RR</div>
+            {!isTournaments && <div className="pl-2">Tier</div>}
+            <div>{isTournaments ? "Name" : "Player"}</div>
+            <div className="text-right">{metricLabel}</div>
           </div>
 
           {/* Rows */}
@@ -497,10 +719,12 @@ export default function ValorantRankingsBoard({ data }: Props) {
             ) : (
               <ul className="flex flex-col gap-3 relative">
                 {pageEntries.map((e) => {
-                  const icon = rankIconUrl(e.viewRankTierId);
+                  const icon = isTournaments ? null : rankIconUrl(e.viewRankTierId);
                   const accent = rankAccentClass(e.viewRankTierId);
                   const label = formatRankLabel(e.viewRankTierId, e.viewRankTier);
-                  const edgeColorClass = tierEdgeColor(e.viewRankTierId);
+                  const edgeColorClass = isTournaments
+                    ? "bg-cyan-500/30 group-hover:bg-cyan-500/70 group-hover:shadow-[-4px_0_10px_rgba(6,182,212,0.45)]"
+                    : tierEdgeColor(e.viewRankTierId);
                   
                   const isRank1 = e.rank === 1;
                   const isRank2 = e.rank === 2;
@@ -541,7 +765,11 @@ export default function ValorantRankingsBoard({ data }: Props) {
                       id={`row-${e.displayName}`}
                       key={`${e.rank}-${e.riotId ?? e.displayName}`}
                       style={{ isolation: "isolate" }}
-                      className={`group relative flex items-center overflow-hidden rounded-xl border ${rowBgClass} px-5 sm:px-6 h-[90px] sm:h-[110px] backdrop-blur-sm transition-all duration-300 ease-out hover:scale-[1.02] hover:-translate-y-1 hover:z-30 hover:border-white/20 hover:bg-white/[0.04]`}
+                      className={`group relative flex items-center overflow-hidden rounded-xl border ${rowBgClass} px-5 sm:px-6 ${
+                        isTournaments && (e.badges?.length ?? 0) > 0
+                          ? "min-h-[90px] sm:min-h-[110px] py-3"
+                          : "h-[90px] sm:h-[110px]"
+                      } backdrop-blur-sm transition-all duration-300 ease-out hover:scale-[1.02] hover:-translate-y-1 hover:z-30 hover:border-white/20 hover:bg-white/[0.04]`}
                     >
                       <LeaderboardPlayerCardBackdrop
                         riotPlayerCard={e.riotPlayerCard}
@@ -557,7 +785,7 @@ export default function ValorantRankingsBoard({ data }: Props) {
                         }`}
                       />
                       {/* Grid Layout for Row */}
-              <div className="flex w-full items-center gap-x-3 lg:grid lg:gap-x-6 z-10" style={{ gridTemplateColumns: "80px 220px 1fr 100px" }}>
+              <div className="flex w-full items-center gap-x-3 lg:grid lg:gap-x-6 z-10" style={{ gridTemplateColumns: gridColumns }}>
                 
                       {/* Rank Column */}
                       <div className="w-12 sm:w-auto shrink-0 flex items-center justify-center sm:justify-start">
@@ -569,24 +797,26 @@ export default function ValorantRankingsBoard({ data }: Props) {
                         </span>
                       </div>
 
-                      {/* Tier Column (Icon + Label) */}
-                      <div className="hidden sm:flex items-center gap-3">
-                        {icon ? (
-                          <Image
-                            src={icon}
-                            alt={label}
-                            width={64}
-                            height={64}
-                            className={`${isTop3 ? 'h-14 w-14 sm:h-16 sm:w-16' : 'h-10 w-10 sm:h-12 sm:w-12'} object-contain drop-shadow-md`}
-                            unoptimized
-                          />
-                        ) : (
-                          <div className={`${isTop3 ? 'h-14 w-14 sm:h-16 sm:w-16' : 'h-10 w-10 sm:h-12 sm:w-12'} rounded-xl bg-white/10`} />
-                        )}
-                        <span className={`font-bold tracking-wide ${accent} ${isTop3 ? 'text-base sm:text-lg' : 'text-sm sm:text-base'}`}>
-                          {label}
-                        </span>
-                      </div>
+                      {/* Tier Column (Icon + Label) — ranks board only */}
+                      {!isTournaments && (
+                        <div className="hidden sm:flex items-center gap-3">
+                          {icon ? (
+                            <Image
+                              src={icon}
+                              alt={label}
+                              width={64}
+                              height={64}
+                              className={`${isTop3 ? 'h-14 w-14 sm:h-16 sm:w-16' : 'h-10 w-10 sm:h-12 sm:w-12'} object-contain drop-shadow-md`}
+                              unoptimized
+                            />
+                          ) : (
+                            <div className={`${isTop3 ? 'h-14 w-14 sm:h-16 sm:w-16' : 'h-10 w-10 sm:h-12 sm:w-12'} rounded-xl bg-white/10`} />
+                          )}
+                          <span className={`font-bold tracking-wide ${accent} ${isTop3 ? 'text-base sm:text-lg' : 'text-sm sm:text-base'}`}>
+                            {label}
+                          </span>
+                        </div>
+                      )}
 
                       {/* Player Column */}
                       <div className="min-w-0 flex-1 flex items-center gap-3">
@@ -611,21 +841,26 @@ export default function ValorantRankingsBoard({ data }: Props) {
                           <p className="truncate text-[10px] sm:text-xs font-medium text-white/40 mt-0.5">
                             {e.riotId ? e.riotId : 'No ID'}
                           </p>
-                          <span className={`sm:hidden text-[10px] font-bold ${accent} mt-0.5`}>
-                            {label}
-                          </span>
+                          {!isTournaments && (
+                            <span className={`sm:hidden text-[10px] font-bold ${accent} mt-0.5`}>
+                              {label}
+                            </span>
+                          )}
+                          {isTournaments && e.badges && e.badges.length > 0 && (
+                            <LeaderboardBadgePills badges={e.badges} />
+                          )}
                         </div>
                       </div>
 
-                      {/* Rating (RR) Column */}
+                      {/* Score Column */}
                       <div className="text-right flex flex-col items-end justify-center shrink-0 ml-auto sm:ml-0">
                         <span className={`font-display font-black tracking-tight ${
                           isUser ? "text-white drop-shadow-lg" : "text-white/90 group-hover:text-white"
                         } ${isTop3 ? 'text-3xl sm:text-5xl' : 'text-xl sm:text-3xl'}`}>
-                          {formatLeaderboardRr(e.viewMmr)}
+                          {formatBoardScore(e.viewMmr, variant)}
                         </span>
                         <span className="text-[9px] sm:text-[10px] font-black text-[#FF4655]/80 uppercase tracking-widest mt-0.5">
-                          RR
+                          {metricLabel}
                         </span>
                       </div>
                       </div>
@@ -648,7 +883,7 @@ export default function ValorantRankingsBoard({ data }: Props) {
                     <span className="font-display text-4xl font-black text-white drop-shadow-[0_0_15px_rgba(255,255,255,0.4)]">#{userEntry.rank}</span>
                   </div>
                   <div className="flex items-center gap-4">
-                    {rankIconUrl(userEntry.viewRankTierId) && (
+                    {!isTournaments && rankIconUrl(userEntry.viewRankTierId) && (
                       <Image
                         src={rankIconUrl(userEntry.viewRankTierId)!}
                         alt={userEntry.viewRankTier ?? ""}
@@ -660,8 +895,10 @@ export default function ValorantRankingsBoard({ data }: Props) {
                     )}
                     <div className="flex flex-col">
                       <span className="text-base font-black text-white drop-shadow-sm">{userEntry.displayName}</span>
-                      <span className={`text-sm font-bold ${rankAccentClass(userEntry.viewRankTierId)} mt-0.5`}>
-                        {formatRankLabel(userEntry.viewRankTierId, userEntry.viewRankTier)} • {formatLeaderboardRr(userEntry.viewMmr)} RR
+                      <span className={`text-sm font-bold ${isTournaments ? "text-white/70" : rankAccentClass(userEntry.viewRankTierId)} mt-0.5`}>
+                        {isTournaments
+                          ? `${formatBoardScore(userEntry.viewMmr, variant)} ${metricLabel}`
+                          : `${formatRankLabel(userEntry.viewRankTierId, userEntry.viewRankTier)} • ${formatLeaderboardRr(userEntry.viewMmr)} RR`}
                       </span>
                     </div>
                   </div>

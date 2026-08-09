@@ -13,7 +13,7 @@ export async function GET() {
   const badges = await prisma.playerBadge.findMany({
     where: { userId: session.user.id },
     orderBy: { awardedAt: "desc" },
-    select: { id: true, label: true, awardedAt: true },
+    select: { id: true, label: true, kind: true, iconKey: true, awardedAt: true },
   });
 
   return NextResponse.json({ badges });

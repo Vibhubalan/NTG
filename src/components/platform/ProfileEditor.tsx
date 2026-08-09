@@ -7,6 +7,8 @@ import type { ValorantRole } from "@prisma/client";
 import { computeAgeFromDateOfBirth } from "@/lib/date-age";
 import AccountInfoPanel from "@/components/platform/AccountInfoPanel";
 import GameProfilesPanel from "@/components/platform/GameProfilesPanel";
+import CustomBadgeIcon from "@/components/badges/CustomBadgeIcon";
+import { CUSTOM_BADGE_PRESETS } from "@/lib/player-badge-presets";
 
 type FullProfile = {
   displayName: string;
@@ -32,7 +34,13 @@ function rolesEqual(a: ValorantRole[], b: ValorantRole[]) {
   return a.every((role) => b.includes(role));
 }
 
-type Badge = { id: string; label: string; awardedAt: string };
+type Badge = {
+  id: string;
+  label: string;
+  awardedAt: string;
+  kind?: string;
+  iconKey?: string | null;
+};
 
 /** Runner-up badges end in "RUNNER-UP"; everything else is a win. */
 function isRunnerUp(label: string): boolean {
@@ -325,16 +333,31 @@ export default function ProfileEditor() {
               <div className="flex flex-wrap gap-2">
                 {badges.map((b) => {
                   const runnerUp = isRunnerUp(b.label);
+                  const custom = b.kind === "CUSTOM" && b.iconKey;
+                  const preset = custom
+                    ? CUSTOM_BADGE_PRESETS.find((p) => p.key === b.iconKey)
+                    : null;
                   return (
                     <span
                       key={b.id}
                       className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide ${
-                        runnerUp
-                          ? "border-slate-400/25 bg-slate-400/10 text-slate-300"
-                          : "border-amber-500/25 bg-amber-500/10 text-amber-300"
+                        custom
+                          ? "border-violet-400/25 bg-violet-400/10 text-violet-100"
+                          : runnerUp
+                            ? "border-slate-400/25 bg-slate-400/10 text-slate-300"
+                            : "border-amber-500/25 bg-amber-500/10 text-amber-300"
                       }`}
                     >
-                      <TrophyIcon silver={runnerUp} /> {b.label}
+                      {custom ? (
+                        <CustomBadgeIcon
+                          iconKey={b.iconKey!}
+                          accent={preset?.accent ?? "#a78bfa"}
+                          className="h-3.5 w-3.5"
+                        />
+                      ) : (
+                        <TrophyIcon silver={runnerUp} />
+                      )}{" "}
+                      {b.label}
                     </span>
                   );
                 })}

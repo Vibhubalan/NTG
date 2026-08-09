@@ -2,7 +2,7 @@
 
 import dynamic from "next/dynamic";
 import Image from "next/image";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import BrandIcon from "@/components/ui/BrandIcon";
 import StatusBadge from "@/components/platform/ui/StatusBadge";
 import TournamentBracketEmpty from "@/components/platform/tournament/TournamentBracketEmpty";
@@ -14,6 +14,7 @@ import TournamentGamesSection, {
   type PublicGame,
 } from "@/components/platform/tournament/TournamentGamesSection";
 import type { TournamentStatsEligibility } from "@/lib/tournament-stats";
+import { buildValorantRoleLeaderPlayers } from "@/lib/valorant-role-leaders";
 import TournamentStatsSection from "@/components/platform/tournament/TournamentStatsSection";
 import { resolveChampion } from "@/lib/tournament-champion";
 import { gameMetaFor, formatRegistrationLabel, buildTournamentScheduleCardView } from "@/lib/tournament-display";
@@ -83,7 +84,12 @@ export default function TournamentDetailView({
   const [statsEligibility, setStatsEligibility] = useState(initialStatsEligibility);
   const [statsLoading, setStatsLoading] = useState(false);
   const statsFetchStarted = useRef(false);
-  const showMatchesTab = showMatchesTabProp ?? tournament.yourGamesEnabled ?? true;
+  // Valorant + published games only. Default off so older cups without match data stay clean.
+  const showMatchesTab =
+    showMatchesTabProp ??
+    (tournament.game === "VALORANT" &&
+      Boolean(tournament.yourGamesEnabled) &&
+      (publishedGames?.length ?? 0) > 0);
   const meta = gameMetaFor(tournament.game);
   const dateStr = tournament.startsAt
     ? new Date(tournament.startsAt).toLocaleDateString("en-IN", {
@@ -156,6 +162,25 @@ export default function TournamentDetailView({
   const showFinalResults = !showChampion && (standings.length > 0 || Boolean(mvp));
   const showMvpOnly = showChampion && Boolean(mvp);
   const showResultsBlock = showChampion || showFinalResults || showMvpOnly;
+
+  // Role Leaders only after the cup is decided (same moment Champions appear).
+  const bestRolePlayers = useMemo(() => {
+    if (!showChampion || tournament.game !== "VALORANT") return [];
+    const games = statsGames ?? publishedGames ?? [];
+    if (!games.length) return [];
+    return buildValorantRoleLeaderPlayers(
+      games,
+      statsEligibility ?? null,
+      tournament.teamDetails,
+    );
+  }, [
+    showChampion,
+    tournament.game,
+    tournament.teamDetails,
+    statsGames,
+    publishedGames,
+    statsEligibility,
+  ]);
   const showTeams =
     tournament.teams.length > 0 ||
     tournament.teamDetails.length > 0 ||
@@ -180,6 +205,8 @@ export default function TournamentDetailView({
   const championsFullWidth = showChampion;
   const useSingleColOverview = championsFullWidth || isCompleted;
   const showMetaSidebar = !championsFullWidth && !isCompleted;
+  // Completed cups (and champion cups) use the full-width meta stack — never hide Schedule.
+  const showOverviewMetaStack = championsFullWidth || isCompleted;
 
   // Auction rank only until the auction window ends (then the cup is "live").
   const showAuctionRank = (() => {
@@ -324,6 +351,19 @@ export default function TournamentDetailView({
   }, [brackets, bracketsLoading, tournament.teams, tournament.registrationFormat, tournament.slug, tournament.name]);
 
   useEffect(() => {
+    if (
+      !showMatchesTab &&
+      (activeTab === "matches" || activeTab === "stats")
+    ) {
+      setActiveTab("overview");
+    }
+  }, [showMatchesTab, activeTab]);
+
+  useEffect(() => {
+    if (!showMatchesTab) {
+      if (Array.isArray(publishedGames)) setStatsGames(publishedGames);
+      return;
+    }
     if (statsFetchStarted.current) return;
     if (Array.isArray(publishedGames)) {
       statsFetchStarted.current = true;
@@ -347,7 +387,7 @@ export default function TournamentDetailView({
     return () => {
       cancelled = true;
     };
-  }, [publishedGames, tournament.slug]);
+  }, [publishedGames, tournament.slug, showMatchesTab]);
 
   return (
     <article className="min-w-0 max-w-full overflow-x-clip pb-24">
@@ -456,7 +496,7 @@ export default function TournamentDetailView({
 
       {activeTab === "overview" ? (
         <div className={`grid min-w-0 gap-6 sm:gap-8 lg:items-start ${useSingleColOverview ? "lg:grid-cols-1" : "lg:grid-cols-[1fr_22rem]"}`}>
-          <div className="order-1 min-w-0 space-y-8 sm:space-y-10 lg:col-start-1 lg:row-start-1">
+          <div className="order-1 min-w-0 space-y-5 sm:space-y-6 lg:col-start-1 lg:row-start-1">
             {showResultsBlock ? (
               <section className="min-w-0 space-y-6 sm:space-y-8">
                 <div className="flex min-w-0 items-center gap-2 sm:gap-4">
@@ -481,6 +521,7 @@ export default function TournamentDetailView({
                     accentHex={meta.hex}
                     mvp={mvp}
                     allTeams={tournament.teamDetails}
+                    bestRolePlayers={bestRolePlayers}
                   />
                 ) : null}
 
@@ -498,13 +539,11 @@ export default function TournamentDetailView({
               </section>
             ) : null}
 
-            {championsFullWidth ? (
-              <div className="grid min-w-0 gap-8 md:grid-cols-2">
-                <TournamentScheduleCard schedule={scheduleCard} />
-                <div className="min-w-0 space-y-8">
-                  {auctionBlock}
-                  {prizeBlock}
-                </div>
+            {showOverviewMetaStack ? (
+              <div className="min-w-0 space-y-4">
+                {auctionBlock}
+                <TournamentScheduleCard schedule={scheduleCard} variant="strip" />
+                {prizeBlock}
               </div>
             ) : null}
 

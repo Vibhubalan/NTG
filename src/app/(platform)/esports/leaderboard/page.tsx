@@ -1,5 +1,8 @@
-import ValorantRankingsBoard from "@/components/platform/ValorantRankingsBoard";
-import { getValorantRankings } from "@tournaments-leagues/index";
+import LeaderboardHub from "@/components/platform/LeaderboardHub";
+import {
+  getValorantRankings,
+  getValorantTournamentLeaderboard,
+} from "@tournaments-leagues/index";
 
 export const revalidate = 60;
 
@@ -8,7 +11,10 @@ export const metadata = {
 };
 
 export default async function EsportsLeaderboardPage() {
-  const rankings = await getValorantRankings(250);
+  const [rankings, tournaments] = await Promise.all([
+    getValorantRankings(250),
+    getValorantTournamentLeaderboard(250),
+  ]);
 
-  return <ValorantRankingsBoard data={rankings} />;
+  return <LeaderboardHub ranks={rankings} tournaments={tournaments} />;
 }

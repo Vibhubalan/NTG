@@ -16,6 +16,8 @@ import {
   type TournamentStatsEligibility,
 } from "@/lib/tournament-stats";
 import type { PublicGame } from "./TournamentGamesSection";
+import ValorantRoleIcon from "@/components/icons/ValorantRoleIcon";
+import { resolveValorantRoleKey } from "@/lib/valorant-role-icons";
 
 type Props = {
   games: PublicGame[];
@@ -123,6 +125,7 @@ const ROLE_CONFIG: Record<
     glowBorder: string;
     glowBg: string;
     accentColor: string;
+    /** Valorant role mark key, or emoji fallback for overall. */
     icon: string;
     /** Shown instead of the generic message when nobody earned the award. */
     emptyLabel?: string;
@@ -144,7 +147,7 @@ const ROLE_CONFIG: Record<
     glowBorder: "border-rose-500/30 hover:border-rose-400/60 shadow-[0_0_25px_rgba(244,63,94,0.08)]",
     glowBg: "from-rose-500/15 via-rose-500/[0.03] to-transparent",
     accentColor: "text-rose-400",
-    icon: "⚔️",
+    icon: "duelist",
   },
   Initiator: {
     title: "Best Initiator",
@@ -153,7 +156,7 @@ const ROLE_CONFIG: Record<
     glowBorder: "border-sky-500/30 hover:border-sky-400/60 shadow-[0_0_25px_rgba(14,165,233,0.08)]",
     glowBg: "from-sky-500/15 via-sky-500/[0.03] to-transparent",
     accentColor: "text-sky-400",
-    icon: "🎯",
+    icon: "initiator",
   },
   Controller: {
     title: "Best Controller",
@@ -162,7 +165,7 @@ const ROLE_CONFIG: Record<
     glowBorder: "border-purple-500/30 hover:border-purple-400/60 shadow-[0_0_25px_rgba(168,85,247,0.08)]",
     glowBg: "from-purple-500/15 via-purple-500/[0.03] to-transparent",
     accentColor: "text-purple-400",
-    icon: "🌫️",
+    icon: "controller",
   },
   Sentinel: {
     title: "Best Sentinel",
@@ -171,7 +174,7 @@ const ROLE_CONFIG: Record<
     glowBorder: "border-emerald-500/30 hover:border-emerald-400/60 shadow-[0_0_25px_rgba(16,185,129,0.08)]",
     glowBg: "from-emerald-500/15 via-emerald-500/[0.03] to-transparent",
     accentColor: "text-emerald-400",
-    icon: "🛡️",
+    icon: "sentinel",
   },
   bestFlex: {
     title: "Best Flex",
@@ -180,10 +183,17 @@ const ROLE_CONFIG: Record<
     glowBorder: "border-fuchsia-500/30 hover:border-fuchsia-400/60 shadow-[0_0_25px_rgba(217,70,239,0.08)]",
     glowBg: "from-fuchsia-500/15 via-fuchsia-500/[0.03] to-transparent",
     accentColor: "text-fuchsia-400",
-    icon: "⚡",
+    icon: "flex",
     emptyLabel: "No player covered all four roles",
   },
 };
+
+function RoleMark({ icon }: { icon: string }) {
+  if (resolveValorantRoleKey(icon)) {
+    return <ValorantRoleIcon role={icon} className="h-3.5 w-3.5" />;
+  }
+  return <span aria-hidden>{icon}</span>;
+}
 
 function StandoutCard({
   roleKey,
@@ -200,7 +210,7 @@ function StandoutCard({
       <div className={`relative overflow-hidden rounded-2xl border border-white/10 bg-white/[0.02] p-5 backdrop-blur-sm transition-all ${config.glowBorder}`}>
         <div className="flex items-center justify-between">
           <span className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[10px] font-black uppercase tracking-wider ring-1 ring-inset ${config.badgeBg}`}>
-            <span>{config.icon}</span>
+            <RoleMark icon={config.icon} />
             <span>{config.title}</span>
           </span>
         </div>
@@ -229,7 +239,7 @@ function StandoutCard({
 
       <div className="flex items-center justify-between gap-2">
         <span className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[10px] font-black uppercase tracking-wider ring-1 ring-inset ${config.badgeBg}`}>
-          <span>{config.icon}</span>
+          <RoleMark icon={config.icon} />
           <span>{config.title}</span>
         </span>
         {!showAllAgents && player.mostPlayedAgent ? (
@@ -374,12 +384,15 @@ export default function TournamentMetaSection({ games, eligibility }: Props) {
           key={role}
           type="button"
           onClick={() => setSelectedAgentRole(role)}
-          className={`rounded-lg px-3 py-1 text-[10px] font-black uppercase tracking-wider transition-all ${
+          className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1 text-[10px] font-black uppercase tracking-wider transition-all ${
             selectedAgentRole === role
               ? "bg-emerald-400/20 text-emerald-300 ring-1 ring-emerald-400/50"
               : "text-white/40 hover:bg-white/5 hover:text-white"
           }`}
         >
+          {role !== "ALL" ? (
+            <ValorantRoleIcon role={role} className="h-3.5 w-3.5" />
+          ) : null}
           {role}
         </button>
       ))}

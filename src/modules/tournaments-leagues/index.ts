@@ -10,6 +10,7 @@ export {
   getValorantRankings,
   recordMatchResult,
 } from "./application/tournament.service";
+export { getValorantTournamentLeaderboard } from "./application/tournament-leaderboard.service";
 export type { ActiveAuction, HeroCupStatus } from "./application/tournament.service";
 export {
   syncUserRank,
@@ -51,6 +52,7 @@ export {
   switchPlayerToCaptain,
   setTournamentPlacements,
   awardPlayerBadge,
+  awardCustomBadge,
   removePlayerBadge,
   listAllPlayerBadges,
   updateTournamentAdmin,
@@ -58,6 +60,7 @@ export {
   adminRemoveTournamentRegistration,
 } from "./application/registration.service";
 export type { PlayerBadgeType } from "./application/registration.service";
+export { CUSTOM_BADGE_PRESETS, getCustomBadgePreset } from "@/lib/player-badge-presets";
 export {
   listTournamentsAdmin,
   getTournamentAdmin,

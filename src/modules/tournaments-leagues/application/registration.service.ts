@@ -1319,25 +1319,6 @@ export async function setTournamentPlacements(
     ),
   ]);
 
-  const champion = placements.find((p) => p.role === "CHAMPION" && p.userId);
-  if (champion?.userId) {
-    await prisma.playerBadge.upsert({
-      where: {
-        userId_tournamentId_label: {
-          userId: champion.userId,
-          tournamentId: tournament.id,
-          label: `${tournament.name} WINNER`,
-        },
-      },
-      create: {
-        userId: champion.userId,
-        tournamentId: tournament.id,
-        label: `${tournament.name} WINNER`,
-      },
-      update: {},
-    });
-  }
-
   safeExpireTag(tournamentDetailTag(slug));
 
   return { ok: true };
@@ -1358,12 +1339,25 @@ export async function awardPlayerBadge(
 
   await prisma.playerBadge.upsert({
     where: { userId_tournamentId_label: { userId, tournamentId, label } },
-    create: { userId, tournamentId, label, awardedBy: awardedBy ?? null },
-    update: {},
+    create: {
+      userId,
+      tournamentId,
+      label,
+      kind: "PLACEMENT",
+      iconKey: null,
+      awardedBy: awardedBy ?? null,
+    },
+    update: { kind: "PLACEMENT" },
   });
 
   return { ok: true };
 }
+
+export {
+  awardCustomBadge,
+  CUSTOM_BADGE_PRESETS,
+  getCustomBadgePreset,
+} from "@/lib/player-badges";
 
 export async function removePlayerBadge(id: string): Promise<{ ok: true } | { ok: false; error: string }> {
   await prisma.playerBadge.delete({ where: { id } }).catch(() => null);

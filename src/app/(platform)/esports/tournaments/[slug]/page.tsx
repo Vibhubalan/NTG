@@ -72,10 +72,16 @@ export default async function TournamentDetailPage({ params }: Props) {
     ]);
 
   const publishedGames = publishedGamesResult.ok ? publishedGamesResult.games : [];
-  const showMatchesTab =
+  // Matches/Stats: Valorant only, and only when the cup actually has published games
+  // (older cups before AUC IV typically have none — hide the tabs).
+  const yourGamesEnabled =
     (publishedGamesResult.ok
       ? publishedGamesResult.yourGamesEnabled
-      : tournament.yourGamesEnabled) ?? true;
+      : tournament.yourGamesEnabled) ?? false;
+  const showMatchesTab =
+    tournament.game === "VALORANT" &&
+    yourGamesEnabled &&
+    publishedGames.length > 0;
 
   const publicAuction = resolveEffectivePublicAuction(
     tournament.publicAuction ?? false,

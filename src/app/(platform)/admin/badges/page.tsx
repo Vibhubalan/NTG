@@ -17,6 +17,8 @@ export default async function AdminBadgesPage() {
       initialBadges={badges.map((b) => ({
         id: b.id,
         label: b.label,
+        kind: b.kind,
+        iconKey: b.iconKey,
         awardedAt: b.awardedAt.toISOString(),
         tournamentName: b.tournament?.name ?? null,
         user: {

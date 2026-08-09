@@ -1,6 +1,12 @@
 import { guardResponse, isAuthedAdmin, requireAdmin } from "@/lib/auth-guard";
 import { serverEnv } from "@core/config/env.server";
-import { awardPlayerBadge, removePlayerBadge, listAllPlayerBadges, type PlayerBadgeType } from "@tournaments-leagues/index";
+import {
+  awardPlayerBadge,
+  awardCustomBadge,
+  removePlayerBadge,
+  listAllPlayerBadges,
+  type PlayerBadgeType,
+} from "@tournaments-leagues/index";
 import { NextResponse } from "next/server";
 
 export const dynamic = "force-dynamic";
@@ -25,14 +31,41 @@ export async function POST(req: Request) {
   const auth = await requireAdmin();
   if (!isAuthedAdmin(auth)) return guardResponse(auth)!;
 
-  let body: { userId?: string; tournamentId?: string; type?: PlayerBadgeType };
+  let body: {
+    userId?: string;
+    tournamentId?: string;
+    type?: PlayerBadgeType;
+    kind?: "PLACEMENT" | "CUSTOM";
+    iconKey?: string;
+    label?: string;
+  };
   try {
     body = await req.json();
   } catch {
     return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
   }
 
-  if (!body.userId || !body.tournamentId || (body.type !== "WINNER" && body.type !== "RUNNER_UP")) {
+  if (!body.userId) {
+    return NextResponse.json({ error: "userId required" }, { status: 400 });
+  }
+
+  if (body.kind === "CUSTOM" || body.iconKey) {
+    if (!body.iconKey) {
+      return NextResponse.json({ error: "iconKey required for custom badges" }, { status: 400 });
+    }
+    const result = await awardCustomBadge({
+      userId: body.userId,
+      iconKey: body.iconKey,
+      label: body.label,
+      awardedBy: auth.userId,
+    });
+    if (!result.ok) {
+      return NextResponse.json({ error: result.error }, { status: 400 });
+    }
+    return NextResponse.json({ ok: true, label: result.label });
+  }
+
+  if (!body.tournamentId || (body.type !== "WINNER" && body.type !== "RUNNER_UP")) {
     return NextResponse.json({ error: "userId, tournamentId and type required" }, { status: 400 });
   }
 

@@ -1,5 +1,12 @@
 import type { GameSlug } from "@prisma/client";
 
+export type LeaderboardPreviewBadge = {
+  id: string;
+  label: string;
+  kind?: string;
+  iconKey?: string | null;
+};
+
 export type LeaderboardPreviewEntry = {
   rank: number;
   /** Last saved board slot from DB — used to preserve order when MMR ties (e.g. all unranked). */
@@ -14,6 +21,8 @@ export type LeaderboardPreviewEntry = {
   currentAct: string | null;
   lastSyncedAt: string | null;
   game: GameSlug;
+  /** Cup trophy badges (tournament leaderboard). */
+  badges?: LeaderboardPreviewBadge[];
 };
 
 export type LeaderboardPreview = {
