@@ -63,6 +63,78 @@ function parseScores(scoresCsv: string): [string, string] {
   return [parts[0] || "0", parts[1] || "0"];
 }
 
+function normalizeScoresCsv(scoresCsv: string | null | undefined): string {
+  if (!scoresCsv?.trim()) return "";
+  const [a, b] = parseScores(scoresCsv);
+  return `${a}-${b}`;
+}
+
+/**
+ * Challonge double-elim creates an optional grand-final reset whose both
+ * slots feed from the first GF. When that reset is left incomplete we already
+ * hide it; when someone completes it by copying the same scoreline it shows
+ * as a duplicate finals card. Detect that case so we only render one GF.
+ */
+export function isDuplicateGrandFinalReset(match: {
+  state?: string | null;
+  scoresCsv?: string | null;
+  player1Id?: number | string | null;
+  player2Id?: number | string | null;
+  player1PrereqId?: number | string | null;
+  player2PrereqId?: number | string | null;
+}, prior: {
+  state?: string | null;
+  scoresCsv?: string | null;
+  player1Id?: number | string | null;
+  player2Id?: number | string | null;
+} | null | undefined): boolean {
+  if (!prior) return false;
+  const p1 = match.player1PrereqId;
+  const p2 = match.player2PrereqId;
+  if (p1 == null || p2 == null || String(p1) !== String(p2)) return false;
+  if ((match.state ?? "").toLowerCase() !== "complete") return false;
+  if ((prior.state ?? "").toLowerCase() !== "complete") return false;
+  if (normalizeScoresCsv(match.scoresCsv) !== normalizeScoresCsv(prior.scoresCsv)) {
+    return false;
+  }
+  if (match.player1Id == null || match.player2Id == null) return false;
+  return (
+    String(match.player1Id) === String(prior.player1Id) &&
+    String(match.player2Id) === String(prior.player2Id)
+  );
+}
+
+function shouldKeepApiMatch(match: ChallongeMatch, all: ChallongeMatch[]): boolean {
+  if (match.optional && match.state !== "complete") return false;
+  const prior =
+    match.player1_prereq_match_id != null
+      ? all.find((m) => m.id === match.player1_prereq_match_id) ?? null
+      : null;
+  if (
+    isDuplicateGrandFinalReset(
+      {
+        state: match.state,
+        scoresCsv: match.scores_csv,
+        player1Id: match.player1_id,
+        player2Id: match.player2_id,
+        player1PrereqId: match.player1_prereq_match_id,
+        player2PrereqId: match.player2_prereq_match_id,
+      },
+      prior
+        ? {
+            state: prior.state,
+            scoresCsv: prior.scores_csv,
+            player1Id: prior.player1_id,
+            player2Id: prior.player2_id,
+          }
+        : null,
+    )
+  ) {
+    return false;
+  }
+  return true;
+}
+
 function participantMap(
   participants: ChallongeParticipant[],
 ): Map<number, ChallongeParticipant> {
@@ -312,8 +384,7 @@ function normalizeResponse(url: string, data: ChallongeResponse): TournamentBrac
   );
   const matches = rawMatches.filter((m) => {
     if (hasNonGroupMatches && m.group_id !== null && m.group_id !== undefined) return false;
-    if (m.optional && m.state !== "complete") return false;
-    return true;
+    return shouldKeepApiMatch(m, rawMatches);
   });
 
   const grouped = new Map<number, ChallongeMatch[]>();
@@ -467,7 +538,8 @@ const REDIS_TTL_LIVE_SEC = 30;
 const REDIS_TTL_COMPLETED_SEC = 600;
 
 function redisBracketKey(slug: string): string {
-  return `challonge:bracket:${slug}`;
+  // v2: hide duplicate completed grand-final resets
+  return `challonge:bracket:v2:${slug}`;
 }
 
 /** Store a freshly fetched bracket in memory, disk, and Redis (cross-instance). */
@@ -814,14 +886,52 @@ function normalizeModuleStore(
   }
 
   const tournamentType = store.tournament?.tournament_type ?? "single elimination";
-  const roundNumbers = Object.keys(byRound)
+
+  // Drop mis-copied grand final resets (same participants + score as first GF).
+  const allModuleMatches = Object.values(byRound).flat();
+  const filteredByRound: Record<string, ModuleMatch[]> = {};
+  for (const [roundKey, roundMatches] of Object.entries(byRound)) {
+    filteredByRound[roundKey] = roundMatches.filter((m) => {
+      const p1Pre = m.player1_prereq_identifier;
+      const p2Pre = m.player2_prereq_identifier;
+      if (p1Pre == null || p2Pre == null || String(p1Pre) !== String(p2Pre)) {
+        return true;
+      }
+      const prior =
+        allModuleMatches.find(
+          (x) => x.identifier != null && String(x.identifier) === String(p1Pre),
+        ) ?? null;
+      const [mScore1, mScore2] = moduleScores(m);
+      const [pScore1, pScore2] = prior ? moduleScores(prior) : ["", ""];
+      return !isDuplicateGrandFinalReset(
+        {
+          state: m.state,
+          scoresCsv: `${mScore1}-${mScore2}`,
+          player1Id: m.player1?.id ?? m.player1?.display_name ?? null,
+          player2Id: m.player2?.id ?? m.player2?.display_name ?? null,
+          player1PrereqId: p1Pre,
+          player2PrereqId: p2Pre,
+        },
+        prior
+          ? {
+              state: prior.state,
+              scoresCsv: `${pScore1}-${pScore2}`,
+              player1Id: prior.player1?.id ?? prior.player1?.display_name ?? null,
+              player2Id: prior.player2?.id ?? prior.player2?.display_name ?? null,
+            }
+          : null,
+      );
+    });
+  }
+
+  const roundNumbers = Object.keys(filteredByRound)
     .map((k) => Number(k))
     .filter((n) => Number.isFinite(n));
   if (roundNumbers.length === 0 && (!groups || groups.length === 0)) return null;
 
   const grouped = new Map<number, ModuleMatch[]>();
   for (const n of roundNumbers) {
-    grouped.set(n, byRound[String(n)] ?? []);
+    grouped.set(n, filteredByRound[String(n)] ?? []);
   }
 
   const positiveRounds = roundNumbers.filter((r) => r > 0);
