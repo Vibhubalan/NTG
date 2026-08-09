@@ -1,7 +1,6 @@
 import type { GameSlug } from "@prisma/client";
 import type { TournamentTeamPlayerView, TournamentTeamView } from "@core/contracts";
 import type { ChampionResult } from "@/lib/tournament-champion";
-import { rankIconUrl } from "@/lib/valorant-rank";
 import { resolvePortraitCardArtUrl } from "@/lib/valorant-player-card";
 import type { MvpData } from "./TournamentFinalResults";
 
@@ -41,13 +40,6 @@ function isMvpPlayer(player: TournamentTeamPlayerView, mvp: MvpData | null): boo
     return true;
   }
   return false;
-}
-
-function playerRankIcon(player: TournamentTeamPlayerView): string | null {
-  const fromTierId = rankIconUrl(player.valorantRankTierId);
-  if (fromTierId) return fromTierId;
-  if (!player.valorantRankTier) return null;
-  return `/valorant/ranks/${player.valorantRankTier.replace(" ", "_")}_Rank.png`;
 }
 
 function playerCardArt(player: TournamentTeamPlayerView): string {
@@ -101,8 +93,6 @@ function RosterPlayerCard({
   game?: GameSlug;
   isMvp?: boolean;
 }) {
-  const isValorant = game === "VALORANT";
-  const rankIcon = playerRankIcon(player);
   const secondary = game === "EA_FC26" ? player.olympusId : player.riotId;
   const role = player.participantRole ?? "PLAYER";
   const badge = ROLE_BADGE[role] ?? ROLE_BADGE.PLAYER!;
@@ -128,7 +118,7 @@ function RosterPlayerCard({
         alt=""
         className="absolute inset-0 h-full w-full object-cover object-top"
       />
-      <div className="absolute inset-0 bg-gradient-to-t from-black via-black/55 to-transparent" />
+      <div className="absolute inset-0 bg-gradient-to-t from-black from-[18%] via-black/70 via-[42%] to-transparent to-[72%]" />
 
       {isMvp ? (
         <div className="absolute left-1.5 top-1.5 z-20 sm:left-4 sm:top-4">
@@ -141,24 +131,25 @@ function RosterPlayerCard({
         </div>
       ) : null}
 
-      <div className="relative z-10 flex h-full flex-col items-center justify-end p-1.5 text-center sm:p-4">
-        {isValorant && rankIcon ? (
-          <div className="mb-1 flex h-7 w-7 items-center justify-center sm:mb-3 sm:h-14 sm:w-14">
-            <img src={rankIcon} alt="" className="h-full w-full object-contain drop-shadow-md" />
-          </div>
-        ) : null}
-
-        <h3 className="max-w-full truncate font-display text-[9px] font-black leading-tight text-white drop-shadow-md sm:text-base">
+      <div className="relative z-10 flex h-full flex-col items-center justify-end px-1.5 pb-2 pt-8 text-center sm:px-3 sm:pb-4 sm:pt-12">
+        <div
+          className={`mb-1.5 h-px w-8 sm:mb-2.5 sm:w-12 ${
+            isMvp
+              ? "bg-gradient-to-r from-transparent via-violet-300/70 to-transparent"
+              : "bg-gradient-to-r from-transparent via-amber-300/65 to-transparent"
+          }`}
+        />
+        <h3 className="max-w-full truncate font-display text-[11px] font-black leading-[1.1] tracking-wide text-white drop-shadow-[0_2px_8px_rgba(0,0,0,0.85)] sm:text-lg sm:tracking-[0.02em]">
           {player.displayName}
         </h3>
         {secondary ? (
-          <p className="mt-0.5 hidden max-w-full truncate text-[10px] font-medium text-white/50 sm:mt-1 sm:block">
+          <p className="mt-0.5 max-w-full truncate text-[8px] font-semibold tracking-wide text-white/55 sm:mt-1 sm:text-[11px]">
             {secondary}
           </p>
         ) : null}
 
         <span
-          className="mt-1 rounded-full border px-1.5 py-0.5 text-[6px] font-black uppercase tracking-wider sm:mt-3 sm:px-3 sm:py-1 sm:text-[9px] sm:tracking-widest"
+          className="mt-2 rounded-full border px-2 py-0.5 text-[7px] font-black uppercase tracking-[0.16em] sm:mt-3 sm:px-3 sm:py-1 sm:text-[9px] sm:tracking-[0.2em]"
           style={{
             background: isMvp ? "#a78bfa22" : `${badge.color}22`,
             color: isMvp ? "#ddd6fe" : badge.color,
