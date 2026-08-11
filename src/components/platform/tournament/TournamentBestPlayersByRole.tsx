@@ -26,7 +26,7 @@ export const DEFAULT_ROLE_PLAYERS: RolePlayerStat[] = [
     roleTitle: "#1 Duelist",
     roleBadgeText: "#1 DUELIST",
     displayName: "Conor McGregor",
-    riotTag: "#Tony",
+    riotTag: "Tony",
     subtitle: "Conor_McGregor",
     statLabel: "FIRST KILLS",
     statValue: "34",
@@ -38,7 +38,7 @@ export const DEFAULT_ROLE_PLAYERS: RolePlayerStat[] = [
     roleTitle: "#1 Initiator",
     roleBadgeText: "#1 INITIATOR",
     displayName: "SaMサム",
-    riotTag: "#1109",
+    riotTag: "1109",
     subtitle: "Samarth",
     statLabel: "ASSISTS",
     statValue: "52",
@@ -50,7 +50,7 @@ export const DEFAULT_ROLE_PLAYERS: RolePlayerStat[] = [
     roleTitle: "#1 Controller",
     roleBadgeText: "#1 CONTROLLER",
     displayName: "Pwnsta",
-    riotTag: "#BLING",
+    riotTag: "BLING",
     subtitle: "Pwnsta",
     statLabel: "KAST",
     statValue: "79.2%",
@@ -62,7 +62,7 @@ export const DEFAULT_ROLE_PLAYERS: RolePlayerStat[] = [
     roleTitle: "#1 Sentinel",
     roleBadgeText: "#1 SENTINEL",
     displayName: "valorant hater",
-    riotTag: "#IGL",
+    riotTag: "IGL",
     subtitle: "Shanks",
     statLabel: "KAST",
     statValue: "81.5%",
@@ -74,7 +74,7 @@ export const DEFAULT_ROLE_PLAYERS: RolePlayerStat[] = [
     roleTitle: "#1 Flex",
     roleBadgeText: "#1 FLEX",
     displayName: "ValkoN 炎",
-    riotTag: "#vibhu",
+    riotTag: "vibhu",
     subtitle: "Vibhu",
     statLabel: "ACS",
     statValue: "248",
@@ -327,12 +327,6 @@ function CrystalGlassPlayerCard({
             {player.displayName}
           </h3>
 
-          {player.riotTag ? (
-            <p className="mt-0.5 hidden max-w-full truncate text-[11px] font-semibold tracking-wide text-white/60 sm:block">
-              {player.riotTag}
-            </p>
-          ) : null}
-
           <div className="mt-1 flex items-center justify-center sm:mt-2">
             <div
               className={`inline-flex items-center gap-0.5 rounded-full border bg-transparent px-1 py-0.5 text-[7px] font-black backdrop-blur-md sm:gap-1 sm:px-3 sm:py-1 sm:text-[9.5px] ${theme.statBadgeStyle}`}
@@ -370,11 +364,7 @@ export default function TournamentBestPlayersByRole({
       <div className="pointer-events-none absolute -right-[15%] -bottom-[35%] h-[70%] w-[55%] rounded-full bg-purple-600/5 blur-[120px]" />
 
       {/* Section Header */}
-      <div className="relative z-10 flex items-center justify-center gap-2 pb-2 sm:gap-3 sm:pb-6">
-        <span className="relative flex h-1.5 w-1.5 items-center justify-center sm:h-3 sm:w-3">
-          <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-amber-400 opacity-75" />
-          <span className="relative inline-flex h-1 w-1 rounded-full bg-amber-400 shadow-[0_0_12px_rgba(251,191,36,0.9)] sm:h-2.5 sm:w-2.5" />
-        </span>
+      <div className="relative z-10 flex items-center justify-center pb-2 sm:pb-6">
         <h2 className="font-display text-[10px] font-black uppercase tracking-[0.16em] text-transparent bg-clip-text bg-gradient-to-r from-amber-100 via-white to-amber-200/80 sm:text-xl sm:tracking-[0.2em] md:text-2xl">
           THE ROLE LEADERS
         </h2>

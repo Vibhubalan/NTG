@@ -226,7 +226,7 @@ export default function Performance() {
         />
 
         <ImageCard
-          src="/arena/auction-nights.png"
+          src="/arena/auction-nights-v2.png"
           kicker="The Vibe"
           title="Auction Nights"
           body="Neon-soaked energy, packed houses, and a crowd that lives for the play."

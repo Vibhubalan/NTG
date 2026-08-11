@@ -85,9 +85,12 @@ function toRolePlayerStat(
     },
     teams,
   );
-  const [gameName, tag] = stats.riotId.split("#");
-  const displayName =
-    stats.userName?.trim() || gameName?.trim() || stats.riotId;
+  const [gameName] = stats.riotId.split("#");
+  const displayName = (
+    stats.userName?.trim() ||
+    gameName?.trim() ||
+    stats.riotId
+  ).split("#")[0].trim();
 
   return {
     roleKey: spec.roleKey,
@@ -95,7 +98,7 @@ function toRolePlayerStat(
     roleBadgeText: spec.roleBadgeText,
     displayName,
     userId: roster?.userId ?? null,
-    riotTag: tag ? `#${tag}` : null,
+    riotTag: null,
     subtitle: roster?.displayName ?? stats.userName,
     riotPlayerCard: roster?.riotPlayerCard ?? null,
     riotPlayerCardWide: roster?.riotPlayerCardWide ?? null,
