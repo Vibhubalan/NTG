@@ -1,14 +1,11 @@
 "use client";
 
 import { useState } from "react";
-import Link from "next/link";
 import { motion } from "framer-motion";
 import type { RosterTeamView } from "@core/contracts/roster-listings";
-import type { ListingPreview } from "@core/contracts/roster-listings";
 import { gameMetaFor } from "@/lib/tournament-display";
 import type { GameSlug } from "@prisma/client";
 import BrandIcon from "@/components/ui/BrandIcon";
-import ListingCard from "@/components/platform/listings/ListingCard";
 import ValorantRosterGrid from "./ValorantRosterGrid";
 import Cs2RosterGrid from "./Cs2RosterGrid";
 import Cs2RosterImagePreload from "./Cs2RosterImagePreload";
@@ -21,7 +18,6 @@ const GAME_KEY_TO_SLUG: Record<string, GameSlug> = {
 
 type Props = {
   teams: RosterTeamView[];
-  jobListings: ListingPreview[];
 };
 
 const NTG_PERKS = [
@@ -46,34 +42,6 @@ const NTG_PERKS = [
     sub: "Priority access to NTG LANs, watch parties, and member-only events",
   },
 ];
-
-function OpenJobsSection({ jobs }: { jobs: ListingPreview[] }) {
-  if (jobs.length === 0) return null;
-
-  return (
-    <section className="space-y-4">
-      <div className="flex items-center justify-between gap-4">
-        <div className="flex items-center gap-3">
-          <span className="h-1.5 w-1.5 rounded-full bg-[var(--color-brand)] shadow-[0_0_8px_rgba(94,234,212,0.8)]" />
-          <h2 className="text-[11px] font-semibold uppercase tracking-[0.35em] text-[var(--color-brand)]/90">
-            Open jobs
-          </h2>
-        </div>
-        <Link
-          href="/listings?type=JOB"
-          className="text-[10px] font-semibold uppercase tracking-wider text-white/40 transition-colors hover:text-[var(--color-brand)]"
-        >
-          View all →
-        </Link>
-      </div>
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        {jobs.map((listing) => (
-          <ListingCard key={listing.id} listing={listing} />
-        ))}
-      </div>
-    </section>
-  );
-}
 
 function NtgPerksSection() {
   return (
@@ -118,14 +86,13 @@ function NtgPerksSection() {
   );
 }
 
-export default function RosterHub({ teams, jobListings }: Props) {
+export default function RosterHub({ teams }: Props) {
   const [activeKey, setActiveKey] = useState(teams[0]?.gameKey ?? "valorant");
   const team = teams.find((t) => t.gameKey === activeKey) ?? teams[0];
 
   if (!team) {
     return (
       <div className="py-24 text-center space-y-10">
-        <OpenJobsSection jobs={jobListings} />
         <div>
           <div className="mx-auto mb-6 flex h-16 w-16 items-center justify-center rounded-2xl border border-dashed border-white/10 bg-white/[0.02]">
             <svg className="h-7 w-7 text-white/20" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
@@ -146,7 +113,6 @@ export default function RosterHub({ teams, jobListings }: Props) {
   return (
     <div className="space-y-8">
       <Cs2RosterImagePreload />
-      <OpenJobsSection jobs={jobListings} />
 
       {teams.length > 1 && (
         <div className="flex border-b border-white/10 pb-6">
