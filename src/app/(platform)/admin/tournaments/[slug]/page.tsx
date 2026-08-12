@@ -19,11 +19,6 @@ export const metadata = { title: "Edit Cup" };
 
 type Props = { params: Promise<{ slug: string }> };
 
-function parseCarousel(value: unknown): string[] {
-  if (!Array.isArray(value)) return [];
-  return value.filter((v): v is string => typeof v === "string");
-}
-
 export default async function AdminTournamentEditPage({ params }: Props) {
   if (!serverEnv.databaseUrl) notFound();
 
@@ -51,7 +46,6 @@ export default async function AdminTournamentEditPage({ params }: Props) {
     description: t.description,
     posterUrl: t.posterUrl,
     hubBannerUrl: t.hubBannerUrl,
-    hubCarouselImages: parseCarousel(t.hubCarouselImages),
     showOnEsportsHub: t.showOnEsportsHub,
     prizePool: t.prizePool?.toString() ?? null,
     prizeNotes: t.prizeNotes,

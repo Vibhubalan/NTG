@@ -920,7 +920,7 @@ describe("buildPlayerStatsCsv", () => {
           teamBRounds: 7,
           mapName: "Ascent",
           mvpRiotId: "poach#001",
-          playedAt: "2026-07-20T12:00:00.000Z",
+          startedAt: "2026-07-20T12:00:00.000Z",
           players: [
             {
               riotId: "poach#001",
@@ -948,7 +948,7 @@ describe("buildPlayerStatsCsv", () => {
           teamBRounds: 9,
           mapName: "Bind",
           mvpRiotId: null,
-          playedAt: "2026-08-02T12:00:00.000Z",
+          startedAt: "2026-08-02T12:00:00.000Z",
           players: [
             {
               riotId: "poach#001",

@@ -5,7 +5,6 @@ export {
   getActiveRegistrationBanner,
   getActiveAuction,
   getHeroCupStatus,
-  listActiveRegistrationBanners,
   getLeaderboardPreview,
   getValorantRankings,
   recordMatchResult,

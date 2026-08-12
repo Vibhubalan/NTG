@@ -23,11 +23,6 @@ function parsePrizeSplit(value: unknown): PrizeSplitRow[] | null {
   return rows.length > 0 ? rows : null;
 }
 
-function parseCarouselImages(value: unknown): string[] {
-  if (!Array.isArray(value)) return [];
-  return value.filter((item): item is string => typeof item === "string" && item.trim().length > 0);
-}
-
 function parseValorantRoles(value: unknown): string[] | null {
   if (!Array.isArray(value)) return null;
   const roles = value.filter((r): r is string => typeof r === "string" && r.trim().length > 0);
@@ -297,7 +292,6 @@ type RegistrationBannerRow = {
   registrationClosesAt: Date | null;
   hideAfter: Date | null;
   hubBannerUrl: string | null;
-  hubCarouselImages: unknown;
   status: TournamentStatus;
 };
 
@@ -315,7 +309,6 @@ function toRegistrationBanner(t: RegistrationBannerRow) {
       t.hideAfter?.toISOString().slice(0, 10) ??
       null,
     hubBannerUrl: t.hubBannerUrl,
-    hubCarouselImages: parseCarouselImages(t.hubCarouselImages),
     status: t.status,
   };
 }

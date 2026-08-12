@@ -165,10 +165,6 @@ export async function getActiveAuction(): Promise<ActiveAuction | null> {
   return { slug: t.slug, name: t.name, endsAt: t.auctionEndsAt?.toISOString() ?? null };
 }
 
-export async function listActiveRegistrationBanners(): Promise<TournamentRegistrationBanner[]> {
-  return tournamentRepo.findActiveRegistrationBanners();
-}
-
 export async function getLeaderboardPreview(
   game: Parameters<LeaderboardRepository["listPreview"]>[0],
   limit = 10,

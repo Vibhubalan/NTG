@@ -28,6 +28,5 @@ export type TournamentRegistrationBanner = {
   href: string;
   hideAfter: string | null;
   hubBannerUrl: string | null;
-  hubCarouselImages: string[];
   status: TournamentStatus;
 };

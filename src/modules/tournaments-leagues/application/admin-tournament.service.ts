@@ -46,7 +46,6 @@ export type CreateTournamentInput = {
   posterUrl?: string;
   rulebookUrl?: string;
   hubBannerUrl?: string;
-  hubCarouselImages?: string[];
   showOnEsportsHub?: boolean;
 };
 
@@ -225,9 +224,6 @@ export async function createTournament(
       posterUrl: input.posterUrl?.trim() || null,
       rulebookUrl: input.rulebookUrl?.trim() || null,
       hubBannerUrl: input.hubBannerUrl?.trim() || null,
-      hubCarouselImages: input.hubCarouselImages?.length
-        ? (input.hubCarouselImages as unknown as Prisma.InputJsonValue)
-        : undefined,
       showOnEsportsHub: input.showOnEsportsHub ?? false,
       registrationFormat: (input.registrationFormat as import("@prisma/client").TournamentFormat | null) ?? null,
     },
@@ -253,7 +249,6 @@ export type AdminCupFieldsSnapshot = {
   description: string | null;
   posterUrl: string | null;
   hubBannerUrl: string | null;
-  hubCarouselImages: string[];
   showOnEsportsHub: boolean;
   prizePool: string | null;
   prizeNotes: string | null;
@@ -294,11 +289,6 @@ function parseRankPoints(value: unknown): { rank: string; floor: number }[] | nu
   return rows.length ? rows : null;
 }
 
-function parseCarouselImages(value: unknown): string[] {
-  if (!Array.isArray(value)) return [];
-  return value.filter((v): v is string => typeof v === "string");
-}
-
 export function toAdminCupFieldsSnapshot(
   t: NonNullable<Awaited<ReturnType<typeof getTournamentAdmin>>>,
 ): AdminCupFieldsSnapshot {
@@ -312,7 +302,6 @@ export function toAdminCupFieldsSnapshot(
     description: t.description,
     posterUrl: t.posterUrl,
     hubBannerUrl: t.hubBannerUrl,
-    hubCarouselImages: parseCarouselImages(t.hubCarouselImages),
     showOnEsportsHub: t.showOnEsportsHub,
     prizePool: t.prizePool?.toString() ?? null,
     prizeNotes: t.prizeNotes,
@@ -424,11 +413,6 @@ export async function updateTournamentFull(
   if (input.posterUrl !== undefined) data.posterUrl = input.posterUrl?.trim() || null;
   if (input.rulebookUrl !== undefined) data.rulebookUrl = input.rulebookUrl?.trim() || null;
   if (input.hubBannerUrl !== undefined) data.hubBannerUrl = input.hubBannerUrl?.trim() || null;
-  if (input.hubCarouselImages !== undefined) {
-    data.hubCarouselImages = input.hubCarouselImages.length
-      ? (input.hubCarouselImages as unknown as Prisma.InputJsonValue)
-      : Prisma.JsonNull;
-  }
   if (input.showOnEsportsHub !== undefined) data.showOnEsportsHub = input.showOnEsportsHub;
   if (input.registrationFormat !== undefined) {
     data.registrationFormat = (input.registrationFormat as import("@prisma/client").TournamentFormat | null) ?? null;

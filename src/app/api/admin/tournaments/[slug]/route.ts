@@ -87,7 +87,6 @@ export async function PATCH(req: Request, { params }: Props) {
     posterUrl: normalizeOptionalString(body.posterUrl),
     rulebookUrl: normalizeOptionalString(body.rulebookUrl),
     hubBannerUrl: normalizeOptionalString(body.hubBannerUrl),
-    hubCarouselImages: body.hubCarouselImages as string[] | undefined,
     showOnEsportsHub: body.showOnEsportsHub as boolean | undefined,
     hideAfter: body.hideAfter as string | null | undefined,
     teams: body.teams as string[] | undefined,

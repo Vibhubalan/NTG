@@ -81,7 +81,6 @@ type TournamentData = {
   description: string | null;
   posterUrl: string | null;
   hubBannerUrl: string | null;
-  hubCarouselImages: string[];
   showOnEsportsHub: boolean;
   prizePool: string | null;
   prizeNotes: string | null;
@@ -205,7 +204,6 @@ function getSavePayload(form: TournamentData) {
     gameLabel: emptyToNull(form.gameLabel),
     status: form.status,
     hubBannerUrl: emptyToNull(form.hubBannerUrl),
-    hubCarouselImages: form.hubCarouselImages,
     showOnEsportsHub: form.showOnEsportsHub,
     prizePool: form.prizePool ? Number(form.prizePool) : null,
     prizeNotes: emptyToNull(form.prizeNotes),
@@ -680,7 +678,6 @@ export default function AdminTournamentEditor({
           description: null,
           posterUrl: emptyToNull(form.hubBannerUrl),
           hubBannerUrl: emptyToNull(form.hubBannerUrl),
-          hubCarouselImages: form.hubCarouselImages,
           showOnEsportsHub: form.showOnEsportsHub,
           prizePool: form.prizePool ? Number(form.prizePool) : null,
           prizeNotes: emptyToNull(form.prizeNotes),
@@ -850,19 +847,6 @@ export default function AdminTournamentEditor({
           const data = await res.json();
           setMessage(data.error ?? "Remove failed.");
         }
-      },
-    });
-  }
-
-  function requestRemoveCarouselSlide(url: string) {
-    openDeleteConfirm({
-      title: "Remove hub slide?",
-      description: "This image will no longer rotate on the esports hub registration card.",
-      confirmLabel: "Remove slide",
-      onConfirm: async () => {
-        const next = form.hubCarouselImages.filter((u) => u !== url);
-        setForm({ ...form, hubCarouselImages: next });
-        await patchField({ hubCarouselImages: next }, "Slide removed.");
       },
     });
   }

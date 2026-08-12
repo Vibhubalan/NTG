@@ -40,7 +40,6 @@ const FIELD_LABELS: Record<string, string> = {
   bracketUrl: "bracket link",
   posterUrl: "poster image",
   hubBannerUrl: "hub banner",
-  hubCarouselImages: "carousel images",
   showOnEsportsHub: "esports hub visibility",
   hideAfter: "hide-after date",
   rulebookUrl: "rulebook",
