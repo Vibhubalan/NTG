@@ -26,7 +26,7 @@ export default async function ListingsPage({ searchParams }: Props) {
         <PlatformHeader
           eyebrow="Work & compete"
           title="Opportunities"
-          subtitle="Open jobs and team tryouts at NTG. Browse listings below — full details and applications are on each listing page."
+          subtitle="Open jobs and team tryouts at NTG. Tap a card to see full details and apply."
         />
         <ListingsBoard listings={listings} initialType={type ?? null} />
       </div>

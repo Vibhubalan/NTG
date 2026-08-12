@@ -10,6 +10,8 @@ type NavLinkItem = {
   label: string;
   href: string;
   badge?: string;
+  /** Quiet numeric hint (e.g. open listings). Shown only when > 0. */
+  count?: number;
   icon?: "home";
   external?: boolean;
 };
@@ -70,6 +72,7 @@ function NavLink({
   active,
   external,
   badge,
+  count,
   icon,
 }: {
   href: string;
@@ -77,6 +80,7 @@ function NavLink({
   active?: boolean;
   external?: boolean;
   badge?: string;
+  count?: number;
   icon?: NavLinkItem["icon"];
 }) {
   const pathname = usePathname();
@@ -114,6 +118,17 @@ function NavLink({
     </span>
   ) : null;
 
+  const countEl =
+    typeof count === "number" && count > 0 ? (
+      <span
+        className="ml-1 inline-flex min-w-[1.15rem] items-center justify-center rounded-full border border-[var(--color-brand)]/30 bg-[var(--color-brand)]/[0.12] px-1.5 py-0.5 text-[9px] font-semibold tabular-nums tracking-normal text-[var(--color-brand)]"
+        aria-label={`${count} openings`}
+        title={`${count} open ${count === 1 ? "opportunity" : "opportunities"}`}
+      >
+        {count}
+      </span>
+    ) : null;
+
   if (external || isExternalHref(href)) {
     return (
       <a
@@ -126,6 +141,7 @@ function NavLink({
         <span className={containerSpanClass}>
           {iconEl}
           <span>{label}</span>
+          {countEl}
           {badgeEl}
         </span>
         {underline}
@@ -138,6 +154,7 @@ function NavLink({
       <span className={containerSpanClass}>
         {iconEl}
         <span>{label}</span>
+        {countEl}
         {badgeEl}
       </span>
       {underline}
@@ -430,6 +447,14 @@ function MobileMenu({
                     <HomeIcon className="h-[1.05em] w-[1.05em] shrink-0 opacity-80" />
                   ) : null}
                   <span>{link.label}</span>
+                  {typeof link.count === "number" && link.count > 0 ? (
+                    <span
+                      className="inline-flex min-w-[1.25rem] items-center justify-center rounded-full border border-[var(--color-brand)]/30 bg-[var(--color-brand)]/[0.12] px-2 py-0.5 text-[10px] font-semibold tabular-nums tracking-normal text-[var(--color-brand)]"
+                      aria-label={`${link.count} openings`}
+                    >
+                      {link.count}
+                    </span>
+                  ) : null}
                   {link.badge ? (
                     <span className="rounded-full border border-amber-500/35 bg-amber-500/15 px-2 py-0.5 text-[9px] font-bold uppercase tracking-[0.12em] text-amber-200/95">
                       {link.badge}
@@ -491,6 +516,7 @@ function NavbarContent() {
   const { data: session, status } = useSession();
   const [isAdmin, setIsAdmin] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [openListingsCount, setOpenListingsCount] = useState(0);
 
   // Initialize state based on window.location.pathname fallback if pathname isn't fully ready yet on mount
   const getIsLeaderboard = () => {
@@ -512,6 +538,23 @@ function NavbarContent() {
   useEffect(() => {
     setMenuOpen(false);
   }, [pathname]);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetch("/api/listings")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => {
+        if (cancelled) return;
+        const n = Array.isArray(data?.listings) ? data.listings.length : 0;
+        setOpenListingsCount(n);
+      })
+      .catch(() => {
+        if (!cancelled) setOpenListingsCount(0);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   // Manually handle page routing with hash anchors (e.g. /esports -> /#games)
   useEffect(() => {
@@ -550,9 +593,14 @@ function NavbarContent() {
   if (pathname && isAuthRoute(pathname)) return null;
 
   const signedIn = status === "authenticated" && session?.user;
-  const links: NavLinkItem[] = isHomePage(pathname)
+  const links: NavLinkItem[] = (isHomePage(pathname)
     ? loungeLinks
-    : [homeNavLink, ...loungeLinks];
+    : [homeNavLink, ...loungeLinks]
+  ).map((link) =>
+    link.href === "/listings" && openListingsCount > 0
+      ? { ...link, count: openListingsCount }
+      : link,
+  );
 
   return (
     <header
@@ -600,6 +648,7 @@ function NavbarContent() {
                   active={isNavActive(pathname, link.href)}
                   external={link.external || link.href.startsWith("#")}
                   badge={link.badge}
+                  count={link.count}
                   icon={link.icon}
                 />
               </li>

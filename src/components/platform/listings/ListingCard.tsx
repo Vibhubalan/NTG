@@ -3,120 +3,74 @@
 import Link from "next/link";
 import type { ListingPreview } from "@core/contracts/roster-listings";
 import BrandIcon from "@/components/ui/BrandIcon";
-import { LISTING_BRAND_ACCENT, listingSummary, rosterGameVisual, withHexAlpha } from "@/lib/roster-games";
+import { LISTING_BRAND_ACCENT, rosterGameVisual, withHexAlpha } from "@/lib/roster-games";
 
 type Props = {
   listing: ListingPreview;
 };
 
 export default function ListingCard({ listing }: Props) {
-  const typeLabel = listing.type === "JOB" ? "Job" : "Team tryout";
+  const typeLabel = listing.type === "JOB" ? "Job" : "Tryout";
   const visual = rosterGameVisual(listing.gameKey, listing.gameLabel);
-  const summary = listingSummary(listing.description);
   const accent = visual?.hex ?? LISTING_BRAND_ACCENT;
 
   return (
     <Link
       href={`/listings/${listing.slug}`}
-      className="group relative flex aspect-[4/3] w-full flex-col overflow-hidden rounded-2xl border bg-[#080f1c]/80 p-4 transition-all duration-300 hover:-translate-y-0.5 sm:aspect-square sm:p-5 isolate [transform:translateZ(0)]"
-      style={{
-        borderColor: withHexAlpha(accent, 0.26),
-        boxShadow: `0 12px 40px -24px ${withHexAlpha(accent, 0.28)}`,
-      }}
+      className="group flex min-h-[200px] w-full flex-col rounded-2xl border bg-[#0b0f16]/80 p-5 transition-[border-color,background-color] duration-300 hover:bg-[#0e141f] sm:min-h-[210px] sm:p-6"
+      style={{ borderColor: withHexAlpha(accent, 0.6) }}
     >
-      <div className="pointer-events-none absolute inset-0 overflow-hidden rounded-2xl">
-        <div
-          aria-hidden
-          className="absolute -right-8 -top-8 h-24 w-24 rounded-full opacity-30 transition-opacity group-hover:opacity-50 sm:-right-10 sm:-top-10 sm:h-32 sm:w-32 sm:opacity-35 sm:group-hover:opacity-55"
-          style={{
-            background: `radial-gradient(circle, ${accent} 0%, transparent 70%)`
-          }}
-        />
-      </div>
-      <div
-        aria-hidden
-        className="pointer-events-none absolute inset-0 opacity-[0.08]"
-        style={{
-          background: `radial-gradient(ellipse at top left, ${withHexAlpha(accent, 0.5)}, transparent 65%)`,
-        }}
-      />
-
-      <div className="relative flex h-full min-h-0 flex-col">
-        <div className="flex items-start justify-between gap-2">
+      <div className="flex items-center justify-between gap-3">
+        <div className="flex items-center gap-2.5">
           {visual ? (
-            <div
-              className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl shadow-md sm:h-12 sm:w-12"
-              style={{
-                background: `linear-gradient(135deg, ${withHexAlpha(accent, 0.22)}, ${withHexAlpha(accent, 0.06)})`,
-                border: `1px solid ${withHexAlpha(accent, 0.38)}`,
-                color: accent,
-              }}
+            <span
+              className="inline-flex h-8 w-8 items-center justify-center rounded-lg"
+              style={{ color: accent, background: withHexAlpha(accent, 0.08) }}
             >
-              <BrandIcon path={visual.iconPath} title={visual.label} className="h-5 w-5 sm:h-6 sm:w-6" />
-            </div>
+              <BrandIcon path={visual.iconPath} title={visual.label} className="h-4 w-4" />
+            </span>
           ) : (
-            <div
-              className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-sm font-bold sm:h-12 sm:w-12"
-              style={{
-                background: withHexAlpha(accent, 0.1),
-                border: `1px solid ${withHexAlpha(accent, 0.28)}`,
-                color: accent,
-              }}
-            >
+            <span className="font-display text-[11px] font-semibold tracking-[0.18em] text-white/35">
               NTG
-            </div>
+            </span>
           )}
-
-          <span
-            className="shrink-0 rounded-full px-2 py-0.5 text-[9px] font-bold uppercase tracking-[0.12em] sm:px-2.5 sm:py-1 sm:text-[10px]"
-            style={{
-              background: withHexAlpha(accent, 0.14),
-              color: accent,
-              border: `1px solid ${withHexAlpha(accent, 0.28)}`,
-            }}
-          >
-            {typeLabel}
-          </span>
-        </div>
-
-        <div className="mt-3 flex min-h-0 flex-1 flex-col gap-1.5">
           {visual ? (
-            <p
-              className="shrink-0 text-[10px] font-semibold uppercase tracking-[0.14em] sm:text-[11px]"
-              style={{ color: withHexAlpha(accent, 0.8) }}
-            >
+            <span className="text-[11px] font-medium tracking-[0.08em] text-white/40 uppercase">
               {visual.label}
-            </p>
+            </span>
           ) : null}
-          <h3 className="shrink-0 font-display text-sm font-semibold leading-snug text-white line-clamp-2 sm:text-base">
-            {listing.title}
-          </h3>
-          {summary ? (
-            <p className="min-h-0 flex-1 text-xs leading-relaxed text-white/45 line-clamp-3 sm:text-sm sm:line-clamp-4">
-              {summary}
-            </p>
-          ) : (
-            <div className="flex-1" />
-          )}
         </div>
 
-        <p
-          className="mt-2 flex shrink-0 items-center gap-1.5 text-[10px] font-semibold uppercase tracking-[0.14em] sm:mt-3 sm:text-xs"
-          style={{ color: accent }}
-        >
-          View details
-          <svg
-            className="h-3 w-3 transition-transform group-hover:translate-x-0.5"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-            strokeWidth="2"
-            aria-hidden
-          >
-            <path strokeLinecap="round" strokeLinejoin="round" d="M5 12h14M13 5l7 7-7 7" />
-          </svg>
+        <span className="text-[10px] font-medium tracking-[0.16em] text-white/35 uppercase">
+          {typeLabel}
+        </span>
+      </div>
+
+      <div className="mt-6 flex flex-1 flex-col">
+        <h3 className="font-display text-[1.05rem] font-medium leading-snug tracking-[-0.01em] text-white/95 line-clamp-2 transition-colors duration-300 group-hover:text-white sm:text-[1.15rem]">
+          {listing.title}
+        </h3>
+        <p className="mt-3 text-[13px] leading-relaxed text-white/40 transition-colors duration-300 group-hover:text-white/55">
+          Learn more about this opportunity
         </p>
       </div>
+
+      <span
+        className="mt-6 inline-flex items-center gap-1.5 text-[11px] font-medium tracking-[0.12em] uppercase transition-colors duration-300"
+        style={{ color: withHexAlpha(accent, 0.95) }}
+      >
+        Open
+        <svg
+          className="h-3 w-3 transition-transform duration-300 group-hover:translate-x-0.5"
+          fill="none"
+          viewBox="0 0 24 24"
+          stroke="currentColor"
+          strokeWidth="1.8"
+          aria-hidden
+        >
+          <path strokeLinecap="round" strokeLinejoin="round" d="M5 12h14M13 5l7 7-7 7" />
+        </svg>
+      </span>
     </Link>
   );
 }
