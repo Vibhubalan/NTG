@@ -12,6 +12,10 @@ import {
   isTryoutApplicationLive,
 } from "../domain/tryout-schedule";
 import { syncTryoutListingStatus } from "./tryout-schedule.service";
+import {
+  meetsValorantTryoutRank,
+  TRYOUT_RANK_INELIGIBLE_MESSAGE,
+} from "../domain/tryout-rank";
 
 function validateGeneralProfileForTryout(user: {
   phone: string | null;
@@ -72,6 +76,8 @@ async function getValorantRankSnapshot(userId: string): Promise<{
   tier: string | null;
   tierId: number | null;
   mmr: number | null;
+  peakTier: string | null;
+  peakTierId: number | null;
 }> {
   let entry = await prisma.leaderboardEntry.findFirst({
     where: { userId, game: "VALORANT", scope: "TOWN" },
@@ -91,7 +97,19 @@ async function getValorantRankSnapshot(userId: string): Promise<{
     tier: entry?.rankTier ?? null,
     tierId: entry?.rankTierId ?? null,
     mmr: entry?.mmr ?? null,
+    peakTier: entry?.peakRankTier ?? null,
+    peakTierId: entry?.peakRankTierId ?? null,
   };
+}
+
+function isAllowedResumeUrl(url: string): boolean {
+  try {
+    const parsed = new URL(url);
+    if (parsed.protocol !== "https:" && parsed.protocol !== "http:") return false;
+    return parsed.pathname.includes("listing-applications/");
+  } catch {
+    return false;
+  }
 }
 
 async function buildApplicantProfile(
@@ -212,9 +230,20 @@ export async function getListingEligibility(
 
   const profile = await buildApplicantProfile(listing, user, userId);
 
+  let rankIneligible = false;
+  if (
+    listing.type === "ROSTER_TRYOUT" &&
+    missing.length === 0 &&
+    gameKeyToSlug(listing.gameKey) === GameSlug.VALORANT
+  ) {
+    const rank = await getValorantRankSnapshot(userId);
+    rankIneligible = !meetsValorantTryoutRank(rank.tierId, rank.peakTierId);
+  }
+
   return {
-    canApply: missing.length === 0,
+    canApply: missing.length === 0 && !rankIneligible,
     missing,
+    rankIneligible,
     displayName: profile.displayName,
     profile,
   };
@@ -260,6 +289,12 @@ export async function applyToListing(
     if (missing.length > 0) {
       return { ok: false, error: missing[0] };
     }
+    if (gameKeyToSlug(listing.gameKey) === GameSlug.VALORANT) {
+      const rank = await getValorantRankSnapshot(userId);
+      if (!meetsValorantTryoutRank(rank.tierId, rank.peakTierId)) {
+        return { ok: false, error: TRYOUT_RANK_INELIGIBLE_MESSAGE };
+      }
+    }
   }
 
   const existing = await prisma.listingApplication.findUnique({
@@ -297,6 +332,16 @@ export async function applyToListing(
     snapshotValorantRoles = user.playerProfile?.valorantRoles ?? [];
   }
 
+  const pastExperience =
+    listing.type === "ROSTER_TRYOUT" ? input.pastExperience?.trim() || null : null;
+  const resumeUrl =
+    listing.type === "ROSTER_TRYOUT" && input.resumeUrl?.trim()
+      ? input.resumeUrl.trim()
+      : null;
+  if (resumeUrl && !isAllowedResumeUrl(resumeUrl)) {
+    return { ok: false, error: "Invalid resume upload." };
+  }
+
   try {
     const app = await prisma.listingApplication.create({
       data: {
@@ -319,6 +364,8 @@ export async function applyToListing(
         snapshotCs2FaceitRank: user.playerProfile?.cs2FaceitRank?.trim() || "NA",
         snapshotOlympusId: user.olympusId,
         snapshotDateOfBirth: user.dateOfBirth,
+        pastExperience,
+        resumeUrl,
         status: "PENDING",
       },
     });

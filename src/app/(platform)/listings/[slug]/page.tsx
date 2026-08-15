@@ -27,7 +27,9 @@ export default async function ListingDetailPage({ params }: Props) {
   const orgLabel = listing.type === "JOB" ? "NTG Lounge Operations" : "NTG Esports";
 
   const isTryout = listing.type === "ROSTER_TRYOUT";
-  const profileIncomplete = Boolean(userId && eligibility && !eligibility.canApply);
+  const profileIncomplete = Boolean(
+    userId && eligibility && !eligibility.canApply && !eligibility.rankIneligible,
+  );
   const navLabel = isTryout ? "Tryouts" : "Application";
 
   return (

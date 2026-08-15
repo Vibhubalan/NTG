@@ -91,6 +91,8 @@ export const replaceListingFormFieldsSchema = z.object({
 export const listingApplySchema = z.object({
   responses: z.record(z.string(), responseValueSchema).optional(),
   message: sanitizedString.pipe(z.string().max(6000)).optional(),
+  pastExperience: z.union([sanitizedString.pipe(z.string().max(4000)), z.literal("")]).optional(),
+  resumeUrl: z.union([z.string().url().max(2048), z.literal("")]).optional(),
   ...registrationTermsField,
 });
 

@@ -40,6 +40,8 @@ export async function POST(req: Request, { params }: Props) {
   const result = await applyToListing(slug, auth.userId, {
     message: parsed.data.message,
     responses: parsed.data.responses,
+    pastExperience: parsed.data.pastExperience || undefined,
+    resumeUrl: parsed.data.resumeUrl || undefined,
   });
 
   if (!result.ok) {

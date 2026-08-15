@@ -114,6 +114,8 @@ export type ListingApplicantProfile = {
 export type ListingEligibility = {
   canApply: boolean;
   missing: string[];
+  /** Valorant tryouts only — applicant does not meet the hidden rank floor. */
+  rankIneligible: boolean;
   displayName: string | null;
   profile: ListingApplicantProfile | null;
 };

@@ -44,6 +44,8 @@ export type AdminListingApplicationRow = {
   cs2PeakPremier: string | null;
   cs2FaceitRank: string | null;
   cs2Hours: number | null;
+  pastExperience: string | null;
+  resumeUrl: string | null;
 };
 
 export async function listListingsAdmin(): Promise<AdminListingRow[]> {
@@ -348,6 +350,8 @@ export async function listListingApplicationsAdmin(
       cs2PeakPremier: r.snapshotCs2PeakPremier,
       cs2FaceitRank: r.snapshotCs2FaceitRank,
       cs2Hours: r.snapshotCs2Hours,
+      pastExperience: r.pastExperience,
+      resumeUrl: r.resumeUrl,
     };
   });
 }
@@ -402,6 +406,8 @@ export function buildListingApplicationsCsv(
     "Steam64",
     "Peak Premier",
     "Faceit",
+    "Past Experience",
+    "Resume URL",
     "Applied At",
   ];
   const lines = [headers.join(",")];
@@ -424,6 +430,8 @@ export function buildListingApplicationsCsv(
         csvEscape(r.steamId64),
         csvEscape(r.cs2PeakPremier),
         csvEscape(r.cs2FaceitRank),
+        csvEscape(r.pastExperience),
+        csvEscape(r.resumeUrl),
         csvEscape(r.createdAt),
       ].join(","),
     );

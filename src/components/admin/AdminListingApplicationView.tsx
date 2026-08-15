@@ -126,6 +126,32 @@ export default function AdminListingApplicationView({
           variant="review"
         />
 
+        {!isJob && (application.pastExperience || application.resumeUrl) ? (
+          <div className="rounded-[1.35rem] border border-white/[0.08] bg-[#0a1020]/85 p-6 sm:p-8 space-y-5">
+            <p className="text-[10px] font-medium uppercase tracking-[0.32em] text-[var(--color-brand)]/85">
+              Additional details
+            </p>
+            {application.pastExperience ? (
+              <div>
+                <p className="mb-1 text-[10px] font-bold uppercase tracking-wider text-white/35">
+                  Past experience
+                </p>
+                <p className="whitespace-pre-wrap text-sm text-white/75">{application.pastExperience}</p>
+              </div>
+            ) : null}
+            {application.resumeUrl ? (
+              <a
+                href={application.resumeUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex text-sm text-[var(--color-brand)] hover:underline"
+              >
+                View resume
+              </a>
+            ) : null}
+          </div>
+        ) : null}
+
         <div className="rounded-[1.35rem] border border-white/[0.08] bg-[#0a1020]/85 p-6 sm:p-8">
           {formFields.length > 0 ? (
             <ListingFormFieldsReadOnly fields={formFields} values={responses} />

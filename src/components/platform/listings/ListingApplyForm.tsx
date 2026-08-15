@@ -50,6 +50,10 @@ export default function ListingApplyForm({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
+  const [pastExperience, setPastExperience] = useState("");
+  const [resumeUrl, setResumeUrl] = useState("");
+  const [uploadingResume, setUploadingResume] = useState(false);
+  const [resumeError, setResumeError] = useState<string | null>(null);
 
   const isJob = !isTryout && listing.type === "JOB";
   const canSubmit = isTryout || hasRequiredInput(listing.formFields, responses);
@@ -141,6 +145,34 @@ export default function ListingApplyForm({
     );
   }
 
+  if (isTryout && eligibility?.rankIneligible) {
+    return (
+      <div className="rounded-[1.35rem] border border-white/[0.08] bg-[#0a1020]/80 p-8 text-center">
+        <p className="font-display text-lg font-medium text-white">Not eligible for rank criteria</p>
+      </div>
+    );
+  }
+
+  async function uploadResume(file: File) {
+    setUploadingResume(true);
+    setResumeError(null);
+    try {
+      const form = new FormData();
+      form.append("file", file);
+      const res = await fetch("/api/listings/upload", { method: "POST", body: form });
+      const data = await res.json();
+      if (!res.ok) {
+        setResumeError(data.error ?? "Upload failed.");
+        return;
+      }
+      setResumeUrl(typeof data.url === "string" ? data.url : "");
+    } catch {
+      setResumeError("Upload failed.");
+    } finally {
+      setUploadingResume(false);
+    }
+  }
+
   async function submit() {
     if (loading || !acceptedTerms || !canSubmit) return;
     setLoading(true);
@@ -151,7 +183,12 @@ export default function ListingApplyForm({
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          ...(isTryout ? {} : { responses }),
+          ...(isTryout
+            ? {
+                pastExperience: pastExperience.trim() || undefined,
+                resumeUrl: resumeUrl || undefined,
+              }
+            : { responses }),
           acceptedTerms: true,
         }),
       });
@@ -203,9 +240,61 @@ export default function ListingApplyForm({
             onChange={updateField}
             disabled={loading}
           />
-        ) : null}
+        ) : (
+          <div className="space-y-6">
+            <div>
+              <label htmlFor="tryout-experience" className="mb-1.5 block text-sm font-medium text-white/85">
+                Past experience
+                <span className="ml-2 text-[10px] font-normal uppercase tracking-wider text-white/35">
+                  Optional
+                </span>
+              </label>
+              <textarea
+                id="tryout-experience"
+                value={pastExperience}
+                onChange={(e) => setPastExperience(e.target.value)}
+                disabled={loading}
+                rows={4}
+                maxLength={4000}
+                placeholder="If any"
+                className="w-full rounded-xl border border-white/[0.08] bg-white/[0.03] px-4 py-3 text-sm text-white placeholder:text-white/30 focus:border-[var(--color-brand)]/45 focus:outline-none"
+              />
+            </div>
+            <div className="space-y-2">
+              <p className="text-sm font-medium text-white/85">
+                Resume
+                <span className="ml-2 text-[10px] font-normal uppercase tracking-wider text-white/35">
+                  Optional
+                </span>
+              </p>
+              <p className="text-xs text-white/35">PDF, Word, Excel, or images — max 15 MB.</p>
+              <input
+                type="file"
+                accept=".pdf,.doc,.docx,.xls,.xlsx,image/*"
+                disabled={loading || uploadingResume}
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (file) void uploadResume(file);
+                }}
+                className="block w-full text-sm text-white/55 file:mr-4 file:rounded-lg file:border-0 file:bg-white/10 file:px-4 file:py-2 file:text-sm file:text-white/80"
+              />
+              {resumeUrl ? (
+                <a
+                  href={resumeUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="text-xs text-[var(--color-brand)] hover:underline"
+                >
+                  View uploaded file
+                </a>
+              ) : null}
+              {uploadingResume ? <p className="text-xs text-white/40">Uploading…</p> : null}
+              {resumeError ? <p className="text-xs text-red-400/90">{resumeError}</p> : null}
+            </div>
+          </div>
+        )}
 
-        <div className={`space-y-5 ${!isTryout ? "mt-10 border-t border-white/[0.08] pt-8" : ""}`}>
+        <div className={`space-y-5 ${isTryout || listing.formFields.length > 0 ? "mt-10 border-t border-white/[0.08] pt-8" : ""}`}>
           <RegistrationTermsAgreement
             checked={acceptedTerms}
             onChange={setAcceptedTerms}
@@ -217,7 +306,7 @@ export default function ListingApplyForm({
           <button
             type="button"
             onClick={submit}
-            disabled={loading || !acceptedTerms || !canSubmit}
+            disabled={loading || uploadingResume || !acceptedTerms || !canSubmit}
             className="cta w-full rounded-full py-3.5 text-xs font-semibold uppercase tracking-[0.18em] disabled:opacity-50"
           >
             {loading
