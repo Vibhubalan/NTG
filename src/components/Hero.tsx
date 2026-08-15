@@ -1,10 +1,23 @@
-import { getHeroCupStatus, getTournamentDetail } from "@tournaments-leagues/index";
+import {
+  getHeroCupStatus,
+  getHeroOpenCup,
+  getLatestChampionCupDetail,
+  getTournamentDetail,
+} from "@tournaments-leagues/index";
 import { resolveEffectivePublicAuction } from "@tournaments-leagues/domain/auction-hero-phase";
-import HeroCupStatusBanner from "@/components/HeroCupStatusBanner";
-import SplitText from "./SplitText";
+import { listOpenListings } from "@roster-listings/index";
 import { getSession } from "@core/auth/session";
 import { requireAdmin } from "@core/auth/require-admin";
 import { tryAuctionLink } from "@/lib/auction-link";
+import { resolveChampion } from "@/lib/tournament-champion";
+import { gameMetaFor } from "@/lib/tournament-display";
+import { serverEnv } from "@core/config/env.server";
+import { socials as siteSocials } from "@/lib/data";
+import { siYoutube } from "simple-icons";
+import type { TournamentPlacementView } from "@core/contracts";
+import type { MvpData } from "@/components/platform/tournament/TournamentFinalResults";
+import HeroCarousel from "@/components/hero/HeroCarousel";
+import type { HeroCarouselData, HeroTournamentSlideData } from "@/components/hero/hero-carousel-types";
 
 // Same gating rules as the tournament detail page's "Enter Live Auction" button
 // (admin.ok, or a registered+eligible user when the admin has made the auction public).
@@ -16,10 +29,9 @@ async function resolveHeroAuctionHref(slug: string): Promise<string | null> {
 
   const publicAuction = resolveEffectivePublicAuction(tournament.publicAuction ?? false, tournament);
 
-  const auctionEligible =
-    tournament.registrationFormat === "AUCTION" &&
-    !!userId;
-  const showEnterButton = tournament.registrationFormat === "AUCTION" && (admin.ok || (auctionEligible && publicAuction));
+  const auctionEligible = tournament.registrationFormat === "AUCTION" && !!userId;
+  const showEnterButton =
+    tournament.registrationFormat === "AUCTION" && (admin.ok || (auctionEligible && publicAuction));
   if (!showEnterButton || !userId) return null;
 
   const auctionView = admin.ok
@@ -30,9 +42,78 @@ async function resolveHeroAuctionHref(slug: string): Promise<string | null> {
   return tryAuctionLink(tournament.id, auctionView, userId);
 }
 
+function mvpFromPlacements(placements: TournamentPlacementView[]): MvpData | null {
+  const mvpPlacement = placements.find((p) => p.role === "MVP");
+  if (!mvpPlacement) return null;
+  if (mvpPlacement.user) {
+    return {
+      displayName: mvpPlacement.displayName || mvpPlacement.user.username,
+      userId: mvpPlacement.user.id,
+      riotId: mvpPlacement.user.riotId,
+      rankTier: mvpPlacement.user.rankTier,
+      valorantRankTierId: mvpPlacement.user.rankTierId ?? null,
+      riotPlayerCard: mvpPlacement.user.riotPlayerCard ?? null,
+      riotPlayerCardWide: mvpPlacement.user.riotPlayerCardWide ?? null,
+    };
+  }
+  if (mvpPlacement.teamLabel?.trim() || mvpPlacement.displayName?.trim()) {
+    return { displayName: mvpPlacement.displayName || mvpPlacement.teamLabel || "MVP" };
+  }
+  return null;
+}
+
+async function resolveTournamentSlide(): Promise<HeroTournamentSlideData> {
+  const openCup = await getHeroOpenCup();
+  if (openCup) {
+    return { mode: "open", banner: openCup };
+  }
+
+  const detail = await getLatestChampionCupDetail();
+  if (!detail) return null;
+
+  const championData = resolveChampion(null, detail.teamDetails, detail.teams, detail.placements);
+  if (!championData) return null;
+
+  const meta = gameMetaFor(detail.game);
+  return {
+    mode: "champions",
+    tournamentName: detail.name,
+    tournamentSlug: detail.slug,
+    game: detail.game,
+    accentHex: meta.hex,
+    championData,
+    mvp: mvpFromPlacements(detail.placements),
+    allTeams: detail.teamDetails,
+  };
+}
+
 export default async function Hero() {
-  const heroCup = await getHeroCupStatus();
-  const auctionHref = heroCup?.phase === "auction_live" ? await resolveHeroAuctionHref(heroCup.slug) : null;
+  const [heroCup, tournament, listings] = await Promise.all([
+    getHeroCupStatus(),
+    resolveTournamentSlide(),
+    listOpenListings(),
+  ]);
+
+  const auctionHref =
+    heroCup?.phase === "auction_live" ? await resolveHeroAuctionHref(heroCup.slug) : null;
+
+  const socials = [
+    ...siteSocials.filter(
+      (s) => Boolean(s.href) && s.href !== "#" && /^https?:\/\//i.test(s.href),
+    ),
+    ...(serverEnv.youtubeChannelUrl
+      ? [{ name: "YouTube", href: serverEnv.youtubeChannelUrl, path: siYoutube.path }]
+      : []),
+  ];
+
+  const data: HeroCarouselData = {
+    homeCup: heroCup,
+    auctionHref,
+    tournament,
+    listings,
+    socials,
+  };
+
   return (
     <section
       id="top"
@@ -54,56 +135,8 @@ export default async function Hero() {
         <div className="absolute inset-x-0 bottom-0 h-64 bg-gradient-to-t from-[var(--color-ink)] to-transparent" />
       </div>
 
-      {/* Watermark */}
-      <span
-        aria-hidden
-        className="text-outline pointer-events-none absolute left-1/2 top-[42.7%] sm:top-[48.5%] z-0 -translate-x-1/2 -translate-y-1/2 select-none whitespace-nowrap font-display text-[25.6vw] font-black leading-none tracking-[-0.06em] sm:text-[20.8vw] md:text-[19.2vw]"
-      >
-        NTG
-      </span>
-
-      {/* Registration Status Banner — shown above watermark on all viewports */}
-      {heroCup ? (
-        <div
-          className="absolute inset-x-0 z-10 -translate-y-full flex flex-col items-center px-6 text-center"
-          style={{ top: "var(--hero-content-bottom-above)" }}
-        >
-          <div className="animate-in fade-in slide-in-from-bottom-1 duration-300">
-            <HeroCupStatusBanner cup={heroCup} auctionHref={auctionHref} />
-          </div>
-        </div>
-      ) : null}
-
-      {/* Heading Container (Centered at Watermark) */}
-      <div className="absolute inset-x-0 top-[42.7%] sm:top-[48.5%] z-10 -translate-y-1/2 flex flex-col items-center px-6 text-center">
-        <h1 className="font-display font-semibold uppercase text-white">
-          <span className="block leading-[0.96] tracking-[-0.025em]" style={{ fontSize: "var(--text-hero)" }}>
-            <SplitText text="Namma Tulunad" delay={0} stagger={25} duration={680} />
-          </span>
-
-          {/* Line 2 — SplitText with brand gradient, delayed to sequence after line 1 */}
-          <span className="mt-2 block leading-[0.96] tracking-[-0.025em]" style={{ fontSize: "var(--text-hero)" }}>
-            <SplitText text="Gaming" delay={380} stagger={35} duration={680} charClassName="text-gradient-brand" />
-          </span>
-        </h1>
-      </div>
-
-      <div
-        className="absolute inset-x-0 z-10 flex flex-col items-center gap-3 sm:gap-8 px-6 text-center"
-        style={{ top: "var(--hero-content-top)" }}
-      >
-        <p
-          className="leading-relaxed text-white/55"
-          style={{
-            fontSize: "clamp(0.68rem, 2.6vw, 1.3rem)",
-            maxWidth: "clamp(14.4rem, 64vw, 54.4rem)",
-          }}
-        >
-          Mangaluru&apos;s premier esports lounge — premium hardware, electric
-          <span className="hidden sm:inline"><br /></span>
-          <span className="sm:hidden"> </span>
-          atmosphere, engineered for the players who set the standard.
-        </p>
+      <div className="absolute inset-0 z-10">
+        <HeroCarousel data={data} />
       </div>
     </section>
   );

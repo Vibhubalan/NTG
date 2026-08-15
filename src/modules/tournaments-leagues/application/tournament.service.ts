@@ -198,3 +198,30 @@ export async function recordMatchResult(
   // Leaderboard recompute runs in same module — reads match results from DB
   await leaderboardRepo.recomputeFromCompletedMatches();
 }
+
+/** Open registration cup for the hero tournament slide, if any. */
+export async function getHeroOpenCup(): Promise<TournamentRegistrationBanner | null> {
+  return getActiveRegistrationBanner();
+}
+
+/**
+ * Latest completed cup with a champion placement — used when no new cup is open.
+ * Detail is loaded so the homepage can render the same Champions UI as the cup page.
+ */
+export async function getLatestChampionCupDetail() {
+  const previews = await listTournamentPreviews();
+  const withChampion = previews
+    .filter((t) => t.status === "COMPLETED" && Boolean(t.championName?.trim()))
+    .sort((a, b) => {
+      const aTime = new Date(a.endsAt ?? a.startsAt ?? 0).getTime();
+      const bTime = new Date(b.endsAt ?? b.startsAt ?? 0).getTime();
+      return bTime - aTime;
+    });
+
+  const latest = withChampion[0];
+  if (!latest) return null;
+
+  const detail = await getTournamentDetail(latest.slug);
+  if (!detail) return null;
+  return detail;
+}
