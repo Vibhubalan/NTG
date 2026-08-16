@@ -3,11 +3,46 @@ import { notFound } from "next/navigation";
 import { requireAdmin } from "@core/auth/require-admin";
 import { redirect } from "next/navigation";
 import AdminListingDetailPanel from "@/components/admin/AdminListingDetailPanel";
-import { getListingAdmin, listListingApplicationsAdmin, listListingFormFields } from "@roster-listings/index";
+import {
+  getListingAdmin,
+  listListingApplicationsAdmin,
+  listListingFormFields,
+  type AdminListingApplicationRow,
+} from "@roster-listings/index";
+import type { ListingFormFieldView } from "@core/contracts/roster-listings";
 
 export const dynamic = "force-dynamic";
 
 type Props = { params: Promise<{ slug: string }> };
+
+function asPlain<T>(value: T): T {
+  return JSON.parse(JSON.stringify(value)) as T;
+}
+
+function safeIso(value: Date | null | undefined): string | null {
+  if (!value) return null;
+  const time = value.getTime();
+  if (Number.isNaN(time)) return null;
+  return value.toISOString();
+}
+
+async function loadAdminApplications(slug: string): Promise<AdminListingApplicationRow[]> {
+  try {
+    return asPlain((await listListingApplicationsAdmin(slug)) ?? []);
+  } catch (error) {
+    console.error("[admin listings] applications failed to load", slug, error);
+    return [];
+  }
+}
+
+async function loadAdminFormFields(slug: string): Promise<ListingFormFieldView[]> {
+  try {
+    return asPlain((await listListingFormFields(slug)) ?? []);
+  } catch (error) {
+    console.error("[admin listings] form fields failed to load", slug, error);
+    return [];
+  }
+}
 
 export default async function AdminListingDetailPage({ params }: Props) {
   const admin = await requireAdmin();
@@ -17,8 +52,10 @@ export default async function AdminListingDetailPage({ params }: Props) {
   const listing = await getListingAdmin(slug);
   if (!listing) notFound();
 
-  const applications = (await listListingApplicationsAdmin(slug)) ?? [];
-  const formFields = (await listListingFormFields(slug)) ?? [];
+  const [applications, formFields] = await Promise.all([
+    loadAdminApplications(slug),
+    loadAdminFormFields(slug),
+  ]);
 
   return (
     <div className="space-y-6">
@@ -42,13 +79,13 @@ export default async function AdminListingDetailPage({ params }: Props) {
       <AdminListingDetailPanel
         slug={slug}
         title={listing.title}
-        listingType={listing.type}
+        listingType={listing.type === "JOB" ? "JOB" : "ROSTER_TRYOUT"}
         gameKey={listing.gameKey}
         initialDescription={listing.description}
         initialRulebookUrl={listing.rulebookUrl}
         initialAutoManageTryout={listing.autoManageTryout}
-        initialTryoutOpensAt={listing.tryoutOpensAt?.toISOString() ?? null}
-        initialTryoutClosesAt={listing.tryoutClosesAt?.toISOString() ?? null}
+        initialTryoutOpensAt={safeIso(listing.tryoutOpensAt)}
+        initialTryoutClosesAt={safeIso(listing.tryoutClosesAt)}
         initialTryoutOpenDays={listing.tryoutOpenDays}
         initialTryoutRepeatDays={listing.tryoutRepeatDays}
         initialFormFields={formFields}

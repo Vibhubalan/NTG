@@ -86,7 +86,10 @@ function HeroPlayerCard({
   }
 
   return (
-    <li style={{ perspective: "800px" }} className="group relative min-w-0">
+    <li
+      style={{ perspective: "800px" }}
+      className="group relative w-[5.15rem] shrink-0 sm:w-auto sm:min-w-0"
+    >
       <div
         onMouseMove={handleMouseMove}
         onMouseLeave={() => setTilt({ rotX: 0, rotY: 0, active: false })}
@@ -99,7 +102,7 @@ function HeroPlayerCard({
             : "transform 0.45s cubic-bezier(0.2, 0.8, 0.2, 1)",
           transformStyle: "preserve-3d",
         }}
-        className={`relative aspect-[268/640] w-full overflow-hidden rounded-lg border bg-[#080b12] transition-all duration-300 sm:rounded-2xl sm:border-2 ${accent.cardBorder}`}
+        className={`relative h-[158px] w-full overflow-hidden rounded-xl border bg-[#080b12] transition-all duration-300 sm:h-auto sm:aspect-[268/640] sm:rounded-2xl sm:border-2 ${accent.cardBorder}`}
       >
         <img
           src={playerCardArt(player)}
@@ -126,21 +129,21 @@ function HeroPlayerCard({
         ) : null}
 
         {isMvp ? (
-          <span className="absolute left-1 top-1 z-30 rounded-full border border-violet-300/40 bg-[#0a0c14]/90 px-1.5 py-0.5 text-[6px] font-black uppercase tracking-[0.12em] text-violet-200 sm:left-2 sm:top-2.5 sm:px-2 sm:py-1 sm:text-[8px]">
+          <span className="absolute left-1.5 top-1.5 z-30 rounded-full border border-violet-300/40 bg-[#0a0c14]/90 px-1.5 py-0.5 text-[8px] font-black uppercase tracking-[0.12em] text-violet-200 sm:left-2 sm:top-2.5 sm:px-2 sm:py-1 sm:text-[8px]">
             MVP
           </span>
         ) : null}
 
         <div
           style={{ transform: "translateZ(18px)" }}
-          className="relative z-20 flex h-full flex-col items-center justify-end px-0.5 pb-1.5 pt-5 text-center sm:px-2.5 sm:pb-3 sm:pt-10"
+          className="relative z-20 flex h-full flex-col items-center justify-end px-1.5 pb-2 pt-6 text-center sm:px-2.5 sm:pb-3 sm:pt-10"
         >
-          <div className={`mb-0.5 h-px w-3.5 sm:mb-2 sm:w-10 ${accent.hairline}`} />
-          <h3 className="max-w-full truncate font-display text-[9px] font-black leading-none tracking-tight text-white drop-shadow-[0_2px_8px_rgba(0,0,0,0.85)] sm:text-sm sm:tracking-[0.02em]">
+          <div className={`mb-1 h-px w-6 sm:mb-2 sm:w-10 ${accent.hairline}`} />
+          <h3 className="max-w-full line-clamp-2 font-display text-[11px] font-black leading-tight tracking-tight text-white drop-shadow-[0_2px_8px_rgba(0,0,0,0.85)] sm:line-clamp-1 sm:text-sm sm:tracking-[0.02em]">
             {player.displayName}
           </h3>
           {secondary ? (
-            <p className="mt-0.5 max-w-full truncate text-[7px] font-semibold tracking-wide text-white/55 sm:mt-1 sm:text-[10px]">
+            <p className="mt-0.5 max-w-full truncate text-[9px] font-semibold tracking-wide text-white/60 sm:mt-1 sm:text-[10px]">
               {secondary}
             </p>
           ) : null}
@@ -158,7 +161,7 @@ export default function HeroChampionsShowcase({ data }: { data: HeroChampionsSli
   const count = Math.max(players.length, 1);
 
   return (
-    <div className="relative flex h-full w-full flex-col items-center justify-center px-6 pb-12 pt-32 sm:pt-36">
+    <div className="relative flex h-full w-full flex-col items-center justify-center px-3 pb-10 pt-24 sm:px-6 sm:pb-12 sm:pt-36">
       <div className="relative z-10 text-center">
         <p className="text-[10px] font-medium uppercase tracking-[0.42em] text-white/40">
           <Link
@@ -168,10 +171,10 @@ export default function HeroChampionsShowcase({ data }: { data: HeroChampionsSli
             {tournamentName}
           </Link>
         </p>
-        <p className="mt-4 text-[10px] font-semibold uppercase tracking-[0.32em] text-white sm:text-[11px]">
+        <p className="mt-2 text-[10px] font-semibold uppercase tracking-[0.32em] text-white sm:mt-4 sm:text-[11px]">
           Winners
         </p>
-        <h2 className="mt-3 font-display text-[clamp(1.45rem,3.4vw,2.85rem)] font-semibold uppercase leading-[0.95] tracking-[-0.04em] text-white">
+        <h2 className="mt-2 font-display text-[clamp(1.35rem,6.4vw,2.85rem)] font-semibold uppercase leading-[0.95] tracking-[-0.04em] text-white sm:mt-3">
           {championTeam.name}
         </h2>
         {runnerUp ? (
@@ -183,12 +186,10 @@ export default function HeroChampionsShowcase({ data }: { data: HeroChampionsSli
 
       {players.length > 0 ? (
         <ul
-          className="relative z-10 mt-8 grid w-full items-end sm:mt-10"
+          className="relative z-10 mt-5 flex w-full flex-wrap items-end justify-center gap-2 sm:mt-10 sm:grid sm:gap-[clamp(0.35rem,0.9vw,1rem)] sm:px-[clamp(2.75rem,5vw,4.5rem)]"
           style={{
             gridTemplateColumns: `repeat(${count}, minmax(0, 1fr))`,
-            gap: "clamp(0.35rem, 0.9vw, 1rem)",
             maxWidth: `min(100%, calc(${count} * 10rem + ${count - 1} * 1rem))`,
-            paddingInline: "clamp(2.75rem, 5vw, 4.5rem)",
           }}
         >
           {players.map((player) => (
