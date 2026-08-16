@@ -1,4 +1,5 @@
 import { prisma } from "@core/database/client";
+import { withListingApplicationExtras } from "../infrastructure/ensure-listing-application-extras";
 import type { ListingEligibility, ListingApplicantProfile } from "@core/contracts/roster-listings";
 import { GameSlug, type ValorantRole } from "@prisma/client";
 import { syncUserRank } from "@tournaments-leagues/application/rank-sync.service";
@@ -343,32 +344,34 @@ export async function applyToListing(
   }
 
   try {
-    const app = await prisma.listingApplication.create({
-      data: {
-        listingId: listing.id,
-        userId,
-        message: validated.message,
-        responses: Object.keys(validated.responses).length > 0 ? validated.responses : undefined,
-        snapshotDisplayName: user.playerProfile?.displayName ?? user.name,
-        snapshotPhone: user.phone,
-        snapshotRiotId:
-          user.riotGameName && user.riotTagLine
-            ? `${user.riotGameName}#${user.riotTagLine}`
-            : null,
-        snapshotRankTier,
-        snapshotRankTierId,
-        snapshotValorantRoles: snapshotValorantRoles ?? undefined,
-        snapshotSteamId64: user.steamId64,
-        snapshotCs2Hours: user.cs2HoursPlayed,
-        snapshotCs2PeakPremier: user.playerProfile?.cs2PeakPremierRank?.trim() || "NA",
-        snapshotCs2FaceitRank: user.playerProfile?.cs2FaceitRank?.trim() || "NA",
-        snapshotOlympusId: user.olympusId,
-        snapshotDateOfBirth: user.dateOfBirth,
-        pastExperience,
-        resumeUrl,
-        status: "PENDING",
-      },
-    });
+    const app = await withListingApplicationExtras(() =>
+      prisma.listingApplication.create({
+        data: {
+          listingId: listing.id,
+          userId,
+          message: validated.message,
+          responses: Object.keys(validated.responses).length > 0 ? validated.responses : undefined,
+          snapshotDisplayName: user.playerProfile?.displayName ?? user.name,
+          snapshotPhone: user.phone,
+          snapshotRiotId:
+            user.riotGameName && user.riotTagLine
+              ? `${user.riotGameName}#${user.riotTagLine}`
+              : null,
+          snapshotRankTier,
+          snapshotRankTierId,
+          snapshotValorantRoles: snapshotValorantRoles ?? undefined,
+          snapshotSteamId64: user.steamId64,
+          snapshotCs2Hours: user.cs2HoursPlayed,
+          snapshotCs2PeakPremier: user.playerProfile?.cs2PeakPremierRank?.trim() || "NA",
+          snapshotCs2FaceitRank: user.playerProfile?.cs2FaceitRank?.trim() || "NA",
+          snapshotOlympusId: user.olympusId,
+          snapshotDateOfBirth: user.dateOfBirth,
+          pastExperience,
+          resumeUrl,
+          status: "PENDING",
+        },
+      }),
+    );
 
     await logUserActivity({
       userId,

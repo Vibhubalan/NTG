@@ -10,6 +10,7 @@ import {
   validateTryoutListingGame,
 } from "../domain/tryout-listing";
 import { syncTryoutListingStatus } from "./tryout-schedule.service";
+import { withListingApplicationExtras } from "../infrastructure/ensure-listing-application-extras";
 
 export type AdminListingRow = {
   id: string;
@@ -313,11 +314,13 @@ export async function listListingApplicationsAdmin(
   const listing = await prisma.listing.findUnique({ where: { slug } });
   if (!listing) return null;
 
-  const rows = await prisma.listingApplication.findMany({
-    where: { listingId: listing.id },
-    include: { user: { include: { playerProfile: true } } },
-    orderBy: { createdAt: "desc" },
-  });
+  const rows = await withListingApplicationExtras(() =>
+    prisma.listingApplication.findMany({
+      where: { listingId: listing.id },
+      include: { user: { include: { playerProfile: true } } },
+      orderBy: { createdAt: "desc" },
+    }),
+  );
 
   return rows.map((r) => {
     const roles = Array.isArray(r.snapshotValorantRoles)
@@ -327,6 +330,7 @@ export async function listListingApplicationsAdmin(
       r.responses && typeof r.responses === "object" && !Array.isArray(r.responses)
         ? (r.responses as Record<string, string | string[] | Record<string, string | string[]>>)
         : null;
+    const user = r.user;
     return {
       id: r.id,
       createdAt: r.createdAt.toISOString(),
@@ -334,26 +338,29 @@ export async function listListingApplicationsAdmin(
       message: r.message,
       responses,
       displayName: r.snapshotDisplayName,
-      email: r.user.email,
-      phone: r.snapshotPhone ?? r.user.phone,
-      town: r.user.playerProfile?.town ?? null,
-      dateOfBirth: r.snapshotDateOfBirth
-        ? r.snapshotDateOfBirth.toISOString().slice(0, 10)
-        : r.user.dateOfBirth
-          ? r.user.dateOfBirth.toISOString().slice(0, 10)
-          : null,
+      email: user?.email ?? null,
+      phone: r.snapshotPhone ?? user?.phone ?? null,
+      town: user?.playerProfile?.town ?? null,
+      dateOfBirth: isoDateOnly(r.snapshotDateOfBirth) ?? isoDateOnly(user?.dateOfBirth),
       riotId: r.snapshotRiotId,
       rankTier: r.snapshotRankTier,
       valorantRoles: roles,
       steamId64: r.snapshotSteamId64,
-      steamPersonaName: r.user.steamPersonaName,
+      steamPersonaName: user?.steamPersonaName ?? null,
       cs2PeakPremier: r.snapshotCs2PeakPremier,
       cs2FaceitRank: r.snapshotCs2FaceitRank,
       cs2Hours: r.snapshotCs2Hours,
-      pastExperience: r.pastExperience,
-      resumeUrl: r.resumeUrl,
+      pastExperience: r.pastExperience ?? null,
+      resumeUrl: r.resumeUrl ?? null,
     };
   });
+}
+
+function isoDateOnly(value: Date | null | undefined): string | null {
+  if (!value) return null;
+  const time = value.getTime();
+  if (Number.isNaN(time)) return null;
+  return value.toISOString().slice(0, 10);
 }
 
 export async function updateListingApplicationStatus(
