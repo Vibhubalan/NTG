@@ -12,7 +12,7 @@ export default function DevOtpBanner({ code, hint }: Props) {
       aria-live="polite"
     >
       <p className="text-[10px] font-medium uppercase tracking-[0.28em] text-amber-300/90">
-        Dev OTP — email not sent locally
+        Dev OTP (email not sent locally)
       </p>
       <p className="mt-1 font-mono text-3xl font-bold tracking-[0.35em] text-amber-100">
         {code}

@@ -769,7 +769,7 @@ function RoundRobinBracketView({
                                         </span>
                                       ))
                                     ) : (
-                                      <span className="text-white/20">—</span>
+                                      <span className="text-white/20">-</span>
                                     )}
                                   </div>
                                 </div>
@@ -852,7 +852,7 @@ function RoundRobinBracketView({
                                         </span>
                                       ))
                                     ) : (
-                                      <span className="text-white/20">—</span>
+                                      <span className="text-white/20">-</span>
                                     )}
                                   </div>
                                 </td>
@@ -1398,7 +1398,7 @@ export default function TournamentBracket({
           <RoundRobinBracketView
             bracket={bracket}
             tournamentName={tournamentName}
-            stageName={stageName || "STAGE 1 — GROUP STAGE"}
+            stageName={stageName || "STAGE 1: GROUP STAGE"}
             format={format || "Round Robin"}
             fallbackTeams={fallbackTeams}
           />
@@ -1407,7 +1407,7 @@ export default function TournamentBracket({
             bracket={bracket}
             accentHex={accentHex}
             tournamentName={tournamentName}
-            stageName={stageName || "STAGE 2 — PLAYOFF BRACKET"}
+            stageName={stageName || "STAGE 2: PLAYOFF BRACKET"}
             format={format || bracket.tournamentType}
           />
         )}

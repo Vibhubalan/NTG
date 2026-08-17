@@ -74,7 +74,7 @@ export function formatAuditTargetLabel(
   resolvedTarget?: string | null,
 ): string {
   if (resolvedTarget?.trim()) return resolvedTarget.trim();
-  if (!target) return "—";
+  if (!target) return "-";
 
   if (metadata && typeof metadata === "object") {
     const m = metadata as Record<string, unknown>;

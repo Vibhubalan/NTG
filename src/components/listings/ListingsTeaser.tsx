@@ -23,7 +23,7 @@ export default async function ListingsTeaser() {
             Jobs and team tryouts at NTG
           </h2>
           <p className="mt-4 max-w-md text-base leading-relaxed text-white/55">
-            Open roles and roster applications — apply with your NTG member profile in a few clicks.
+            Open roles and roster applications. Apply with your NTG member profile in a few clicks.
           </p>
           <Link
             href="/listings"

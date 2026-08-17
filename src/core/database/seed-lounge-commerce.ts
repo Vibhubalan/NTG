@@ -82,10 +82,10 @@ const GAMEPASS_PLANS: PlanSeed[] = [
     slug: "ps-group-2-4",
     category: "PLAYSTATION",
     title: "Group Play",
-    subtitle: "2–4 players · per person per hour",
+    subtitle: "2-4 players · per person per hour",
     priceSingle: 70,
     sortOrder: 55,
-    whatsappMessage: "Hi NTG Lounge, I'd like a group PlayStation session for 2–4 players (₹70/person/hr).",
+    whatsappMessage: "Hi NTG Lounge, I'd like a group PlayStation session for 2-4 players (₹70/person/hr).",
   },
   {
     slug: "ps-5-hour",
@@ -140,7 +140,7 @@ const HOST_OFFERINGS = [
     type: HostOfferingType.SPONSORSHIP,
     title: "Partner with NTG",
     summary: "Put your brand in front of Mangaluru's competitive gaming community.",
-    body: "From tournament title sponsorship to lounge branding and social reach — we work with partners who want real visibility with players, creators, and event crowds.",
+    body: "From tournament title sponsorship to lounge branding and social reach, we work with partners who want real visibility with players, creators, and event crowds.",
     highlights: [
       "Tournament & cup branding",
       "In-lounge visibility",
@@ -151,7 +151,7 @@ const HOST_OFFERINGS = [
     type: HostOfferingType.BIRTHDAY,
     title: "Birthday at NTG",
     summary: "Host an unforgettable birthday party at the lounge.",
-    body: "Private stations, squad setups, and a vibe built for celebrations. Tell us your headcount and date — we'll tailor a package.",
+    body: "Private stations, squad setups, and a vibe built for celebrations. Tell us your headcount and date. We'll tailor a package.",
     highlights: [
       "Dedicated PS5 / PC stations",
       "Flexible party durations",
@@ -162,7 +162,7 @@ const HOST_OFFERINGS = [
     type: HostOfferingType.PRIVATE_EVENT,
     title: "Private Events",
     summary: "Rent NTG for your event, meetup, or community night.",
-    body: "Whether it's a college society night, brand activation, or private tournament — the full lounge can be yours.",
+    body: "Whether it's a college society night, brand activation, or private tournament, the full lounge can be yours.",
     highlights: [
       "Full or partial lounge rental",
       "Tournament-ready setups",

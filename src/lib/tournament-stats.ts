@@ -143,6 +143,37 @@ export function weightedAcs(
 }
 
 /**
+ * Cross-cup board: treat each tournament as one observation, then add a
+ * capped consistency bonus so a one-cup spike cannot outrank a steady run.
+ *
+ * Pure Bayesian shrinkage toward the mean is not enough on its own. If the
+ * field mean is ~230, four cups at 250 never overtake one cup at 300, because
+ * 300 is further above the mean than 250 is. The bonus is what makes showing
+ * up across cups count, without bringing back unbounded ACS × log(games)
+ * (a long 200 ACS grind still loses to a real 300 cup).
+ */
+export const CROSS_CUP_PRIOR = 2;
+/** Rating points added per log2(cups), capped so a long average grind cannot snowball. */
+export const CUP_CONSISTENCY_BONUS = 18;
+export const CONSISTENCY_CUP_CAP = 6;
+
+export function crossCupRating(
+  cupRatings: number[],
+  leagueMeanCupRating: number,
+): number {
+  const n = cupRatings.length;
+  if (n <= 0) return 0;
+  const avg = cupRatings.reduce((sum, rating) => sum + rating, 0) / n;
+  const shrunk =
+    CROSS_CUP_PRIOR > 0
+      ? (n * avg + CROSS_CUP_PRIOR * leagueMeanCupRating) /
+        (n + CROSS_CUP_PRIOR)
+      : avg;
+  const cappedN = Math.min(n, CONSISTENCY_CUP_CAP);
+  return shrunk + CUP_CONSISTENCY_BONUS * Math.log2(cappedN);
+}
+
+/**
  * Games required to qualify for an award, derived from the pool's own busiest
  * player rather than a fixed number.
  *
@@ -433,6 +464,141 @@ export function aggregatePlayerStats(
     });
   }
   return result;
+}
+
+export type CrossCupStanding = AggregatedPlayerStats & {
+  rating: number;
+  tournamentsPlayed: number;
+};
+
+function mostPlayedAgentFromCounts(
+  agentCounts: Record<string, number>,
+): string | null {
+  return (
+    Object.entries(agentCounts).sort((a, b) => b[1] - a[1])[0]?.[0] ?? null
+  );
+}
+
+/**
+ * Rank players across cups: score each cup with weightedAcs, then combine
+ * those cup scores with {@link crossCupRating}.
+ */
+export function rankCrossCupPlayers(
+  cupPools: AggregatedPlayerStats[][],
+): CrossCupStanding[] {
+  type Acc = {
+    riotId: string;
+    userName: string | null;
+    gamesPlayed: number;
+    totalRounds: number;
+    totalKills: number;
+    totalDeaths: number;
+    totalAssists: number;
+    totalFirstKills: number;
+    totalFirstDeaths: number;
+    acsWeighted: number;
+    adrWeighted: number;
+    hsWeighted: number;
+    agentCounts: Record<string, number>;
+    teamNames: Set<string>;
+    mvpCount: number;
+    cupRatings: number[];
+  };
+
+  const byKey = new Map<string, Acc>();
+  const allCupRatings: number[] = [];
+
+  for (const pool of cupPools) {
+    if (pool.length === 0) continue;
+    const baseline = computeStandoutBaseline(pool);
+    for (const p of pool) {
+      if (p.gamesPlayed <= 0) continue;
+      const cupRating = weightedAcs(p.avgAcs, p.gamesPlayed, baseline);
+      allCupRatings.push(cupRating);
+      const existing = byKey.get(p.key);
+      if (!existing) {
+        byKey.set(p.key, {
+          riotId: p.riotId,
+          userName: p.userName,
+          gamesPlayed: p.gamesPlayed,
+          totalRounds: p.totalRounds,
+          totalKills: p.totalKills,
+          totalDeaths: p.totalDeaths,
+          totalAssists: p.totalAssists,
+          totalFirstKills: p.totalFirstKills,
+          totalFirstDeaths: p.totalFirstDeaths,
+          acsWeighted: p.avgAcs * p.gamesPlayed,
+          adrWeighted: p.avgAdr * p.gamesPlayed,
+          hsWeighted: p.avgHsPercent * p.gamesPlayed,
+          agentCounts: { ...p.agentCounts },
+          teamNames: new Set(p.teamNames),
+          mvpCount: p.mvpCount,
+          cupRatings: [cupRating],
+        });
+        continue;
+      }
+      existing.gamesPlayed += p.gamesPlayed;
+      existing.totalRounds += p.totalRounds;
+      existing.totalKills += p.totalKills;
+      existing.totalDeaths += p.totalDeaths;
+      existing.totalAssists += p.totalAssists;
+      existing.totalFirstKills += p.totalFirstKills;
+      existing.totalFirstDeaths += p.totalFirstDeaths;
+      existing.acsWeighted += p.avgAcs * p.gamesPlayed;
+      existing.adrWeighted += p.avgAdr * p.gamesPlayed;
+      existing.hsWeighted += p.avgHsPercent * p.gamesPlayed;
+      existing.mvpCount += p.mvpCount;
+      existing.cupRatings.push(cupRating);
+      if (!existing.userName && p.userName) existing.userName = p.userName;
+      for (const [agent, count] of Object.entries(p.agentCounts)) {
+        existing.agentCounts[agent] = (existing.agentCounts[agent] ?? 0) + count;
+      }
+      for (const name of p.teamNames) existing.teamNames.add(name);
+    }
+  }
+
+  const leagueMean =
+    allCupRatings.length === 0
+      ? 0
+      : allCupRatings.reduce((sum, rating) => sum + rating, 0) /
+        allCupRatings.length;
+
+  const rows: CrossCupStanding[] = [];
+  for (const [key, acc] of byKey) {
+    const g = acc.gamesPlayed;
+    rows.push({
+      key,
+      riotId: acc.riotId,
+      userName: acc.userName,
+      gamesPlayed: g,
+      totalRounds: acc.totalRounds,
+      totalKills: acc.totalKills,
+      totalDeaths: acc.totalDeaths,
+      totalAssists: acc.totalAssists,
+      totalFirstKills: acc.totalFirstKills,
+      totalFirstDeaths: acc.totalFirstDeaths,
+      avgAcs: g > 0 ? Math.round(acc.acsWeighted / g) : 0,
+      avgAdr: g > 0 ? Math.round((acc.adrWeighted / g) * 10) / 10 : 0,
+      avgHsPercent: g > 0 ? Math.round((acc.hsWeighted / g) * 10) / 10 : 0,
+      mostPlayedAgent: mostPlayedAgentFromCounts(acc.agentCounts),
+      agentCounts: acc.agentCounts,
+      teamNames: [...acc.teamNames].sort((a, b) => a.localeCompare(b)),
+      mvpCount: acc.mvpCount,
+      rating: crossCupRating(acc.cupRatings, leagueMean),
+      tournamentsPlayed: acc.cupRatings.length,
+    });
+  }
+
+  return rows.sort((a, b) => {
+    if (b.rating !== a.rating) return b.rating - a.rating;
+    if (b.tournamentsPlayed !== a.tournamentsPlayed) {
+      return b.tournamentsPlayed - a.tournamentsPlayed;
+    }
+    if (b.mvpCount !== a.mvpCount) return b.mvpCount - a.mvpCount;
+    if (b.totalKills !== a.totalKills) return b.totalKills - a.totalKills;
+    if (b.avgAcs !== a.avgAcs) return b.avgAcs - a.avgAcs;
+    return a.riotId.localeCompare(b.riotId);
+  });
 }
 
 function csvEscape(value: string | number | null | undefined): string {

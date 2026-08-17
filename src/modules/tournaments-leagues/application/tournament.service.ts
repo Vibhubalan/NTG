@@ -1,6 +1,7 @@
 import { cache } from "react";
 import { unstable_cache } from "next/cache";
 import { prisma } from "@core/database/client";
+import { withDbFallback } from "@core/database/transient-error";
 import type {
   LeaderboardPreview,
   TournamentPreview,
@@ -23,7 +24,7 @@ export async function listTournamentPreviews(): Promise<TournamentPreview[]> {
   // Do NOT call Challonge here — homepage / lists / APIs would burn the API quota
   // (one request per cup with a bracket link on every page load). Champion comes
   // from DB placements. Challonge is only fetched on the cup detail page / brackets API.
-  return listTournamentPreviewsCached();
+  return withDbFallback("tournament-previews", [], () => listTournamentPreviewsCached());
 }
 
 export const getTournamentBySlug = cache(async (slug: string): Promise<TournamentPreview | null> => {
@@ -86,7 +87,11 @@ export const getTournamentDetail = cache(async (slug: string, userId?: string) =
 });
 
 export async function getActiveRegistrationBanner(): Promise<TournamentRegistrationBanner | null> {
-  return tournamentRepo.findActiveRegistrationBanner();
+  return withDbFallback(
+    "registration-banner",
+    null,
+    () => tournamentRepo.findActiveRegistrationBanner(),
+  );
 }
 
 export type ActiveAuction = { slug: string; name: string; endsAt: string | null };
@@ -100,6 +105,7 @@ export type HeroCupStatus = {
 
 /** Nearest upcoming auction cup phase for the homepage hero CTA strip. */
 export async function getHeroCupStatus(): Promise<HeroCupStatus | null> {
+  return withDbFallback("hero-cup-status", null, async () => {
   const now = new Date();
   const tournaments = await prisma.tournament.findMany({
     where: {
@@ -137,46 +143,69 @@ export async function getHeroCupStatus(): Promise<HeroCupStatus | null> {
   }
 
   return null;
+  });
 }
 
 /** The auction whose live window (auctionStartsAt..auctionEndsAt) currently contains now, if any. */
 export async function getActiveAuction(): Promise<ActiveAuction | null> {
-  const hero = await getHeroCupStatus();
-  if (hero?.phase === "auction_live") {
-    return {
-      slug: hero.slug,
-      name: hero.name,
-      endsAt: hero.countdownEndsAt,
-    };
-  }
+  return withDbFallback("active-auction", null, async () => {
+    const hero = await getHeroCupStatus();
+    if (hero?.phase === "auction_live") {
+      return {
+        slug: hero.slug,
+        name: hero.name,
+        endsAt: hero.countdownEndsAt,
+      };
+    }
 
-  const now = new Date();
-  const t = await prisma.tournament.findFirst({
-    where: {
-      registrationFormat: "AUCTION",
-      status: { not: "CANCELLED" },
-      auctionStartsAt: { lte: now },
-      auctionEndsAt: { gte: now },
-    },
-    orderBy: { auctionStartsAt: "desc" },
-    select: { slug: true, name: true, auctionEndsAt: true },
+    const now = new Date();
+    const t = await prisma.tournament.findFirst({
+      where: {
+        registrationFormat: "AUCTION",
+        status: { not: "CANCELLED" },
+        auctionStartsAt: { lte: now },
+        auctionEndsAt: { gte: now },
+      },
+      orderBy: { auctionStartsAt: "desc" },
+      select: { slug: true, name: true, auctionEndsAt: true },
+    });
+    if (!t) return null;
+    return { slug: t.slug, name: t.name, endsAt: t.auctionEndsAt?.toISOString() ?? null };
   });
-  if (!t) return null;
-  return { slug: t.slug, name: t.name, endsAt: t.auctionEndsAt?.toISOString() ?? null };
 }
 
 export async function getLeaderboardPreview(
   game: Parameters<LeaderboardRepository["listPreview"]>[0],
   limit = 10,
 ): Promise<LeaderboardPreview> {
-  return leaderboardRepo.listPreview(game, limit);
+  return withDbFallback(
+    "leaderboard-preview",
+    {
+      game,
+      scope: "TOWN",
+      entries: [],
+      lastRefreshedAt: null,
+      hourlyRefreshEnabled: false,
+    },
+    () => leaderboardRepo.listPreview(game, limit),
+  );
 }
 
 export async function getValorantRankings(
   limit = 250,
   search?: string,
 ): Promise<LeaderboardPreview> {
-  return leaderboardRepo.listValorantRankings({ limit, search });
+  return withDbFallback(
+    "valorant-rankings",
+    {
+      game: "VALORANT",
+      scope: "TOWN",
+      entries: [],
+      lastRefreshedAt: null,
+      hourlyRefreshEnabled: false,
+    },
+    () => leaderboardRepo.listValorantRankings({ limit, search }),
+  );
 }
 
 export async function recordMatchResult(
@@ -201,7 +230,7 @@ export async function recordMatchResult(
 
 /** Open registration cup for the hero tournament slide, if any. */
 export async function getHeroOpenCup(): Promise<TournamentRegistrationBanner | null> {
-  return getActiveRegistrationBanner();
+  return withDbFallback("hero-open-cup", null, () => getActiveRegistrationBanner());
 }
 
 /**
@@ -209,19 +238,21 @@ export async function getHeroOpenCup(): Promise<TournamentRegistrationBanner | n
  * Detail is loaded so the homepage can render the same Champions UI as the cup page.
  */
 export async function getLatestChampionCupDetail() {
-  const previews = await listTournamentPreviews();
-  const withChampion = previews
-    .filter((t) => t.status === "COMPLETED" && Boolean(t.championName?.trim()))
-    .sort((a, b) => {
-      const aTime = new Date(a.endsAt ?? a.startsAt ?? 0).getTime();
-      const bTime = new Date(b.endsAt ?? b.startsAt ?? 0).getTime();
-      return bTime - aTime;
-    });
+  return withDbFallback("hero-champions", null, async () => {
+    const previews = await listTournamentPreviews();
+    const withChampion = previews
+      .filter((t) => t.status === "COMPLETED" && Boolean(t.championName?.trim()))
+      .sort((a, b) => {
+        const aTime = new Date(a.endsAt ?? a.startsAt ?? 0).getTime();
+        const bTime = new Date(b.endsAt ?? b.startsAt ?? 0).getTime();
+        return bTime - aTime;
+      });
 
-  const latest = withChampion[0];
-  if (!latest) return null;
+    const latest = withChampion[0];
+    if (!latest) return null;
 
-  const detail = await getTournamentDetail(latest.slug);
-  if (!detail) return null;
-  return detail;
+    const detail = await getTournamentDetail(latest.slug);
+    if (!detail) return null;
+    return detail;
+  });
 }

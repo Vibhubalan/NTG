@@ -49,7 +49,7 @@ type Props = {
 };
 
 function formatWhen(iso: string | null): string {
-  if (!iso) return "—";
+  if (!iso) return "-";
   return new Date(iso).toLocaleString("en-IN", {
     dateStyle: "medium",
     timeStyle: "short",
@@ -394,7 +394,7 @@ export default function AdminTournamentGamesPanel({ slug, teams }: Props) {
                 />
                 <div className="min-w-0 flex-1">
                   <p className="text-sm text-white">
-                    {g.mapName ?? "Unknown map"} · {g.teamAName} {g.teamARounds}–{g.teamBRounds}{" "}
+                    {g.mapName ?? "Unknown map"} · {g.teamAName} {g.teamARounds}-{g.teamBRounds}{" "}
                     {g.teamBName}
                   </p>
                   <p className="text-[11px] text-white/40">
@@ -440,7 +440,7 @@ export default function AdminTournamentGamesPanel({ slug, teams }: Props) {
                 </span>
                 <div className="min-w-0 flex-1">
                   <p className="text-sm text-white">
-                    {g.mapName ?? "Unknown map"} · {g.teamAName} {g.teamARounds}–{g.teamBRounds}{" "}
+                    {g.mapName ?? "Unknown map"} · {g.teamAName} {g.teamARounds}-{g.teamBRounds}{" "}
                     {g.teamBName}
                   </p>
                   <p className="text-[11px] text-white/40">{formatWhen(g.startedAt)}</p>

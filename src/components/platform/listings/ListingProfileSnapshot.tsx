@@ -39,7 +39,7 @@ export default function ListingProfileSnapshot({
         <p className="mt-2 text-sm text-white/45">
           {variant === "review"
             ? "Snapshot from their NTG account at time of application."
-            : "From your profile — update it if anything looks wrong."}
+            : "From your profile. Update it if anything looks wrong."}
         </p>
       </div>
 

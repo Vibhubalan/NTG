@@ -1,4 +1,5 @@
 import { prisma } from "@core/database/client";
+import { isTransientPrismaConnectionError } from "@core/database/transient-error";
 import {
   advanceTryoutWindow,
   computeTryoutListingStatus,
@@ -27,9 +28,19 @@ function toScheduleFields(listing: {
 
 export async function syncTryoutListingStatus(): Promise<{ updated: number }> {
   const now = new Date();
-  const listings = await prisma.listing.findMany({
-    where: { type: "ROSTER_TRYOUT", autoManageTryout: true },
-  });
+  let listings: Awaited<ReturnType<typeof prisma.listing.findMany>>;
+  try {
+    listings = await prisma.listing.findMany({
+      where: { type: "ROSTER_TRYOUT", autoManageTryout: true },
+    });
+  } catch (error) {
+    // A pooler blip on this housekeeping query should not 500 the listings page.
+    if (isTransientPrismaConnectionError(error)) {
+      console.warn("[listings] tryout schedule sync skipped (database unreachable)");
+      return { updated: 0 };
+    }
+    throw error;
+  }
 
   let updated = 0;
 

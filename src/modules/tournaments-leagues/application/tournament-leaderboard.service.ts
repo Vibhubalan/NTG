@@ -2,12 +2,11 @@ import { GameSlug, TournamentGameStatus } from "@prisma/client";
 import { cache } from "react";
 import type { LeaderboardPreview } from "@core/contracts";
 import { prisma } from "@core/database/client";
+import { withDbFallback } from "@core/database/transient-error";
 import {
   aggregatePlayerStats,
-  computeStandoutBaseline,
-  weightedAcs,
+  rankCrossCupPlayers,
   type StatsGame,
-  type TournamentStatsEligibility,
 } from "@/lib/tournament-stats";
 import {
   listPublishedTournamentGames,
@@ -22,20 +21,6 @@ function parseRiotId(riotId: string): { gameName: string; tagLine: string } | nu
     gameName: riotId.slice(0, hash),
     tagLine: riotId.slice(hash + 1),
   };
-}
-
-function mergeEligibility(
-  into: TournamentStatsEligibility,
-  from: TournamentStatsEligibility,
-): void {
-  for (const [userId, memberships] of Object.entries(from.byUserId)) {
-    const list = into.byUserId[userId] ?? [];
-    into.byUserId[userId] = [...list, ...memberships];
-  }
-  for (const [riotId, memberships] of Object.entries(from.byRiotId)) {
-    const list = into.byRiotId[riotId] ?? [];
-    into.byRiotId[riotId] = [...list, ...memberships];
-  }
 }
 
 function toStatsGames(
@@ -71,12 +56,36 @@ function toStatsGames(
   }));
 }
 
+function emptyTournamentBoard(): LeaderboardPreview {
+  return {
+    game: GameSlug.VALORANT,
+    scope: "TOURNAMENTS",
+    entries: [],
+    lastRefreshedAt: null,
+    hourlyRefreshEnabled: false,
+  };
+}
+
+async function mapInBatches<T, R>(
+  items: T[],
+  batchSize: number,
+  fn: (item: T) => Promise<R>,
+): Promise<R[]> {
+  const out: R[] = [];
+  for (let i = 0; i < items.length; i += batchSize) {
+    const batch = items.slice(i, i + batchSize);
+    out.push(...(await Promise.all(batch.map(fn))));
+  }
+  return out;
+}
+
 /**
- * Cross-cup Valorant tournament leaderboard: same Bayesian Rating as cup Stats,
- * aggregated across every Valorant cup that has published games.
+ * Cross-cup Valorant tournament leaderboard: each cup is scored on its own,
+ * then combined so consistent multi-cup ACS outranks a one-tournament spike.
  */
 export const getValorantTournamentLeaderboard = cache(
   async (limit = 250): Promise<LeaderboardPreview> => {
+    return withDbFallback("tournament-leaderboard", emptyTournamentBoard(), async () => {
     const cups = await prisma.tournament.findMany({
       where: {
         game: GameSlug.VALORANT,
@@ -86,42 +95,24 @@ export const getValorantTournamentLeaderboard = cache(
       orderBy: { updatedAt: "desc" },
     });
 
-    const allGames: StatsGame[] = [];
-    const eligibility: TournamentStatsEligibility = { byUserId: {}, byRiotId: {} };
     let latestAt: Date | null = null;
 
-    const cupPayloads = await Promise.all(
-      cups.map(async (cup) => {
-        const [gamesResult, cupEligibility] = await Promise.all([
-          listPublishedTournamentGames(cup.slug),
-          listTournamentStatsEligibility(cup.slug),
-        ]);
-        return { cup, gamesResult, cupEligibility };
-      }),
-    );
+    const cupPayloads = await mapInBatches(cups, 2, async (cup) => {
+      const [gamesResult, cupEligibility] = await Promise.all([
+        listPublishedTournamentGames(cup.slug),
+        listTournamentStatsEligibility(cup.slug),
+      ]);
+      return { cup, gamesResult, cupEligibility };
+    });
 
-    for (const { cup, gamesResult, cupEligibility } of cupPayloads) {
-      allGames.push(...toStatsGames(gamesResult));
-      mergeEligibility(eligibility, cupEligibility);
+    const cupPools = cupPayloads.map(({ cup, gamesResult, cupEligibility }) => {
       if (!latestAt || cup.updatedAt > latestAt) latestAt = cup.updatedAt;
-    }
+      return aggregatePlayerStats(toStatsGames(gamesResult), {
+        eligibility: cupEligibility,
+      });
+    });
 
-    const aggregated = aggregatePlayerStats(allGames, { eligibility });
-    const baseline = computeStandoutBaseline(aggregated);
-
-    const ranked = [...aggregated]
-      .map((p) => ({
-        ...p,
-        rating: weightedAcs(p.avgAcs, p.gamesPlayed, baseline),
-      }))
-      .sort((a, b) => {
-        if (b.rating !== a.rating) return b.rating - a.rating;
-        if (b.mvpCount !== a.mvpCount) return b.mvpCount - a.mvpCount;
-        if (b.totalKills !== a.totalKills) return b.totalKills - a.totalKills;
-        if (b.avgAcs !== a.avgAcs) return b.avgAcs - a.avgAcs;
-        return a.riotId.localeCompare(b.riotId);
-      })
-      .slice(0, limit);
+    const ranked = rankCrossCupPlayers(cupPools).slice(0, limit);
 
     const linkedUserIds = ranked
       .map((p) => (p.key.startsWith("user:") ? p.key.slice(5) : null))
@@ -248,6 +239,7 @@ export const getValorantTournamentLeaderboard = cache(
         riotPlayerCardWide: user?.riotPlayerCardWide ?? null,
         // Store Rating in mmr so the shared board sort/view path works.
         mmr: Math.round(p.rating * 10) / 10,
+        tournamentsPlayed: p.tournamentsPlayed,
         rankTier: p.mostPlayedAgent,
         rankTierId: null,
         currentAct: null,
@@ -264,5 +256,6 @@ export const getValorantTournamentLeaderboard = cache(
       lastRefreshedAt: latestAt?.toISOString() ?? null,
       hourlyRefreshEnabled: false,
     };
+    });
   },
 );

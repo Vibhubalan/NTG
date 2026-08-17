@@ -294,7 +294,7 @@ export default function AdminRosterPanel({ initialTeams }: Props) {
     if (!team || !selectedMember) return;
     const sortOrder = slotIndex ?? activeSlot;
     if (usesSlotGrid(team.gameKey) && sortOrder === null) {
-      setMessage("Pick a slot (1–5) first.");
+      setMessage("Pick a slot (1-5) first.");
       return;
     }
     if (
@@ -491,7 +491,7 @@ export default function AdminRosterPanel({ initialTeams }: Props) {
                 <div>
                   <p className="text-[10px] font-bold uppercase tracking-wider text-white/40">Roster slots</p>
                   <p className="mt-1 text-xs text-white/35">
-                    Assign NTG members to each slot. Profile data (in-game name, roles, rank) is pulled automatically — you just pick the member and assign their primary role.
+                    Assign NTG members to each slot. Profile data (in-game name, roles, rank) is pulled automatically. You just pick the member and assign their primary role.
                   </p>
                 </div>
 

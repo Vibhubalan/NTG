@@ -119,7 +119,7 @@ function ChampionshipCard({
           >
             <Image
               src={championshipSlides[index]}
-              alt={`${title} — slide ${index + 1}`}
+              alt={`${title}, slide ${index + 1}`}
               fill
               sizes="(max-width: 768px) 100vw, 55vw"
               quality={75}

@@ -15,7 +15,7 @@ const FIELD_TYPE_OPTIONS: { value: ListingFormFieldView["fieldType"]; label: str
   { value: "SINGLE_CHOICE", label: "Multiple choice", hint: "Select one (radio)" },
   { value: "MULTIPLE_CHOICE", label: "Checkboxes", hint: "Select multiple" },
   { value: "DROPDOWN", label: "Dropdown", hint: "Select one from menu" },
-  { value: "LINEAR_SCALE", label: "Linear scale", hint: "Rating scale (e.g. 1–5)" },
+  { value: "LINEAR_SCALE", label: "Linear scale", hint: "Rating scale (e.g. 1-5)" },
   { value: "MULTIPLE_CHOICE_GRID", label: "Multiple choice grid", hint: "One selection per row" },
   { value: "CHECKBOX_GRID", label: "Checkbox grid", hint: "Multiple selections per row" },
   { value: "DATE", label: "Date", hint: "Date picker" },
@@ -162,7 +162,7 @@ export default function AdminListingFormBuilder({ slug, listingType, initialFiel
     }
     const next = (data.fields as ListingFormFieldView[]).map((f, i) => toDraft({ ...f, id: `tpl-${i}` }, i));
     setFields(next);
-    setMessage("Template loaded — save to apply.");
+    setMessage("Template loaded. Save to apply.");
   }
 
   async function save() {

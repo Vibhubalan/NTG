@@ -30,6 +30,32 @@ export function resolvePortraitCardArtUrl(
   return normalizeToLarge(wide);
 }
 
+export type RiotPlayerCardFields = {
+  riotPlayerCard: string | null;
+  riotPlayerCardWide: string | null;
+};
+
+type RiotPlayerCardSource = {
+  riotPlayerCard?: string | null;
+  riotPlayerCardWide?: string | null;
+} | null | undefined;
+
+/** First source that already has stored Riot card art. */
+export function pickRiotPlayerCardFields(
+  sources: RiotPlayerCardSource[],
+): RiotPlayerCardFields {
+  for (const source of sources) {
+    if (!source) continue;
+    if (source.riotPlayerCard || source.riotPlayerCardWide) {
+      return {
+        riotPlayerCard: source.riotPlayerCard ?? null,
+        riotPlayerCardWide: source.riotPlayerCardWide ?? null,
+      };
+    }
+  }
+  return { riotPlayerCard: null, riotPlayerCardWide: null };
+}
+
 /** Persist wide + large together when Henrik omits wide. */
 export function normalizeRiotPlayerCardUrls(
   large?: string | null,

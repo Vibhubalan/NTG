@@ -16,6 +16,8 @@ export type LeaderboardPreviewEntry = {
   riotPlayerCard?: string | null;
   riotPlayerCardWide?: string | null;
   mmr: number | null;
+  /** Cups with published games (tournament board only). */
+  tournamentsPlayed?: number;
   rankTier: string | null;
   rankTierId: number | null;
   currentAct: string | null;

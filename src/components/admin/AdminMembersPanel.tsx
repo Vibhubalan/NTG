@@ -34,7 +34,7 @@ type Member = {
 };
 
 function formatValorantRoles(roles: ValorantRole[] | undefined): string {
-  if (!roles?.length) return "—";
+  if (!roles?.length) return "-";
   return roles.map((r) => VALORANT_ROLE_LABELS[r] ?? r).join(", ");
 }
 
@@ -422,7 +422,7 @@ export default function AdminMembersPanel({
                   <div className="flex justify-between gap-3">
                     <dt className="text-white/40">Username</dt>
                     <dd className="font-semibold text-[var(--color-brand)]/90">
-                      {selected.displayName ?? "—"}
+                      {selected.displayName ?? "-"}
                     </dd>
                   </div>
                   <div className="flex justify-between gap-3">
@@ -430,17 +430,17 @@ export default function AdminMembersPanel({
                     <dd className="text-white/75">
                       {selected.dateOfBirth
                         ? formatDateOfBirthDisplay(selected.dateOfBirth) ?? selected.dateOfBirth
-                        : "—"}
+                        : "-"}
                     </dd>
                   </div>
                   <div className="flex justify-between gap-3">
                     <dt className="text-white/40">Age</dt>
-                    <dd className="text-white/75">{selected.age !== null ? selected.age : "—"}</dd>
+                    <dd className="text-white/75">{selected.age !== null ? selected.age : "-"}</dd>
                   </div>
                   <div className="flex justify-between gap-3">
                     <dt className="text-white/40">Olympus ID</dt>
                     <dd className="text-white/75 truncate max-w-[55%] text-right">
-                      {selected.olympusId ?? "—"}
+                      {selected.olympusId ?? "-"}
                     </dd>
                   </div>
                   {selected.phone ? (
@@ -462,7 +462,7 @@ export default function AdminMembersPanel({
                     <div className="flex justify-between gap-3">
                       <dt className="text-white/40">Riot ID</dt>
                       <dd className="text-white/75 text-right truncate max-w-[58%]">
-                        {selected.riotId ?? "—"}
+                        {selected.riotId ?? "-"}
                       </dd>
                     </div>
                     <div className="flex justify-between gap-3">
@@ -474,7 +474,7 @@ export default function AdminMembersPanel({
                     <div className="flex justify-between gap-3">
                       <dt className="text-white/40">Current rank</dt>
                       <dd className="text-white/75 text-right">
-                        {selected.valorantRankTier ?? "—"}
+                        {selected.valorantRankTier ?? "-"}
                       </dd>
                     </div>
                     {selected.valorantRankMmr != null ? (
@@ -492,7 +492,7 @@ export default function AdminMembersPanel({
                     <div className="flex justify-between gap-3">
                       <dt className="text-white/40">Steam</dt>
                       <dd className="text-white/75 text-right truncate max-w-[58%]">
-                        {selected.steamPersonaName ?? selected.steamId64 ?? "—"}
+                        {selected.steamPersonaName ?? selected.steamId64 ?? "-"}
                       </dd>
                     </div>
                     <div className="flex justify-between gap-3">

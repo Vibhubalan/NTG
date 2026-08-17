@@ -271,7 +271,7 @@ export default function GameProfilesPanel({
             <div className="mt-3 flex items-center justify-between text-xs text-white/70">
               <span>CS2 Hours:</span>
               <span className="font-mono font-semibold text-white">
-                {profile.cs2HoursPlayed != null ? Math.round(profile.cs2HoursPlayed) : "—"}
+                {profile.cs2HoursPlayed != null ? Math.round(profile.cs2HoursPlayed) : "-"}
               </span>
             </div>
           </div>

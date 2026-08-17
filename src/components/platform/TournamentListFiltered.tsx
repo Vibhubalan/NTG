@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import Link from "next/link";
 import BrandIcon from "@/components/ui/BrandIcon";
 import StatusBadge from "@/components/platform/ui/StatusBadge";
+import TournamentScheduleButton from "@/components/platform/TournamentScheduleButton";
 import { allowPastTournamentClicks } from "@/lib/env";
 import { prefetchTournamentCupApis } from "@/lib/prefetch-tournament-cup";
 import { toTournamentDisplay } from "@/lib/tournament-display";
@@ -37,13 +38,13 @@ export default function TournamentListFiltered({ tournaments }: Props) {
 
   return (
     <div>
-      <div className="mb-8 flex flex-wrap gap-2">
+      <div className="mb-8 flex items-center gap-1.5 sm:gap-2">
         {filters.map((f) => (
           <button
             key={f.id}
             type="button"
             onClick={() => setFilter(f.id)}
-            className={`rounded-full px-4 py-2 text-[11px] font-medium uppercase tracking-[0.18em] transition-all ${
+            className={`shrink-0 whitespace-nowrap rounded-full px-2.5 py-1.5 text-[10px] font-medium uppercase tracking-wide transition-all sm:px-4 sm:py-2 sm:text-[11px] sm:tracking-[0.18em] ${
               filter === f.id
                 ? "bg-[var(--color-brand)]/12 text-[var(--color-brand)] ring-1 ring-inset ring-[var(--color-brand)]/30"
                 : "text-white/45 ring-1 ring-inset ring-white/10 hover:text-white/70"
@@ -52,6 +53,13 @@ export default function TournamentListFiltered({ tournaments }: Props) {
             {f.label}
           </button>
         ))}
+        <div className="ml-auto shrink-0">
+          <TournamentScheduleButton
+            tournaments={tournaments.filter(
+              (t) => t.status !== "DRAFT" && t.status !== "CANCELLED",
+            )}
+          />
+        </div>
       </div>
 
       <ol className="space-y-4">

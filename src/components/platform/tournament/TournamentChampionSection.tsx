@@ -204,6 +204,9 @@ function RosterPlayerCard({
         <img
           src={playerCardArt(player)}
           alt=""
+          onError={(e) => {
+            (e.currentTarget as HTMLImageElement).src = DEFAULT_VAL_CARD;
+          }}
           className="absolute inset-0 h-full w-full object-cover object-top transition-transform duration-700 ease-out group-hover:scale-[1.06]"
         />
         <div className="absolute inset-0 bg-gradient-to-t from-black from-[18%] via-black/70 via-[42%] to-transparent to-[72%]" />

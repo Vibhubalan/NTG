@@ -1004,7 +1004,7 @@ export async function registerForTournament(
           ok: false,
           error:
             requiredCoCaptains === 0
-              ? "This tournament only requires a team name — do not add co-captains."
+              ? "This tournament only requires a team name. Do not add co-captains."
               : `Enter exactly ${requiredCoCaptains} co-captain username${requiredCoCaptains > 1 ? "s" : ""}.`,
         };
       }
@@ -1621,7 +1621,7 @@ export async function switchPlayerToCaptain(
         ok: false,
         error:
           requiredCoCaptains === 0
-            ? "This tournament only requires a team name — do not add co-captains."
+            ? "This tournament only requires a team name. Do not add co-captains."
             : `Enter exactly ${requiredCoCaptains} co-captain username${requiredCoCaptains > 1 ? "s" : ""}.`,
       };
     }
@@ -1966,7 +1966,7 @@ export async function adminAddTournamentRegistration(
           ok: false,
           error:
             requiredCoCaptains === 0
-              ? "This tournament only requires a team name — do not add co-captains."
+              ? "This tournament only requires a team name. Do not add co-captains."
               : `Enter exactly ${requiredCoCaptains} co-captain username${requiredCoCaptains > 1 ? "s" : ""}.`,
         };
       }

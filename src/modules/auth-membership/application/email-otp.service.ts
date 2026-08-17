@@ -71,7 +71,7 @@ async function sendViaResend(
     logOtpDev(
       email,
       code,
-      `Resend failed in dev — use this code in the signup form`,
+      `Resend failed in dev. Use this code in the signup form`,
     );
     return { ok: true, devFallback: true, fallbackReason: resendError };
   }

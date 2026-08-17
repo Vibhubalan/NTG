@@ -72,8 +72,8 @@ export default function TryoutStatusBlock({ team }: Props) {
             <p className="mt-0.5 text-sm font-semibold text-white">{dateStr}</p>
             <p className="mt-0.5 text-xs text-white/40">
               {daysAway === 1
-                ? "Opening tomorrow — check back soon"
-                : `Opening in ${daysAway} days — check back then`}
+                ? "Opening tomorrow. Check back soon."
+                : `Opening in ${daysAway} days. Check back then.`}
             </p>
           </div>
         </div>

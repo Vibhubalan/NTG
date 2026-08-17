@@ -254,7 +254,7 @@ async function readJsonResponse(
       __nonJson: true,
       error:
         res.status === 401 || res.status === 403
-          ? "Admin session expired — refresh and sign in again."
+          ? "Admin session expired. Refresh and sign in again."
           : `Save failed (got a web page instead of JSON, HTTP ${res.status}).`,
     };
   }
@@ -263,7 +263,7 @@ async function readJsonResponse(
   } catch {
     return {
       __nonJson: true,
-      error: `Save failed — invalid server response (HTTP ${res.status}).`,
+      error: `Save failed. Invalid server response (HTTP ${res.status}).`,
     };
   }
 }
@@ -1480,7 +1480,7 @@ export default function AdminTournamentEditor({
                       />
                     </div>
                     <p className="text-xs text-white/35 sm:col-span-2">
-                      The &quot;Auction is live&quot; countdown banner displays on the homepage while the auction is live.
+                      The Tournaments homepage slide shows this countdown while the auction is live.
                     </p>
                   </>
                 ) : null}
@@ -1510,7 +1510,7 @@ export default function AdminTournamentEditor({
                     >
                       {[0, 1, 2, 3, 4].map((n) => (
                         <option key={n} value={n} className="bg-[#0a1020]">
-                          {n === 0 ? "0 — Captain only" : `${n} co-captain${n > 1 ? "s" : ""}`}
+                          {n === 0 ? "0, captain only" : `${n} co-captain${n > 1 ? "s" : ""}`}
                         </option>
                       ))}
                     </select>
@@ -1564,7 +1564,7 @@ export default function AdminTournamentEditor({
                       <div>
                         <label className="text-[11px] font-bold uppercase tracking-wider text-white/55">Rank Points</label>
                         <p className="mt-0.5 text-[10px] leading-relaxed text-white/35">
-                          Base points every player of a rank starts at. Sent to the auction app on Create — still editable there.
+                          Base points every player of a rank starts at. Sent to the auction app on Create, and still editable there.
                         </p>
                       </div>
                       <button
@@ -1634,7 +1634,7 @@ export default function AdminTournamentEditor({
                   {confirmCreateAuction && (
                     <div className="rounded-xl border border-amber-500/25 bg-amber-500/[0.06] p-4 space-y-3">
                       <p className="text-xs text-amber-200">
-                        This will delete and rebuild the live auction session — any in-progress bids and sold
+                        This will delete and rebuild the live auction session. Any in-progress bids and sold
                         players in the auction app will be lost. Published cup rosters on the teams tab are kept.
                       </p>
                       {auctionFinalized && (
@@ -1684,7 +1684,7 @@ export default function AdminTournamentEditor({
                         </p>
                         {autoManaged && (
                           <p className="text-[10px] text-cyan-300/70 mt-1">
-                            Auto-managed by the auction schedule — on automatically during the live window, off otherwise.
+                            Auto-managed by the auction schedule: on automatically during the live window, off otherwise.
                           </p>
                         )}
                       </div>
@@ -2245,29 +2245,29 @@ export default function AdminTournamentEditor({
                     <tbody>
                       {registrations.map((r) => (
                         <tr key={r.id} className="border-b border-white/[0.04]">
-                          <td className="px-3 py-2 font-medium text-white/85">{r.displayName ?? "—"}</td>
-                          <td className="px-3 py-2">{r.email ?? "—"}</td>
-                          <td className="px-3 py-2 font-mono">{r.phone ?? "—"}</td>
+                          <td className="px-3 py-2 font-medium text-white/85">{r.displayName ?? "-"}</td>
+                          <td className="px-3 py-2">{r.email ?? "-"}</td>
+                          <td className="px-3 py-2 font-mono">{r.phone ?? "-"}</td>
                           <td className="px-3 py-2">{formatParticipantRole(r.participantRole)}</td>
-                          <td className="px-3 py-2">{r.teamName ?? "—"}</td>
+                          <td className="px-3 py-2">{r.teamName ?? "-"}</td>
                           {form.game === "CS2" ? (
                             <>
-                              <td className="px-3 py-2 font-mono">{r.steamId64 ?? "—"}</td>
-                              <td className="px-3 py-2">{r.cs2Hours != null ? Math.round(r.cs2Hours) : "—"}</td>
-                              <td className="px-3 py-2">{r.cs2FaceitRank ?? "—"}</td>
-                              <td className="px-3 py-2">{r.cs2PeakPremier ?? "—"}</td>
+                              <td className="px-3 py-2 font-mono">{r.steamId64 ?? "-"}</td>
+                              <td className="px-3 py-2">{r.cs2Hours != null ? Math.round(r.cs2Hours) : "-"}</td>
+                              <td className="px-3 py-2">{r.cs2FaceitRank ?? "-"}</td>
+                              <td className="px-3 py-2">{r.cs2PeakPremier ?? "-"}</td>
                             </>
                           ) : form.game === "EA_FC26" ? (
                             <>
-                              <td className="px-3 py-2">{r.olympusId ?? "—"}</td>
-                              <td className="px-3 py-2">{r.partnerUsername ?? "—"}</td>
-                              <td className="px-3 py-2">{r.partnerName ?? "—"}</td>
+                              <td className="px-3 py-2">{r.olympusId ?? "-"}</td>
+                              <td className="px-3 py-2">{r.partnerUsername ?? "-"}</td>
+                              <td className="px-3 py-2">{r.partnerName ?? "-"}</td>
                             </>
                           ) : (
                             <>
-                              <td className="px-3 py-2 font-mono">{r.riotId ?? "—"}</td>
-                              <td className="px-3 py-2">{r.rankTier ?? "—"}</td>
-                              <td className="px-3 py-2">{r.valorantRoles ?? "—"}</td>
+                              <td className="px-3 py-2 font-mono">{r.riotId ?? "-"}</td>
+                              <td className="px-3 py-2">{r.rankTier ?? "-"}</td>
+                              <td className="px-3 py-2">{r.valorantRoles ?? "-"}</td>
                             </>
                           )}
                           <td className="px-3 py-2 whitespace-nowrap text-white/45">
@@ -2701,7 +2701,7 @@ export default function AdminTournamentEditor({
                               {mode === "poach" ? (
                                 <div className="space-y-2 rounded-xl border border-amber-400/20 bg-amber-500/[0.06] p-3">
                                   <p className="text-[10px] text-amber-200/70">
-                                    Extra roster slot — can poach multiple players from other teams.
+                                    Extra roster slot. Can poach multiple players from other teams.
                                   </p>
                                   <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
                                     <select

@@ -89,7 +89,7 @@ function refreshRunStatusLabel(status: string): string {
 }
 
 function formatDuration(ms: number | null): string {
-  if (ms == null) return "—";
+  if (ms == null) return "-";
   const sec = Math.round(ms / 1000);
   if (sec < 60) return `${sec}s`;
   const min = Math.floor(sec / 60);
@@ -163,11 +163,11 @@ export default function AdminLeaderboardSyncPanel({
       const key = `${nextCron.runStartedAt}:${nextCron.phase}`;
       if (prev !== key) {
         if (nextCron.phase === "running" && !prev?.endsWith(":running")) {
-          setCronFlash("Daily cron started — refreshing all linked players…");
+          setCronFlash("Daily cron started. Refreshing all linked players…");
           setDismissedCronRunId(null);
         } else if (nextCron.phase === "complete" && !prev?.endsWith(":complete")) {
           setCronFlash(
-            `Daily cron finished — ${nextCron.synced} refreshed${nextCron.failed > 0 ? `, ${nextCron.failed} failed` : ""}.`,
+            `Daily cron finished. ${nextCron.synced} refreshed${nextCron.failed > 0 ? `, ${nextCron.failed} failed` : ""}.`,
           );
         } else if (nextCron.phase === "error" && !prev?.endsWith(":error")) {
           setCronFlash(nextCron.errorMessage ?? "Daily cron failed.");
@@ -365,7 +365,7 @@ export default function AdminLeaderboardSyncPanel({
                   style={{ width: `${cronProgressPct}%` }}
                 />
               </div>
-              <p className="text-[10px] text-white/40">Live — updates every few seconds</p>
+              <p className="text-[10px] text-white/40">Live. Updates every few seconds.</p>
             </div>
           ) : null}
         </div>
@@ -374,11 +374,11 @@ export default function AdminLeaderboardSyncPanel({
       <dl className="mt-5 grid gap-3 sm:grid-cols-3 text-sm">
         <div className="rounded-xl border border-white/[0.06] bg-white/[0.02] px-4 py-3">
           <dt className="text-[10px] uppercase tracking-wider text-white/40">Riot linked</dt>
-          <dd className="mt-1 text-2xl font-bold text-white">{stats?.linkedPlayers ?? "—"}</dd>
+          <dd className="mt-1 text-2xl font-bold text-white">{stats?.linkedPlayers ?? "-"}</dd>
         </div>
         <div className="rounded-xl border border-white/[0.06] bg-white/[0.02] px-4 py-3">
           <dt className="text-[10px] uppercase tracking-wider text-white/40">On leaderboard</dt>
-          <dd className="mt-1 text-2xl font-bold text-emerald-300">{stats?.rankedOnLeaderboard ?? "—"}</dd>
+          <dd className="mt-1 text-2xl font-bold text-emerald-300">{stats?.rankedOnLeaderboard ?? "-"}</dd>
         </div>
         <div className="rounded-xl border border-white/[0.06] bg-white/[0.02] px-4 py-3">
           <dt className="text-[10px] uppercase tracking-wider text-white/40">Last sync</dt>

@@ -11,7 +11,7 @@ export async function POST(req: Request) {
 
   if (!serverEnv.databaseUrl) {
     return NextResponse.json(
-      { error: "Registration unavailable — database not configured." },
+      { error: "Registration unavailable. Database not configured." },
       { status: 503 },
     );
   }

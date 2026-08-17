@@ -126,7 +126,7 @@ export default function RankChangeAuditPanel() {
                 <tr key={row.id} className={`${row.error ? "bg-red-500/5" : ""} hover:bg-white/[0.01]`}>
                   <td className="whitespace-nowrap px-3 py-2.5 text-white/40">{formatWhen(row.createdAt)}</td>
                   <td className="px-3 py-2.5">
-                    <div className="font-semibold text-white/80">{row.displayName ?? "—"}</div>
+                    <div className="font-semibold text-white/80">{row.displayName ?? "-"}</div>
                     <div className="text-[9px] text-white/35">{row.riotId ?? ""}</div>
                   </td>
                   <td className="px-3 py-2.5">
@@ -149,7 +149,7 @@ export default function RankChangeAuditPanel() {
                       <span className="text-red-300">{row.error}</span>
                     ) : (
                       <>
-                        {row.previousRankTier ?? "—"}
+                        {row.previousRankTier ?? "-"}
                         {row.previousMmr != null ? (
                           <span className="text-white/35"> · {row.previousMmr}</span>
                         ) : null}
@@ -158,11 +158,11 @@ export default function RankChangeAuditPanel() {
                   </td>
                   <td className="px-3 py-2.5">
                     {row.error ? (
-                      "—"
+                      "-"
                     ) : (
                       <>
                         <span className={row.changed ? "font-semibold text-emerald-300" : "text-white/60"}>
-                          {row.newRankTier ?? "—"}
+                          {row.newRankTier ?? "-"}
                         </span>
                         {row.newMmr != null ? (
                           <span className="text-white/35"> · {row.newMmr}</span>

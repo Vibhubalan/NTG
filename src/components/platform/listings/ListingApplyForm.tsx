@@ -254,10 +254,10 @@ export default function ListingApplyForm({
                 value={pastExperience}
                 onChange={(e) => setPastExperience(e.target.value)}
                 disabled={loading}
-                rows={4}
+                rows={8}
                 maxLength={4000}
-                placeholder="If any"
-                className="w-full rounded-xl border border-white/[0.08] bg-white/[0.03] px-4 py-3 text-sm text-white placeholder:text-white/30 focus:border-[var(--color-brand)]/45 focus:outline-none"
+                placeholder="Tell us about your past experience, if any."
+                className="min-h-[10rem] w-full rounded-xl border border-white/[0.08] bg-white/[0.03] px-4 py-3 text-sm text-white placeholder:text-white/30 focus:border-[var(--color-brand)]/45 focus:outline-none"
               />
             </div>
             <div className="space-y-2">
@@ -267,7 +267,7 @@ export default function ListingApplyForm({
                   Optional
                 </span>
               </p>
-              <p className="text-xs text-white/35">PDF, Word, Excel, or images — max 15 MB.</p>
+              <p className="text-xs text-white/35">PDF, Word, Excel, or images. Max 15 MB.</p>
               <input
                 type="file"
                 accept=".pdf,.doc,.docx,.xls,.xlsx,image/*"

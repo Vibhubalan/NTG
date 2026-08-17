@@ -305,6 +305,6 @@ export function formatResponsesAsMessage(
 export function formatResponseForDisplay(
   value: string | string[] | Record<string, string | string[]> | undefined,
 ): string {
-  if (value == null) return "—";
+  if (value == null) return "-";
   return formatResponseValue(value);
 }

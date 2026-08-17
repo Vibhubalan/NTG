@@ -647,7 +647,7 @@ export default function TournamentDetailView({
                 (brackets.length > 1 ? `Bracket ${activeStageIndex + 1}` : null);
 
               const displayName = bracketLabel
-                ? `${tournament.name} — ${bracketLabel}`
+                ? `${tournament.name}: ${bracketLabel}`
                 : tournament.name;
 
               const tournamentTeamsList =

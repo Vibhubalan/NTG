@@ -42,7 +42,7 @@ export default function VisitLounge() {
         className="mb-10 text-center"
       >
         <span className="text-[10px] font-medium uppercase tracking-[0.4em] text-[var(--color-brand)]/80">
-          06 · Visit
+          05 · Visit
         </span>
         <h2 className="mt-3 font-display text-4xl font-semibold tracking-[-0.02em] text-white sm:text-5xl">
           Step{" "}
@@ -102,10 +102,9 @@ export default function VisitLounge() {
           </div>
 
           {/*
-            Neon teal map — locked, mobile-optimized.
-            • Lazy-mounted iframe (no Google JS until near viewport)
-            • Lighter filter chain on mobile, fuller chain on desktop
-            • No backdrop-blur or animate-ping below `md` (GPU-cheap)
+            Lounge map. Lazy-mounted iframe (no Google JS until near viewport).
+            Lighter filter chain on mobile, fuller chain on desktop.
+            No backdrop-blur or animate-ping below md.
           */}
           <div className="group relative overflow-hidden rounded-3xl border border-[var(--color-brand)]/25 bg-[#060a14] [contain:layout_paint] [content-visibility:auto] md:shadow-[0_0_40px_rgba(94,234,212,0.08),inset_0_0_60px_rgba(124,58,237,0.05)]" style={{ minHeight: "clamp(15rem, 22vw, 22rem)" }} >
             <a

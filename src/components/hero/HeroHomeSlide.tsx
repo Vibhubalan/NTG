@@ -1,14 +1,8 @@
 "use client";
 
-import HeroCupStatusBanner, { type HeroCupStatusClient } from "@/components/HeroCupStatusBanner";
 import SplitText from "@/components/SplitText";
 
-type Props = {
-  cup: HeroCupStatusClient | null;
-  auctionHref: string | null;
-};
-
-export default function HeroHomeSlide({ cup, auctionHref }: Props) {
+export default function HeroHomeSlide() {
   return (
     <div className="relative flex h-full w-full items-center justify-center">
       <span
@@ -17,17 +11,6 @@ export default function HeroHomeSlide({ cup, auctionHref }: Props) {
       >
         NTG
       </span>
-
-      {cup ? (
-        <div
-          className="absolute inset-x-0 z-10 -translate-y-full flex flex-col items-center px-6 text-center"
-          style={{ top: "var(--hero-content-bottom-above)" }}
-        >
-          <div className="animate-in fade-in slide-in-from-bottom-1 duration-300">
-            <HeroCupStatusBanner cup={cup} auctionHref={auctionHref} />
-          </div>
-        </div>
-      ) : null}
 
       <div className="absolute inset-x-0 top-[42.7%] sm:top-[48.5%] z-10 -translate-y-1/2 flex flex-col items-center px-6 text-center">
         <h1 className="font-display font-semibold uppercase text-white">
@@ -51,7 +34,7 @@ export default function HeroHomeSlide({ cup, auctionHref }: Props) {
             maxWidth: "clamp(14.4rem, 64vw, 54.4rem)",
           }}
         >
-          Mangaluru&apos;s premier esports lounge — premium hardware, electric
+          Mangaluru&apos;s premier esports lounge. Premium hardware, electric
           <span className="hidden sm:inline">
             <br />
           </span>

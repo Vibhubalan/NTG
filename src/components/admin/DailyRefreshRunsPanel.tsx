@@ -42,7 +42,7 @@ function refreshRunStatusLabel(status: string): string {
 }
 
 function formatDuration(ms: number | null): string {
-  if (ms == null) return "—";
+  if (ms == null) return "-";
   const sec = Math.round(ms / 1000);
   if (sec < 60) return `${sec}s`;
   const min = Math.floor(sec / 60);

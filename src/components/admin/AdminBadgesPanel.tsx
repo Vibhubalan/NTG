@@ -246,7 +246,7 @@ export default function AdminBadgesPanel({
         setMessage(data.error ?? "Custom badge award failed.");
       } else {
         setMessage(
-          `Custom badge awarded to ${customPlayer.label}${data.label ? ` — ${data.label}` : ""}. Previous holder (if any) was replaced.`,
+          `Custom badge awarded to ${customPlayer.label}${data.label ? `: ${data.label}` : ""}. Previous holder (if any) was replaced.`,
         );
         setCustomPlayer(null);
         setCustomSearch("");
@@ -395,7 +395,7 @@ export default function AdminBadgesPanel({
                 ))}
               </div>
             ) : (
-              <p className="text-[10px] italic text-white/25">No players selected yet — search above to add them.</p>
+              <p className="text-[10px] italic text-white/25">No players selected yet. Search above to add them.</p>
             )}
 
             <button
@@ -419,7 +419,7 @@ export default function AdminBadgesPanel({
       <div className="relative z-10">
         <AdminSection
           title="Award custom badge"
-          showsOn="Global — one person only per badge type; transfers if reassigned"
+          showsOn="Global: one person only per badge type; transfers if reassigned"
         >
           <div className="space-y-4">
             <div className="space-y-2">
@@ -495,7 +495,7 @@ export default function AdminBadgesPanel({
               </div>
             ) : (
               <p className="text-[10px] italic text-white/25">
-                Pick exactly one player — awarding replaces any previous holder of this badge.
+                Pick exactly one player. Awarding replaces any previous holder of this badge.
               </p>
             )}
 

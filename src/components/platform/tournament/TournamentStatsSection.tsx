@@ -290,8 +290,8 @@ export default function TournamentStatsSection({
                   {searchedPlayers.length} players
                 </p>
                 <p className="mt-1.5 text-[11px] leading-snug text-white/35">
-                  Rating balances score with how many games someone played —
-                  one hot match can&apos;t beat a full tournament run.
+                  Rating balances score with how many games someone played.
+                  One hot match can&apos;t beat a full tournament run.
                 </p>
               </div>
               <div className="flex shrink-0 items-center gap-2">
