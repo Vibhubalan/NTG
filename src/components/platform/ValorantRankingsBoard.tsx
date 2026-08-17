@@ -669,7 +669,7 @@ export default function ValorantRankingsBoard({
               </div>
               {isTournaments ? (
                 <p className="mt-1 max-w-[28rem] text-[11px] font-medium leading-snug text-white/35 sm:ml-auto">
-                  Rankings start at AUC Cup IV. Playing more cups with steady scores ranks you higher than one great tournament.
+                  Rankings start at AUC Cup III. Playing more cups with steady scores ranks you higher than one great tournament.
                 </p>
               ) : (
                 <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[10px] font-bold uppercase tracking-widest text-white/30">

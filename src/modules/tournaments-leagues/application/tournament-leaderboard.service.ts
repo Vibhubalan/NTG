@@ -95,7 +95,7 @@ export const getValorantTournamentLeaderboard = cache(
       orderBy: { updatedAt: "desc" },
     });
 
-    let latestAt: Date | null = null;
+    const latestAt = cups[0]?.updatedAt ?? null;
 
     const cupPayloads = await mapInBatches(cups, 2, async (cup) => {
       const [gamesResult, cupEligibility] = await Promise.all([
@@ -105,12 +105,11 @@ export const getValorantTournamentLeaderboard = cache(
       return { cup, gamesResult, cupEligibility };
     });
 
-    const cupPools = cupPayloads.map(({ cup, gamesResult, cupEligibility }) => {
-      if (!latestAt || cup.updatedAt > latestAt) latestAt = cup.updatedAt;
-      return aggregatePlayerStats(toStatsGames(gamesResult), {
+    const cupPools = cupPayloads.map(({ gamesResult, cupEligibility }) =>
+      aggregatePlayerStats(toStatsGames(gamesResult), {
         eligibility: cupEligibility,
-      });
-    });
+      }),
+    );
 
     const ranked = rankCrossCupPlayers(cupPools).slice(0, limit);
 
