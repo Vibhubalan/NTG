@@ -1,9 +1,11 @@
 import { prisma } from "@core/database/client";
 import type { TournamentDetail, PrizeSplitRow, TournamentTeamPlayerView, TournamentTeamView } from "@core/contracts";
 import type { GameSlug, TournamentFormat, TournamentStatus } from "@prisma/client";
+import { parseRiotId } from "@auth-membership/application/riot-henrik.service";
 import { gameMetaFor } from "@/lib/tournament-display";
 import { normalizeBracketUrlItems, normalizeBracketUrls } from "@/lib/challonge";
 import { teamNamesMatch } from "@/lib/tournament-champion";
+import { pickRiotPlayerCardFields } from "@/lib/valorant-player-card";
 import { isTournamentRegistrationLive } from "../domain/registration-window";
 import { slugWhere } from "@/lib/slug-utils";
 
@@ -110,6 +112,10 @@ function buildTeamDetailsFromData(
       membershipKind?: "PRIMARY" | "POACH" | null;
       poachedFromTeam?: { id: string; name: string } | null;
       registration: RegistrationPlayerRow | null;
+      user?: {
+        riotPlayerCard: string | null;
+        riotPlayerCardWide: string | null;
+      } | null;
     }>;
     registrations: RegistrationPlayerRow[];
   }>,
@@ -128,12 +134,14 @@ function buildTeamDetailsFromData(
                 ? (p.poachedFromTeam?.name ?? null)
                 : null,
             };
+            const cardFields = pickRiotPlayerCardFields([p.user, p.registration?.user]);
             if (p.registration && !isPoach) {
               claimedRegIds.add(p.registration.id);
               return {
                 ...mapRegistrationToPlayerView(p.registration),
                 id: p.id,
                 ...poachMeta,
+                ...cardFields,
               };
             }
             return {
@@ -151,6 +159,7 @@ function buildTeamDetailsFromData(
                 : ((p.registration?.participantRole as TournamentTeamPlayerView["participantRole"]) ??
                   "PLAYER"),
               ...poachMeta,
+              ...cardFields,
             };
           })
         : sortRegsByRole(team.registrations).map((r) => {
@@ -235,11 +244,69 @@ function mapRegistrationToPlayerView(r: RegistrationPlayerRow): TournamentTeamPl
     cs2PeakPremier: r.snapshotCs2PeakPremier,
     valorantRankTier: r.snapshotRankTier,
     valorantRankTierId: r.snapshotRankTierId,
-    riotPlayerCard: r.user?.riotPlayerCard ?? null,
-    riotPlayerCardWide: r.user?.riotPlayerCardWide ?? null,
+    ...pickRiotPlayerCardFields([r.user]),
     valorantRoles: parseValorantRoles(r.snapshotValorantRoles),
     participantRole: r.participantRole as TournamentTeamPlayerView["participantRole"],
   };
+}
+
+function riotIdKey(gameName: string, tagLine: string): string {
+  return `${gameName.trim().toLowerCase()}#${tagLine.trim().toLowerCase()}`;
+}
+
+/** Fill dummy roster art for poaches/subs whose User row was not on the team-player include. */
+async function enrichMissingRosterCards(
+  teams: TournamentTeamView[],
+): Promise<TournamentTeamView[]> {
+  const missing: { gameName: string; tagLine: string }[] = [];
+  for (const team of teams) {
+    for (const player of team.players) {
+      if (player.riotPlayerCard || player.riotPlayerCardWide) continue;
+      const parsed = player.riotId ? parseRiotId(player.riotId) : null;
+      if (!parsed) continue;
+      missing.push(parsed);
+    }
+  }
+  if (missing.length === 0) return teams;
+
+  const unique = [
+    ...new Map(missing.map((m) => [riotIdKey(m.gameName, m.tagLine), m])).values(),
+  ];
+
+  const users = await prisma.user.findMany({
+    where: {
+      OR: unique.map((u) => ({
+        riotGameName: { equals: u.gameName, mode: "insensitive" as const },
+        riotTagLine: { equals: u.tagLine, mode: "insensitive" as const },
+      })),
+    },
+    select: {
+      riotGameName: true,
+      riotTagLine: true,
+      riotPlayerCard: true,
+      riotPlayerCardWide: true,
+    },
+  });
+
+  const cardsByRiot = new Map<string, ReturnType<typeof pickRiotPlayerCardFields>>();
+  for (const user of users) {
+    if (!user.riotGameName || !user.riotTagLine) continue;
+    const cards = pickRiotPlayerCardFields([user]);
+    if (!cards.riotPlayerCard && !cards.riotPlayerCardWide) continue;
+    cardsByRiot.set(riotIdKey(user.riotGameName, user.riotTagLine), cards);
+  }
+  if (cardsByRiot.size === 0) return teams;
+
+  return teams.map((team) => ({
+    ...team,
+    players: team.players.map((player) => {
+      if (player.riotPlayerCard || player.riotPlayerCardWide) return player;
+      const parsed = player.riotId ? parseRiotId(player.riotId) : null;
+      if (!parsed) return player;
+      const cards = cardsByRiot.get(riotIdKey(parsed.gameName, parsed.tagLine));
+      return cards ? { ...player, ...cards } : player;
+    }),
+  }));
 }
 
 function isRegistrationOpen(t: {
@@ -378,6 +445,12 @@ export class TournamentRepository {
             players: {
               orderBy: { sortOrder: "asc" },
               include: {
+                user: {
+                  select: {
+                    riotPlayerCard: true,
+                    riotPlayerCardWide: true,
+                  },
+                },
                 registration: { select: registrationPlayerSelect },
                 poachedFromTeam: { select: { id: true, name: true } },
               },
@@ -411,7 +484,9 @@ export class TournamentRepository {
     if (!t) return null;
 
     const allRegs = t.registrations;
-    const teamDetails = buildTeamDetailsFromData(t.tournamentTeams, allRegs);
+    const teamDetails = await enrichMissingRosterCards(
+      buildTeamDetailsFromData(t.tournamentTeams, allRegs),
+    );
 
     const teams = teamDetails.map((team) => team.name);
 

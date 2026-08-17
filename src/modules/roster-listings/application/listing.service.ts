@@ -1,4 +1,5 @@
 import { prisma } from "@core/database/client";
+import { withDbFallback } from "@core/database/transient-error";
 import type { ListingDetail, ListingPreview } from "@core/contracts/roster-listings";
 import { rosterPresetLabel } from "@/lib/roster-games";
 import { mapListingFormField } from "../domain/listing-form";
@@ -60,56 +61,62 @@ function mapListing(row: {
 }
 
 export async function listOpenListings(type?: ListingType): Promise<ListingPreview[]> {
-  await syncTryoutListingStatus();
+  return withDbFallback("listings", [], async () => {
+    await syncTryoutListingStatus();
 
-  const rows = await prisma.listing.findMany({
-    where: {
-      status: "OPEN",
-      ...(type ? { type } : {}),
-    },
-    orderBy: [{ sortOrder: "asc" }, { createdAt: "desc" }],
+    const rows = await prisma.listing.findMany({
+      where: {
+        status: "OPEN",
+        ...(type ? { type } : {}),
+      },
+      orderBy: [{ sortOrder: "asc" }, { createdAt: "desc" }],
+    });
+    return rows.map((r) => mapListing({ ...r, status: r.status }));
   });
-  return rows.map((r) => mapListing({ ...r, status: r.status }));
 }
 
 export async function getListingBySlug(
   slug: string,
   userId?: string | null,
 ): Promise<ListingDetail | null> {
-  await syncTryoutListingStatus();
+  return withDbFallback("listing-detail", null, async () => {
+    await syncTryoutListingStatus();
 
-  const row = await prisma.listing.findUnique({
-    where: { slug },
-    include: {
-      formFields: { orderBy: { sortOrder: "asc" } },
-    },
-  });
-  if (!row || row.status === "DRAFT") return null;
-  if (row.type === "JOB" && row.status !== "OPEN") return null;
-
-  let userApplied = false;
-  let applicationStatus: string | null = null;
-
-  if (userId) {
-    const app = await prisma.listingApplication.findUnique({
-      where: { listingId_userId: { listingId: row.id, userId } },
-      select: { status: true },
+    const row = await prisma.listing.findUnique({
+      where: { slug },
+      include: {
+        formFields: { orderBy: { sortOrder: "asc" } },
+      },
     });
-    if (app) {
-      userApplied = true;
-      applicationStatus = app.status;
-    }
-  }
+    if (!row || row.status === "DRAFT") return null;
+    if (row.type === "JOB" && row.status !== "OPEN") return null;
 
-  return {
-    ...mapListing(row),
-    userApplied,
-    applicationStatus,
-    formFields: row.formFields.map(mapListingFormField),
-  };
+    let userApplied = false;
+    let applicationStatus: string | null = null;
+
+    if (userId) {
+      const app = await prisma.listingApplication.findUnique({
+        where: { listingId_userId: { listingId: row.id, userId } },
+        select: { status: true },
+      });
+      if (app) {
+        userApplied = true;
+        applicationStatus = app.status;
+      }
+    }
+
+    return {
+      ...mapListing(row),
+      userApplied,
+      applicationStatus,
+      formFields: row.formFields.map(mapListingFormField),
+    };
+  });
 }
 
 export async function countOpenListings(): Promise<number> {
-  await syncTryoutListingStatus();
-  return prisma.listing.count({ where: { status: "OPEN" } });
+  return withDbFallback("listings-count", 0, async () => {
+    await syncTryoutListingStatus();
+    return prisma.listing.count({ where: { status: "OPEN" } });
+  });
 }

@@ -22,7 +22,7 @@ export default async function RosterPage() {
       <PlatformHeader
         eyebrow="NTG Esports"
         title="Official Roster"
-        subtitle="Our competitive teams — and open team tryouts you can apply for right now."
+        subtitle="Our competitive teams, plus open team tryouts you can apply for right now."
       />
       <RosterHub teams={teams} />
     </div>

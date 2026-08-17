@@ -292,7 +292,7 @@ export default function ListingFormFields({ fields, values, onChange, disabled }
             {field.fieldType === "FILE_UPLOAD" ? (
               <div className="space-y-2">
                 <p className="text-xs text-white/35">
-                  Excel (.xls, .xlsx), Word, PDF, or images — max 15 MB.
+                  Excel (.xls, .xlsx), Word, PDF, or images. Max 15 MB.
                 </p>
                 <input
                   type="file"

@@ -8,6 +8,7 @@ import { resolveEffectivePublicAuction } from "@tournaments-leagues/domain/aucti
 import { listOpenListings } from "@roster-listings/index";
 import { getSession } from "@core/auth/session";
 import { requireAdmin } from "@core/auth/require-admin";
+import { isTransientPrismaConnectionError } from "@core/database/transient-error";
 import { tryAuctionLink } from "@/lib/auction-link";
 import { resolveChampion } from "@/lib/tournament-champion";
 import { gameMetaFor } from "@/lib/tournament-display";
@@ -19,8 +20,6 @@ import type { MvpData } from "@/components/platform/tournament/TournamentFinalRe
 import HeroCarousel from "@/components/hero/HeroCarousel";
 import type { HeroCarouselData, HeroTournamentSlideData } from "@/components/hero/hero-carousel-types";
 
-// Same gating rules as the tournament detail page's "Enter Live Auction" button
-// (admin.ok, or a registered+eligible user when the admin has made the auction public).
 async function resolveHeroAuctionHref(slug: string): Promise<string | null> {
   const session = await getSession();
   const userId = session?.user?.id;
@@ -29,7 +28,7 @@ async function resolveHeroAuctionHref(slug: string): Promise<string | null> {
 
   const publicAuction = resolveEffectivePublicAuction(tournament.publicAuction ?? false, tournament);
 
-  const auctionEligible = tournament.registrationFormat === "AUCTION" && !!userId;
+  const auctionEligible = tournament.registrationFormat === "AUCTION";
   const showEnterButton =
     tournament.registrationFormat === "AUCTION" && (admin.ok || (auctionEligible && publicAuction));
   if (!showEnterButton || !userId) return null;
@@ -63,39 +62,45 @@ function mvpFromPlacements(placements: TournamentPlacementView[]): MvpData | nul
 }
 
 async function resolveTournamentSlide(): Promise<HeroTournamentSlideData> {
-  const openCup = await getHeroOpenCup();
-  if (openCup) {
-    return { mode: "open", banner: openCup };
+  try {
+    const heroCup = await getHeroCupStatus();
+    if (heroCup) {
+      const auctionHref =
+        heroCup.phase === "auction_live" ? await resolveHeroAuctionHref(heroCup.slug) : null;
+      return { mode: "status", cup: heroCup, auctionHref };
+    }
+
+    const openCup = await getHeroOpenCup();
+    if (openCup) {
+      return { mode: "open", banner: openCup };
+    }
+
+    const detail = await getLatestChampionCupDetail();
+    if (!detail) return null;
+
+    const championData = resolveChampion(null, detail.teamDetails, detail.teams, detail.placements);
+    if (!championData) return null;
+
+    const meta = gameMetaFor(detail.game);
+    return {
+      mode: "champions",
+      tournamentName: detail.name,
+      tournamentSlug: detail.slug,
+      game: detail.game,
+      accentHex: meta.hex,
+      championData,
+      mvp: mvpFromPlacements(detail.placements),
+      allTeams: detail.teamDetails,
+    };
+  } catch (error) {
+    if (!isTransientPrismaConnectionError(error)) throw error;
+    console.warn("[hero] tournament slide skipped (database unreachable)");
+    return null;
   }
-
-  const detail = await getLatestChampionCupDetail();
-  if (!detail) return null;
-
-  const championData = resolveChampion(null, detail.teamDetails, detail.teams, detail.placements);
-  if (!championData) return null;
-
-  const meta = gameMetaFor(detail.game);
-  return {
-    mode: "champions",
-    tournamentName: detail.name,
-    tournamentSlug: detail.slug,
-    game: detail.game,
-    accentHex: meta.hex,
-    championData,
-    mvp: mvpFromPlacements(detail.placements),
-    allTeams: detail.teamDetails,
-  };
 }
 
 export default async function Hero() {
-  const [heroCup, tournament, listings] = await Promise.all([
-    getHeroCupStatus(),
-    resolveTournamentSlide(),
-    listOpenListings(),
-  ]);
-
-  const auctionHref =
-    heroCup?.phase === "auction_live" ? await resolveHeroAuctionHref(heroCup.slug) : null;
+  const [tournament, listings] = await Promise.all([resolveTournamentSlide(), listOpenListings()]);
 
   const socials = [
     ...siteSocials.filter(
@@ -107,8 +112,6 @@ export default async function Hero() {
   ];
 
   const data: HeroCarouselData = {
-    homeCup: heroCup,
-    auctionHref,
     tournament,
     listings,
     socials,
@@ -119,7 +122,6 @@ export default async function Hero() {
       id="top"
       className="relative flex min-h-[100svh] w-full items-center justify-center overflow-hidden"
     >
-      {/* Static aurora-style gradient backdrop */}
       <div
         aria-hidden
         className="pointer-events-none absolute inset-0"
@@ -129,7 +131,6 @@ export default async function Hero() {
         }}
       />
 
-      {/* Grid + bottom vignette */}
       <div className="pointer-events-none absolute inset-0">
         <div className="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.025)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.025)_1px,transparent_1px)] bg-[size:64px_64px] [mask-image:radial-gradient(ellipse_at_center,black_30%,transparent_75%)]" />
         <div className="absolute inset-x-0 bottom-0 h-64 bg-gradient-to-t from-[var(--color-ink)] to-transparent" />

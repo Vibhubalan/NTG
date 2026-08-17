@@ -66,7 +66,7 @@ export default function ListingsBoard({ listings, initialType }: Props) {
         <div className="rounded-3xl border border-dashed border-white/10 bg-white/[0.02] px-6 py-20 text-center backdrop-blur-sm sm:py-24">
           <p className="font-display text-xl text-white/70">No opportunities available</p>
           <p className="mx-auto mt-3 max-w-sm text-sm text-white/40">
-            Check back soon or browse other categories to see our open listings.
+            Check back soon, try another category, or refresh if listings usually show here.
           </p>
         </div>
       ) : (

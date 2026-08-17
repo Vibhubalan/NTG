@@ -9,6 +9,7 @@ import {
   aggregateTeamMapStats,
   buildPlayerStatsCsv,
   computeStandoutBaseline,
+  crossCupRating,
   distinctRolesPlayed,
   dynamicGamesThreshold,
   flexPriorityScore,
@@ -17,6 +18,7 @@ import {
   isStatsAppearanceEligible,
   normalizeCompKey,
   qualifiesFlex,
+  rankCrossCupPlayers,
   statsPlayerKey,
   weightedAcs,
   winningTeamId,
@@ -423,6 +425,60 @@ describe("tournament-stats meta aggregations", () => {
     // Result stays in ACS units and converges on the true average.
     expect(weightedAcs(300, 200, baseline)).toBeCloseTo(298.9, 0);
     expect(weightedAcs(250, 0, baseline)).toBe(0);
+  });
+
+  it("crossCupRating rewards a consistent 3-4 cup run over a one-cup spike", () => {
+    const mean = 230;
+    const spike = crossCupRating([300], mean);
+    const fourCups = crossCupRating([250, 250, 250, 250], mean);
+    const threeCups = crossCupRating([240, 245, 242], mean);
+    const grind = crossCupRating([200, 200, 200, 200], mean);
+
+    expect(fourCups).toBeGreaterThan(spike);
+    expect(threeCups).toBeGreaterThan(spike);
+    // A long 200 ACS grind still should not beat a real 300 cup.
+    expect(grind).toBeLessThan(spike);
+    expect(crossCupRating([], mean)).toBe(0);
+  });
+
+  it("rankCrossCupPlayers puts a 4-cup 250 run above a 1-cup 300, and still lists the spike", () => {
+    const field = (suffix: string, avgAcs: number) => ({
+      key: `user:${suffix}`,
+      riotId: `${suffix}#001`,
+      userName: suffix,
+      gamesPlayed: 5,
+      totalRounds: 100,
+      totalKills: 40,
+      totalDeaths: 35,
+      totalAssists: 15,
+      totalFirstKills: 4,
+      totalFirstDeaths: 4,
+      avgAcs,
+      avgAdr: 140,
+      avgHsPercent: 22,
+      mostPlayedAgent: "Jett",
+      agentCounts: { Jett: 5 },
+      teamNames: ["Field"],
+      mvpCount: 0,
+    });
+
+    const spike = field("Spike", 300);
+    const steady = field("Steady", 250);
+    const filler = field("Filler", 220);
+
+    const ranked = rankCrossCupPlayers([
+      [spike, { ...steady, avgAcs: 248 }, filler],
+      [{ ...steady, avgAcs: 252 }, filler],
+      [{ ...steady, avgAcs: 246 }, filler],
+      [{ ...steady, avgAcs: 251 }, filler],
+    ]);
+
+    expect(ranked[0]?.key).toBe("user:Steady");
+    expect(ranked[0]?.tournamentsPlayed).toBe(4);
+    const spikeRow = ranked.find((p) => p.key === "user:Spike");
+    expect(spikeRow).toBeTruthy();
+    expect(spikeRow?.tournamentsPlayed).toBe(1);
+    expect(ranked.findIndex((p) => p.key === "user:Spike")).toBeGreaterThan(0);
   });
 
   it("computeStandoutBaseline weights the mean ACS by appearances", () => {

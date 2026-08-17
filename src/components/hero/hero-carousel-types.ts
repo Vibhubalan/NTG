@@ -3,12 +3,19 @@ import type { ListingPreview } from "@core/contracts/roster-listings";
 import type { TournamentRegistrationBanner, TournamentTeamView } from "@core/contracts";
 import type { ChampionResult } from "@/lib/tournament-champion";
 import type { MvpData } from "@/components/platform/tournament/TournamentFinalResults";
-import type { HeroCupStatusClient } from "@/components/HeroCupStatusBanner";
+import type { HeroCupPhase } from "@tournaments-leagues/domain/auction-hero-phase";
 
 export type HeroSocialLink = {
   name: string;
   href: string;
   path: string;
+};
+
+export type HeroCupStatusClient = {
+  slug: string;
+  name: string;
+  phase: HeroCupPhase;
+  countdownEndsAt: string | null;
 };
 
 export type HeroChampionsSlideData = {
@@ -27,11 +34,19 @@ export type HeroOpenCupSlideData = {
   banner: TournamentRegistrationBanner;
 };
 
-export type HeroTournamentSlideData = HeroChampionsSlideData | HeroOpenCupSlideData | null;
+export type HeroStatusSlideData = {
+  mode: "status";
+  cup: HeroCupStatusClient;
+  auctionHref: string | null;
+};
+
+export type HeroTournamentSlideData =
+  | HeroChampionsSlideData
+  | HeroOpenCupSlideData
+  | HeroStatusSlideData
+  | null;
 
 export type HeroCarouselData = {
-  homeCup: HeroCupStatusClient | null;
-  auctionHref: string | null;
   tournament: HeroTournamentSlideData;
   listings: ListingPreview[];
   socials: HeroSocialLink[];

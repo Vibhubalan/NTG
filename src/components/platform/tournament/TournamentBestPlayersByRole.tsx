@@ -214,7 +214,7 @@ function getRoleStatData(player: RolePlayerStat): {
   mobileLabel: string;
 } {
   if (player.statValue === undefined || player.statValue === null) {
-    return { value: "—", label: "STAT", mobileLabel: "STAT" };
+    return { value: "-", label: "STAT", mobileLabel: "STAT" };
   }
   const val = String(player.statValue);
   const lbl = (player.statLabel ?? "STAT").toUpperCase();

@@ -238,7 +238,7 @@ export default function AdminListingsPanel({ initialListings }: Props) {
 
             <textarea
               className={`${inputClass} min-h-[7rem]`}
-              placeholder="Description — requirements, schedule, what applicants should know…"
+              placeholder="Description: requirements, schedule, what applicants should know…"
               value={description}
               onChange={(e) => setDescription(e.target.value)}
             />

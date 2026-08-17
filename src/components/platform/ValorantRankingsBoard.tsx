@@ -23,6 +23,11 @@ import {
 
 export type LeaderboardBoardVariant = "ranks" | "tournaments";
 
+function formatCupsPlayed(count: number | null | undefined): string {
+  if (count == null || count < 0) return "-";
+  return count === 1 ? "1 cup" : `${count} cups`;
+}
+
 function formatBoardScore(
   mmr: number | null | undefined,
   variant: LeaderboardBoardVariant,
@@ -286,6 +291,11 @@ function PodiumCard({
         <div className={`mt-2 sm:mt-4 rounded-full px-2 sm:px-5 py-0.5 sm:py-1.5 text-[8px] sm:text-xs font-black tracking-widest text-white shadow-md uppercase ${pillBg}`}>
           {formatBoardScore(entry.viewMmr, variant)} {metricLabel}
         </div>
+        {variant === "tournaments" && entry.tournamentsPlayed != null && (
+          <p className="mt-1 text-[8px] sm:text-[10px] font-bold uppercase tracking-widest text-white/45">
+            {formatCupsPlayed(entry.tournamentsPlayed)}
+          </p>
+        )}
       </div>
     </div>
   );
@@ -350,7 +360,7 @@ export default function ValorantRankingsBoard({
   const [introComplete, setIntroComplete] = useState(false);
   const isTournaments = variant === "tournaments";
   const metricLabel = isTournaments ? "Rating" : "RR";
-  const gridColumns = isTournaments ? "80px 1fr 120px" : "80px 220px 1fr 100px";
+  const gridColumns = isTournaments ? "72px 1fr 112px" : "80px 220px 1fr 100px";
 
   const sorted = useMemo(() => buildLeaderboardView(data.entries), [data.entries]);
 
@@ -618,7 +628,7 @@ export default function ValorantRankingsBoard({
             </h2>
             <p className="mt-4 max-w-2xl text-sm sm:text-base font-medium text-white/50 leading-relaxed">
               {isTournaments
-                ? "The official NTG Valorant cup leaderboard. Rating is built from published tournament game stats and updates as every cup is played."
+                ? "The official NTG Valorant cup leaderboard. Rating is ACS across cups, adjusted so a one-tournament spike cannot outrank a consistent run."
                 : "The official valorant competitive leaderboard for Mangaluru. Link your Riot ID to claim your rank and earn your place among the city's best."}
             </p>
           </div>
@@ -658,11 +668,8 @@ export default function ValorantRankingsBoard({
                 {filtered.length} Players on the board
               </div>
               {isTournaments ? (
-                <p className="mt-1 max-w-[20rem] space-y-0.5 text-[11px] font-medium leading-snug text-white/35 sm:ml-auto">
-                  <span className="block">Ratings start from AUC Cup IV.</span>
-                  <span className="block">
-                    Future events will continue to update these ratings.
-                  </span>
+                <p className="mt-1 max-w-[28rem] text-[11px] font-medium leading-snug text-white/35 sm:ml-auto">
+                  Rankings start at AUC Cup IV. Playing more cups with steady scores ranks you higher than one great tournament.
                 </p>
               ) : (
                 <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[10px] font-bold uppercase tracking-widest text-white/30">
@@ -701,7 +708,7 @@ export default function ValorantRankingsBoard({
           
           {/* Column headers (Visible on large screens) */}
           <div
-            className="mb-4 hidden items-center px-8 text-xs font-bold uppercase tracking-[0.2em] text-white/30 lg:grid border-b border-white/5 pb-4 gap-x-6"
+            className="mb-4 hidden items-center px-5 text-xs font-bold uppercase tracking-[0.2em] text-white/30 sm:px-6 lg:grid border-b border-white/5 pb-4 gap-x-6"
             style={{ gridTemplateColumns: gridColumns }}
           >
             <div className="text-center">Rank</div>
@@ -862,6 +869,11 @@ export default function ValorantRankingsBoard({
                         <span className="text-[9px] sm:text-[10px] font-black text-[#FF4655]/80 uppercase tracking-widest mt-0.5">
                           {metricLabel}
                         </span>
+                        {isTournaments ? (
+                          <span className="mt-0.5 text-[9px] font-bold uppercase tracking-widest text-white/35 sm:text-[10px]">
+                            {formatCupsPlayed(e.tournamentsPlayed)}
+                          </span>
+                        ) : null}
                       </div>
                       </div>
                     </li>
@@ -897,7 +909,7 @@ export default function ValorantRankingsBoard({
                       <span className="text-base font-black text-white drop-shadow-sm">{userEntry.displayName}</span>
                       <span className={`text-sm font-bold ${isTournaments ? "text-white/70" : rankAccentClass(userEntry.viewRankTierId)} mt-0.5`}>
                         {isTournaments
-                          ? `${formatBoardScore(userEntry.viewMmr, variant)} ${metricLabel}`
+                          ? `${formatBoardScore(userEntry.viewMmr, variant)} ${metricLabel} · ${formatCupsPlayed(userEntry.tournamentsPlayed)}`
                           : `${formatRankLabel(userEntry.viewRankTierId, userEntry.viewRankTier)} • ${formatLeaderboardRr(userEntry.viewMmr)} RR`}
                       </span>
                     </div>
@@ -911,7 +923,7 @@ export default function ValorantRankingsBoard({
           {filtered.length > PAGE_SIZE && (
             <div className="mt-10 flex items-center justify-between pt-6 px-2">
               <p className="text-xs text-white/40 uppercase tracking-widest font-bold">
-                Showing {(safePage - 1) * PAGE_SIZE + 1} – {Math.min(safePage * PAGE_SIZE, filtered.length)} of {filtered.length}
+                Showing {(safePage - 1) * PAGE_SIZE + 1}-{Math.min(safePage * PAGE_SIZE, filtered.length)} of {filtered.length}
               </p>
               <div className="flex items-center gap-3">
                 <span className="mr-4 text-xs text-white/40 uppercase tracking-widest font-bold hidden sm:block">

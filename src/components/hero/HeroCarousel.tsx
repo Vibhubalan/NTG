@@ -80,9 +80,13 @@ export default function HeroCarousel({ data }: Props) {
     if (count <= 1) return;
     if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
     const slide = slides[index] ?? "home";
-    const id = window.setTimeout(() => go(1), SLIDE_MS[slide] ?? 5500);
+    const dwell =
+      slide === "tournaments" && (data.tournament?.mode === "status" || data.tournament?.mode === "open")
+        ? 9000
+        : (SLIDE_MS[slide] ?? 5500);
+    const id = window.setTimeout(() => go(1), dwell);
     return () => window.clearTimeout(id);
-  }, [count, go, index, slides]);
+  }, [count, data.tournament?.mode, go, index, slides]);
 
   function onTouchStart(e: React.TouchEvent) {
     touchStartX.current = e.changedTouches[0]?.clientX ?? null;
@@ -127,9 +131,7 @@ export default function HeroCarousel({ data }: Props) {
                   : "Socials"
           }
         >
-          {active === "home" ? (
-            <HeroHomeSlide cup={data.homeCup} auctionHref={data.auctionHref} />
-          ) : null}
+          {active === "home" ? <HeroHomeSlide /> : null}
           {active === "tournaments" ? <HeroTournamentSlide data={data.tournament} /> : null}
           {active === "listings" ? <HeroListingsSlide listings={data.listings} /> : null}
           {active === "socials" ? <HeroSocialsSlide socials={data.socials} /> : null}

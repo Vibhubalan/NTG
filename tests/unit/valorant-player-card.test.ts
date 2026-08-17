@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   normalizeRiotPlayerCardUrls,
+  pickRiotPlayerCardFields,
   resolveLeaderboardCardArtUrl,
 } from "@/lib/valorant-player-card";
 
@@ -20,5 +21,23 @@ describe("valorant-player-card", () => {
 
   it("normalizes both fields on link/sync", () => {
     expect(normalizeRiotPlayerCardUrls(large, null)).toEqual({ large, wide });
+  });
+
+  it("picks stored card art from the first source that has it", () => {
+    expect(
+      pickRiotPlayerCardFields([
+        { riotPlayerCard: null, riotPlayerCardWide: null },
+        { riotPlayerCard: large, riotPlayerCardWide: wide },
+      ]),
+    ).toEqual({ riotPlayerCard: large, riotPlayerCardWide: wide });
+  });
+
+  it("keeps poach/sub roster art when registration is missing", () => {
+    expect(
+      pickRiotPlayerCardFields([
+        { riotPlayerCard: large, riotPlayerCardWide: wide },
+        null,
+      ]),
+    ).toEqual({ riotPlayerCard: large, riotPlayerCardWide: wide });
   });
 });

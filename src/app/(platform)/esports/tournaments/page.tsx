@@ -16,7 +16,7 @@ export default async function EsportsTournamentsPage() {
       <PlatformHeader
         eyebrow="Tournaments"
         title="Every cup we've run"
-        subtitle="Filter by upcoming or completed. Tap a cup for prizepool, results, and registration."
+        subtitle="Filter by upcoming or completed. Open Schedule for dates, or tap a cup for prizepool, results, and registration."
       />
       <TournamentListFiltered tournaments={tournaments} />
     </>

@@ -156,10 +156,10 @@ function formatCupDateRange(startsAt: string, endsAt: string | null): string {
     start.getMonth() === end.getMonth() && start.getFullYear() === end.getFullYear();
   if (sameMonth) {
     const monthYear = start.toLocaleDateString("en-IN", { month: "long", year: "numeric" });
-    return `${start.getDate()} – ${end.getDate()} ${monthYear}`;
+    return `${start.getDate()}-${end.getDate()} ${monthYear}`;
   }
 
-  return `${formatScheduleDate(startsAt)} – ${formatScheduleDate(endsAt)}`;
+  return `${formatScheduleDate(startsAt)} - ${formatScheduleDate(endsAt)}`;
 }
 
 export function buildTournamentScheduleCardView(input: {

@@ -313,7 +313,7 @@ export default function AdminPassesPanel({ initialPlans }: { initialPlans: Gamep
                 className={inputClass}
                 value={form.timeWindowText}
                 onChange={(e) => setForm({ ...form, timeWindowText: e.target.value })}
-                placeholder="10:00 AM – 3:00 PM"
+                placeholder="10:00 AM - 3:00 PM"
               />
             </label>
             <label className="space-y-1 sm:col-span-2">

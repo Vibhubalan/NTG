@@ -167,7 +167,7 @@ export async function POST(req: Request) {
       {
         error:
           message.includes("timeout") || message.includes("Timeout")
-            ? "Sync timed out. Try again — progress is saved between users."
+            ? "Sync timed out. Try again. Progress is saved between users."
             : "Sync failed. Try again in a moment.",
       },
       { status: 500 },

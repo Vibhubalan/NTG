@@ -469,7 +469,7 @@ export default function TournamentRegisterForm({
         setError(
           (data as { error?: string }).error ??
             (res.status >= 500
-              ? "Server error — restart dev after running prisma generate."
+              ? "Server error. Restart dev after running prisma generate."
               : "Registration failed."),
         );
         submitting.current = false;
@@ -507,7 +507,7 @@ export default function TournamentRegisterForm({
         setError(
           (data as { error?: string }).error ??
             (res.status >= 500
-              ? "Server error — restart dev after running prisma generate."
+              ? "Server error. Restart dev after running prisma generate."
               : "Registration failed."),
         );
         submitting.current = false;
@@ -561,7 +561,7 @@ export default function TournamentRegisterForm({
         setError(
           (data as { error?: string }).error ??
             (res.status >= 500
-              ? "Server error — restart dev after running prisma generate."
+              ? "Server error. Restart dev after running prisma generate."
               : "Registration failed."),
         );
         submitting.current = false;
@@ -638,7 +638,7 @@ export default function TournamentRegisterForm({
           <div>
             <p className="text-[10px] font-medium uppercase tracking-[0.32em] text-[var(--color-brand)]/85">Register</p>
             <p className="mt-2 text-sm text-white/45">
-              Register your full 5-player team. You are the captain — add 4 teammates by NTG username.
+              Register your full 5-player team. You are the captain. Add 4 teammates by NTG username.
             </p>
           </div>
 

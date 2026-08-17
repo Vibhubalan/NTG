@@ -115,7 +115,7 @@ export default function AdminListingApplicationView({
             {application.email ? ` · ${application.email}` : ""}
           </p>
           <p className="mt-1 text-xs text-white/35">
-            {isJob ? "Job application" : "Team tryout application"} — read-only review
+            {isJob ? "Job application" : "Team tryout application"}. Read-only review.
           </p>
         </div>
 

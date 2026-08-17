@@ -1,10 +1,9 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
 import BrandIcon from "@/components/ui/BrandIcon";
-import StatusBadge from "@/components/platform/ui/StatusBadge";
 import { toTournamentDisplay } from "@/lib/tournament-display";
 import type { TournamentPreview } from "@core/contracts";
 
@@ -15,6 +14,8 @@ type DisplayTournament = TournamentPreview & {
 type Props = {
   tournaments: TournamentPreview[];
   defaultToToday?: boolean;
+  /** Open the day schedule immediately (used in the tournaments dialog). */
+  startWithSchedule?: boolean;
 };
 
 type CalendarCell = {
@@ -36,7 +37,11 @@ type EventBand = {
   label: string;      // shown only on start cell
 };
 
-export default function TournamentCalendar({ tournaments, defaultToToday = false }: Props) {
+export default function TournamentCalendar({
+  tournaments,
+  defaultToToday = false,
+  startWithSchedule = false,
+}: Props) {
   // Convert tournaments to display structure
   const displayTournaments = useMemo(() => {
     return tournaments.map((t) => ({
@@ -87,6 +92,8 @@ export default function TournamentCalendar({ tournaments, defaultToToday = false
   const [currentMonth, setCurrentMonth] = useState(() => initialDate.getMonth());
   const [selectedDate, setSelectedDate] = useState<Date>(() => initialDate);
   const [activeTab, setActiveTab] = useState<"day" | "month">("day");
+  const [scheduleOpen, setScheduleOpen] = useState(startWithSchedule);
+  const scheduleRef = useRef<HTMLDivElement>(null);
 
   const handlePrevMonth = () => {
     if (currentMonth === 0) {
@@ -111,7 +118,21 @@ export default function TournamentCalendar({ tournaments, defaultToToday = false
     setCurrentYear(today.getFullYear());
     setCurrentMonth(today.getMonth());
     setSelectedDate(today);
+    setActiveTab("day");
+    setScheduleOpen(true);
   };
+
+  const openScheduleForDate = (date: Date) => {
+    setSelectedDate(date);
+    setActiveTab("day");
+    setScheduleOpen(true);
+  };
+
+  useEffect(() => {
+    if (!scheduleOpen || startWithSchedule || !scheduleRef.current) return;
+    if (typeof window === "undefined" || window.innerWidth >= 1024) return;
+    scheduleRef.current.scrollIntoView({ behavior: "smooth", block: "nearest" });
+  }, [scheduleOpen, selectedDate, startWithSchedule]);
 
   // Check if a date matches a specific year, month, and day
   const isSameDay = (d1: Date, d2: Date) => {
@@ -288,11 +309,6 @@ export default function TournamentCalendar({ tournaments, defaultToToday = false
     });
   }, [cells, displayTournaments]);
 
-  // Selected date's tournaments
-  const selectedDateTournaments = useMemo(() => {
-    return getTournamentsForDate(selectedDate);
-  }, [selectedDate, displayTournaments]);
-
   // Active events and phases for the selected date (what is going on on that day)
   const selectedDatePhases = useMemo(() => {
     const toMidnight = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDate());
@@ -370,261 +386,143 @@ export default function TournamentCalendar({ tournaments, defaultToToday = false
     return tempDate.toLocaleDateString("en-IN", { month: "long", year: "numeric" });
   }, [currentYear, currentMonth]);
 
-  const weekdays = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+  const weekdays = ["Mo", "Tu", "We", "Th", "Fr", "Sa", "Su"];
 
   return (
-    <div className="scroll-mt-24 rounded-[2rem] border border-white/[0.06] bg-[#0A0A0A]/40 p-4 sm:p-8 backdrop-blur-md">
-      {/* Header */}
-      <div className="mb-8 flex flex-col justify-between gap-4 md:flex-row md:items-center">
-        <div>
-          <h2 className="font-display text-2xl font-bold tracking-tight text-white sm:text-3xl">Competitive Schedule</h2>
-          <p className="mt-1 text-sm text-white/40">Keep track of ongoing, upcoming, and completed tournament stages</p>
-        </div>
-
-        {/* Month Navigation Controls */}
-        <div className="flex items-center justify-between gap-3 w-full sm:w-auto sm:justify-start">
+    <div className="flex flex-col items-stretch gap-3 lg:flex-row lg:items-start lg:gap-6">
+      <div className="mx-auto w-full max-w-[18rem] shrink-0 rounded-xl border border-white/[0.08] bg-white/[0.03] p-2.5 sm:p-3">
+        <div className="mb-2 flex items-center justify-between gap-1">
           <button
             type="button"
             onClick={handleGoToToday}
-            className="rounded-full border border-white/10 bg-white/[0.04] px-3 py-1.5 sm:px-4 sm:py-2 text-[9px] sm:text-[10px] font-bold uppercase tracking-widest text-white/80 transition-all hover:bg-white/10 hover:text-white"
+            className="rounded-full border border-white/10 bg-white/[0.04] px-2.5 py-1 text-[9px] font-bold uppercase tracking-widest text-white/80 transition-colors hover:bg-white/10 hover:text-white"
           >
             Today
           </button>
-          <div className="flex items-center rounded-full border border-white/10 bg-white/[0.02] p-0.5 sm:p-1">
+          <div className="flex items-center rounded-full border border-white/10 bg-white/[0.02] p-0.5">
             <button
               type="button"
               onClick={handlePrevMonth}
-              className="flex h-7 w-7 sm:h-8 sm:w-8 items-center justify-center rounded-full text-white/60 transition-all hover:bg-white/5 hover:text-white"
-              aria-label="Previous Month"
+              className="flex h-7 w-7 items-center justify-center rounded-full text-white/60 transition-colors hover:bg-white/5 hover:text-white"
+              aria-label="Previous month"
             >
-              <svg className="h-3.5 w-3.5 sm:h-4 sm:w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
               </svg>
             </button>
-            <span className="px-1.5 sm:px-3 font-display text-[10px] sm:text-xs font-bold uppercase tracking-widest text-white min-w-[90px] sm:min-w-[120px] text-center">
+            <span className="min-w-[7.5rem] px-1 text-center font-display text-[10px] font-bold uppercase tracking-widest text-white">
               {monthName}
             </span>
             <button
               type="button"
               onClick={handleNextMonth}
-              className="flex h-7 w-7 sm:h-8 sm:w-8 items-center justify-center rounded-full text-white/60 transition-all hover:bg-white/5 hover:text-white"
-              aria-label="Next Month"
+              className="flex h-7 w-7 items-center justify-center rounded-full text-white/60 transition-colors hover:bg-white/5 hover:text-white"
+              aria-label="Next month"
             >
-              <svg className="h-3.5 w-3.5 sm:h-4 sm:w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
               </svg>
             </button>
           </div>
         </div>
-      </div>
 
-      {/* Main Grid + Sidebar Container */}
-      <div className="grid grid-cols-1 gap-8 lg:grid-cols-12">
-        {/* Calendar Grid (8 Cols on large screens) */}
-        <div className="lg:col-span-8">
-          <div className="grid grid-cols-7 gap-1 sm:gap-1.5 text-center mb-2">
-            {weekdays.map((day) => (
-              <span key={day} className="text-[9px] sm:text-[10px] font-bold uppercase tracking-wider sm:tracking-widest text-white/35 py-2">
-                {day}
-              </span>
-            ))}
-          </div>
-
-          <div className="grid grid-cols-7 gap-1 sm:gap-1.5">
-            {cells.map((cell, idx) => {
-              const selected = isSameDay(cell.date, selectedDate);
-              const current = isToday(cell.date);
-              const hasTournaments = cell.tournaments.length > 0;
-              const firstT = cell.tournaments[0];
-              const glowColor = hasTournaments ? firstT.display.hex : "";
-              const bands = cellBands[idx] ?? [];
-
-              const boundaryTag = (() => {
-                for (const b of bands) {
-                  const t = displayTournaments.find(tour => tour.id === b.tournamentId);
-                  if (!t) continue;
-
-                  const getShortName = (name: string) => {
-                    let short = name.replace(/\b(cup|tournament|league)\b/gi, "").trim();
-                    if (short.length > 8) {
-                      short = short.substring(0, 7) + "..";
-                    }
-                    return short;
-                  };
-
-                  const shortName = getShortName(t.name);
-
-                  if (b.phase === "registration" && b.isActualStart) {
-                    return { text: `${shortName} OPENS`, color: b.color };
-                  }
-                  if (b.phase === "registration" && b.isActualEnd) {
-                    return { text: `${shortName} CLOSES`, color: b.color };
-                  }
-                  if (b.phase === "auction" && b.isActualStart) {
-                    return { text: `${shortName} AUCTION`, color: b.color };
-                  }
-                  if (b.phase === "tournament" && b.isActualStart) {
-                    return { text: `${shortName} PLAY`, color: b.color };
-                  }
-                  if (b.phase === "tournament" && b.isActualEnd) {
-                    return { text: `${shortName} FINALS`, color: b.color };
-                  }
-                }
-                return null;
-              })();
-
-              return (
-                <button
-                  key={idx}
-                  type="button"
-                  onClick={() => { setSelectedDate(cell.date); setActiveTab("day"); }}
-                  className={`group relative flex aspect-square flex-col justify-between rounded-xl border p-1 sm:p-2 transition-all duration-300 text-left cursor-pointer min-w-0 overflow-hidden
-                    ${cell.isCurrentMonth ? "bg-white/[0.02]" : "bg-transparent opacity-30"}
-                    ${
-                      selected
-                        ? "border-[var(--color-brand)] bg-white/[0.04] shadow-[0_0_20px_rgba(94,234,212,0.12)] z-10"
-                        : hasTournaments || bands.length > 0
-                          ? "border-white/[0.08]"
-                          : "border-white/[0.03] hover:border-white/15"
-                    }
-                  `}
-                  style={
-                    {
-                      "--glow-color": glowColor,
-                      borderColor: selected
-                        ? "var(--color-brand)"
-                        : bands.length > 0 && !selected
-                          ? `${bands[0].color}40`
-                          : hasTournaments && !selected
-                            ? `${glowColor}30`
-                            : undefined,
-                    } as React.CSSProperties
-                  }
-                >
-                  {/* Left Edge Accent Bar for Phase Start */}
-                  {bands.some(b => b.isActualStart) && (
-                    <div
-                      className="absolute left-0 top-0 bottom-0 w-[3px] sm:w-[4px] z-20"
-                      style={{
-                        backgroundColor: bands.find(b => b.isActualStart)?.color,
-                      }}
-                    />
-                  )}
-
-                  {/* Right Edge Accent Bar for Phase End */}
-                  {bands.some(b => b.isActualEnd) && (
-                    <div
-                      className="absolute right-0 top-0 bottom-0 w-[3px] sm:w-[4px] z-20"
-                      style={{
-                        backgroundColor: bands.find(b => b.isActualEnd)?.color,
-                      }}
-                    />
-                  )}
-
-                  {/* Option E: Rising Color Tide Gradient Fill */}
-                  {bands.map((band) => (
-                    <div
-                      key={`${band.tournamentId}-${band.phase}`}
-                      className="absolute inset-0 pointer-events-none rounded-xl"
-                      style={{
-                        background: `linear-gradient(to top, ${band.color}38 0%, ${band.color}00 80%)`,
-                      }}
-                    />
-                  ))}
-
-                  {/* Glow overlay for tournament days */}
-                  {hasTournaments && !selected && (
-                    <div
-                      className="absolute inset-0 rounded-xl opacity-0 transition-opacity duration-300 group-hover:opacity-100 pointer-events-none"
-                      style={{
-                        background: `radial-gradient(circle at center, ${glowColor}15 0%, transparent 70%)`,
-                        boxShadow: `0 0 15px ${glowColor}10`,
-                      }}
-                    />
-                  )}
-
-                  {/* Day Number Header */}
-                  <div className="flex items-center justify-between gap-1 w-full min-w-0 z-10">
-                    <span
-                      className={`font-display text-xs font-bold leading-none ${
-                        current
-                          ? "rounded-md bg-[var(--color-brand)]/15 px-1.5 py-1 text-[var(--color-brand)] ring-1 ring-[var(--color-brand)]/30"
-                          : selected
-                            ? "text-[var(--color-brand)]"
-                            : "text-white"
-                      }`}
-                    >
-                      {cell.dayNum}
-                    </span>
-
-                    {/* Phase Boundary Tag (Desktop only) */}
-                    {boundaryTag && (
-                      <span
-                        className="hidden md:inline-block text-[7px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded bg-[#070707] ring-1 ring-white/10"
-                        style={{ color: boundaryTag.color }}
-                      >
-                        {boundaryTag.text}
-                      </span>
-                    )}
-
-                    {/* Small dot indicators for status if multiple (Desktop only) */}
-                    {hasTournaments && cell.tournaments.length > 1 && !boundaryTag && (
-                      <span className="hidden sm:flex gap-0.5 shrink-0">
-                        {cell.tournaments.map((t) => (
-                          <span
-                            key={t.id}
-                            className="h-1 w-1 sm:h-1.5 sm:w-1.5 rounded-full"
-                            style={{ backgroundColor: t.display.hex }}
-                          />
-                        ))}
-                      </span>
-                    )}
-                  </div>
-
-                  {/* Tournament Content inside Cell */}
-                  {hasTournaments && (
-                    <div className="mt-auto w-full z-10">
-                      {/* Desktop/Tablet view: show Brand Icon */}
-                      <div className="hidden sm:flex items-center justify-between gap-1 w-full min-w-0">
-                        <span
-                          className="flex h-4 w-4 sm:h-5 sm:w-5 shrink-0 items-center justify-center rounded bg-[#0a1020]/80 ring-1 ring-white/10"
-                          style={{ color: firstT.display.hex }}
-                        >
-                          <BrandIcon path={firstT.display.iconPath} title={firstT.display.game} className="h-2.5 w-2.5 sm:h-3 sm:w-3" />
-                        </span>
-
-                        {/* Brief tournament label (first 10 chars) */}
-                        <span className="hidden sm:block truncate text-[8px] font-black uppercase tracking-wider text-white/50 w-full min-w-0 text-right leading-none">
-                          {firstT.name.length > 12 ? firstT.name.substring(0, 10) + ".." : firstT.name}
-                        </span>
-                      </div>
-                    </div>
-                  )}
-                </button>
-              );
-            })}
-          </div>
+        <div className="mb-1 grid grid-cols-7 text-center">
+          {weekdays.map((day) => (
+            <span key={day} className="py-1 text-[9px] font-bold uppercase tracking-wider text-white/35">
+              {day}
+            </span>
+          ))}
         </div>
 
-        {/* Sidebar/Panel Details (4 Cols on large screens) */}
-        <div className="lg:col-span-4 flex flex-col min-w-0">
-          <div className="rounded-2xl border border-white/[0.08] bg-[#0E0E0E]/60 p-5 shadow-xl backdrop-blur-md flex flex-col flex-1 h-full min-h-[350px]">
-            
-            {/* Selected Date Title */}
-            <div className="border-b border-white/[0.06] pb-3 mb-3">
-              <p className="text-[10px] font-black uppercase tracking-[0.25em] text-[var(--color-brand)]">Selected Date</p>
-              <h3 className="font-display text-base font-bold text-white mt-1">
-                {selectedDate.toLocaleDateString("en-IN", {
-                  weekday: "long",
+        <div className="grid grid-cols-7 gap-0.5">
+          {cells.map((cell, idx) => {
+            const selected = scheduleOpen && isSameDay(cell.date, selectedDate);
+            const current = isToday(cell.date);
+            const bands = cellBands[idx] ?? [];
+            const eventDots = bands.slice(0, 3);
+            const accent = bands[0]?.color;
+
+            return (
+              <button
+                key={idx}
+                type="button"
+                onClick={() => openScheduleForDate(cell.date)}
+                aria-pressed={selected}
+                aria-label={`Schedule for ${cell.date.toLocaleDateString("en-IN", {
                   day: "numeric",
                   month: "long",
-                  year: "numeric",
+                })}`}
+                className={`relative flex h-7 w-full flex-col items-center justify-center rounded-md transition-colors sm:h-9 ${
+                  cell.isCurrentMonth ? "" : "opacity-30"
+                } ${
+                  selected
+                    ? "bg-[var(--color-brand)]/12 ring-1 ring-[var(--color-brand)]"
+                    : "hover:bg-white/[0.06]"
+                }`}
+              >
+                {bands.length > 0 && (
+                  <span
+                    className="pointer-events-none absolute inset-0 rounded-lg opacity-40"
+                    style={{
+                      background: `linear-gradient(to top, ${accent}50 0%, transparent 75%)`,
+                    }}
+                  />
+                )}
+                <span
+                  className={`relative z-10 font-display text-[10px] font-bold leading-none sm:text-[11px] ${
+                    current
+                      ? "flex h-5 w-5 items-center justify-center rounded-full bg-[var(--color-brand)] text-black sm:h-6 sm:w-6"
+                      : selected
+                        ? "text-[var(--color-brand)]"
+                        : "text-white"
+                  }`}
+                >
+                  {cell.dayNum}
+                </span>
+                {eventDots.length > 0 && (
+                  <span className="relative z-10 mt-0.5 flex h-1.5 items-center justify-center gap-0.5">
+                    {eventDots.map((band) => (
+                      <span
+                        key={`${band.tournamentId}-${band.phase}`}
+                        className="h-1 w-1 rounded-full"
+                        style={{ backgroundColor: band.color }}
+                      />
+                    ))}
+                  </span>
+                )}
+              </button>
+            );
+          })}
+        </div>
+        {!startWithSchedule && (
+          <p className="mt-3 text-center text-[10px] font-medium text-white/35">
+            Click a date to see the schedule
+          </p>
+        )}
+      </div>
+
+      <div ref={scheduleRef} className="min-w-0 w-full flex-1">
+        <AnimatePresence mode="wait">
+          {scheduleOpen ? (
+            <motion.div
+              key="schedule"
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: 8 }}
+              transition={{ duration: 0.2 }}
+              className="flex flex-col rounded-xl border border-white/[0.08] bg-white/[0.03] p-3 sm:p-5 lg:min-h-[20rem]"
+            >
+            <div className="mb-2 border-b border-white/[0.06] pb-2 sm:mb-3 sm:pb-3">
+              <p className="text-[9px] font-bold uppercase tracking-[0.2em] text-[var(--color-brand)] sm:text-[10px] sm:tracking-[0.25em] sm:font-black">
+                {selectedDate.toLocaleDateString("en-IN", {
+                  weekday: "short",
+                  day: "numeric",
+                  month: "short",
                 })}
-              </h3>
+              </p>
             </div>
 
-            {/* Tabs Header */}
-            <div className="flex rounded-lg bg-white/[0.02] p-1 border border-white/[0.04] mb-4 shrink-0">
+            <div className="mb-3 hidden rounded-lg border border-white/[0.04] bg-white/[0.02] p-1 sm:flex">
               <button
                 type="button"
                 onClick={() => setActiveTab("day")}
@@ -657,111 +555,31 @@ export default function TournamentCalendar({ tournaments, defaultToToday = false
                 {activeTab === "day" ? (
                   selectedDatePhases.length > 0 ? (
                     selectedDatePhases.map((t) => (
-                      <motion.div
-                        key={t.id}
-                        initial={{ opacity: 0, y: 10 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        exit={{ opacity: 0, y: -10 }}
-                        transition={{ duration: 0.2 }}
-                        className="group relative flex flex-col gap-3.5 rounded-xl border border-white/[0.06] bg-white/[0.02] p-4 shadow transition-all duration-300 hover:-translate-y-0.5 hover:border-[var(--game-color)]/30 hover:shadow-[0_0_20px_var(--game-color-glow)] mb-4 last:mb-0"
-                        style={
-                          {
-                            "--game-color": t.display.hex,
-                            "--game-color-glow": `${t.display.hex}15`,
-                          } as React.CSSProperties
-                        }
-                      >
-                        {/* Game Info */}
-                        <div className="flex items-center gap-3">
-                          <span
-                            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-[#0a1020] ring-1 ring-white/10"
-                            style={{ color: t.display.hex }}
-                          >
-                            <BrandIcon path={t.display.iconPath} title={t.display.game} className="h-4.5 w-4.5" />
-                          </span>
-                          <div className="min-w-0">
-                            <span className="block text-xs font-bold text-white leading-none whitespace-nowrap">
-                              {t.display.game}
-                            </span>
-                            {t.display.format && (
-                              <span className="block text-[9px] text-white/40 font-semibold uppercase tracking-wider mt-1 whitespace-nowrap">
-                                {t.display.format}
-                              </span>
-                            )}
-                          </div>
-                        </div>
-
-                        {/* Phase Status Badge */}
-                        <div className="flex justify-center w-full">
-                          <span
-                            className="text-[9px] font-black uppercase tracking-wider px-2.5 py-0.5 rounded border whitespace-nowrap"
-                            style={{
-                              color: t.display.hex,
-                              borderColor: `${t.display.hex}30`,
-                              backgroundColor: `${t.display.hex}08`,
-                            }}
-                          >
-                            {t.activePhase === "REGISTRATION"
-                              ? "🟣 Registration Open"
-                              : t.activePhase === "AUCTION"
-                                ? "🟣 Auction Day"
-                                : "🟢 Tournament Day"}
-                          </span>
-                        </div>
-
-                        {/* Name */}
-                        <div>
-                          <h4 className="font-display text-sm font-black text-white leading-tight">
-                            {t.name}
-                          </h4>
-                        </div>
-
-                        {/* Winners / Date info */}
-                        {t.status === "COMPLETED" && t.championName ? (
-                          <div className="rounded-lg bg-amber-500/[0.04] border border-amber-500/10 p-2 text-center">
-                            <p className="text-[8px] font-black uppercase tracking-wider text-amber-400">Cup Champions</p>
-                            <p className="mt-0.5 text-xs font-black text-white truncate">🏆 {t.championName}</p>
-                          </div>
-                        ) : (
-                          <div className="text-[10px] text-white/50">
-                            {t.activePhase === "REGISTRATION" ? (
-                              <>
-                                Registration Closes: <span className="font-semibold text-white/80">
-                                  {t.registrationClosesAt ? new Date(t.registrationClosesAt).toLocaleDateString("en-IN", {
-                                    day: "numeric",
-                                    month: "short",
-                                  }) : "—"}
-                                </span>
-                              </>
-                            ) : t.activePhase === "AUCTION" ? (
-                              <>
-                                Auction Day: <span className="font-semibold text-white/80">
-                                  {t.auctionStartsAt ? new Date(t.auctionStartsAt).toLocaleDateString("en-IN", {
-                                    day: "numeric",
-                                    month: "short",
-                                  }) : "—"}
-                                </span>
-                              </>
-                            ) : (
-                              <>
-                                Starts at: <span className="font-semibold text-white/80">
-                                  {new Date(t.startsAt!).toLocaleTimeString("en-IN", {
-                                    hour: "2-digit",
-                                    minute: "2-digit",
-                                  })}
-                                </span>
-                              </>
-                            )}
-                          </div>
-                        )}
-
-                        {/* Details Link */}
+                      <motion.div key={t.id} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
                         <Link
                           href={`/esports/tournaments/${t.slug}`}
-                          className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-white/10 bg-white/[0.04] py-2 px-3 text-[10px] font-bold uppercase tracking-wider text-white/95 transition-all hover:bg-white/10 hover:text-white"
+                          className="mb-1.5 flex items-center gap-2.5 rounded-lg border border-white/[0.07] bg-white/[0.03] px-2.5 py-2 last:mb-0"
                         >
-                          {t.status === "COMPLETED" ? "View Bracket" : t.status === "REGISTRATION_OPEN" ? "Register Now" : "Details"}
-                          <span>→</span>
+                          <span
+                            className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-[#0a1020] ring-1 ring-white/10"
+                            style={{ color: t.display.hex }}
+                          >
+                            <BrandIcon path={t.display.iconPath} title={t.display.game} className="h-3.5 w-3.5" />
+                          </span>
+                          <span className="min-w-0 flex-1">
+                            <span className="block truncate font-display text-xs font-bold text-white">
+                              {t.name}
+                            </span>
+                            <span className="block text-[10px] text-white/40">
+                              {t.activePhase === "REGISTRATION"
+                                ? "Registration"
+                                : t.activePhase === "AUCTION"
+                                  ? "Auction"
+                                  : t.status === "COMPLETED"
+                                    ? t.championName ?? "Completed"
+                                    : "Match day"}
+                            </span>
+                          </span>
                         </Link>
                       </motion.div>
                     ))
@@ -771,9 +589,9 @@ export default function TournamentCalendar({ tournaments, defaultToToday = false
                       initial={{ opacity: 0 }}
                       animate={{ opacity: 1 }}
                       exit={{ opacity: 0 }}
-                      className="flex flex-col pt-8 pb-12 text-center"
+                      className="py-4 text-center"
                     >
-                      <p className="text-xs text-white/35">No matches or active phases on this date.</p>
+                      <p className="text-xs text-white/35">No events on this date.</p>
                     </motion.div>
                   )
                 ) : (
@@ -791,8 +609,7 @@ export default function TournamentCalendar({ tournaments, defaultToToday = false
                           type="button"
                           onClick={() => {
                             if (t.startsAt) {
-                              setSelectedDate(new Date(t.startsAt));
-                              setActiveTab("day");
+                              openScheduleForDate(new Date(t.startsAt));
                             }
                           }}
                           className="flex items-center justify-between w-full p-2.5 rounded-lg border border-white/[0.04] bg-white/[0.01] hover:bg-white/[0.04] hover:border-white/10 transition-all text-left"
@@ -825,16 +642,30 @@ export default function TournamentCalendar({ tournaments, defaultToToday = false
                       initial={{ opacity: 0 }}
                       animate={{ opacity: 1 }}
                       exit={{ opacity: 0 }}
-                      className="flex flex-col pt-8 pb-12 text-center"
+                      className="py-4 text-center"
                     >
-                      <p className="text-xs text-white/35">No tournaments scheduled in this month.</p>
+                      <p className="text-xs text-white/35">No cups this month.</p>
                     </motion.div>
                   )
                 )}
               </AnimatePresence>
             </div>
-          </div>
-        </div>
+            </motion.div>
+          ) : (
+            <motion.div
+              key="hint"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="flex flex-col items-center justify-center rounded-xl border border-dashed border-white/10 bg-white/[0.02] px-4 py-8 text-center lg:min-h-[16rem]"
+            >
+              <p className="text-sm font-medium text-white/70">Pick a date</p>
+              <p className="mt-1 max-w-xs text-xs text-white/40">
+                Tap a day to see what is on.
+              </p>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
     </div>
   );

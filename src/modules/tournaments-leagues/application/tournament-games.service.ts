@@ -1,4 +1,5 @@
 import { prisma } from "@core/database/client";
+import { withDbFallback } from "@core/database/transient-error";
 import { unstable_cache } from "next/cache";
 import { safeExpireTag } from "@/lib/safe-revalidate";
 import { henrikFetch, henrikHeaders } from "@/lib/henrik-client";
@@ -694,7 +695,11 @@ export async function listPublishedTournamentGames(slug: string): Promise<{
   } catch (error) {
     console.error(`[tournament] cached games failed for ${slug}:`, error);
   }
-  return fetchPublishedTournamentGames(slug);
+  return withDbFallback(
+    "published-games",
+    { ok: true as const, yourGamesEnabled: false, games: [] },
+    () => fetchPublishedTournamentGames(slug),
+  );
 }
 
 export type ScanChunkResult = {
@@ -1119,7 +1124,11 @@ export async function listTournamentStatsEligibility(
     )();
   } catch (error) {
     console.error(`[tournament] cached stats eligibility failed for ${slug}:`, error);
-    return fetchTournamentStatsEligibility(slug);
+    return withDbFallback(
+      "stats-eligibility",
+      { byUserId: {}, byRiotId: {} },
+      () => fetchTournamentStatsEligibility(slug),
+    );
   }
 }
 

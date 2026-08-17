@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { AdminSection } from "@/components/admin/AdminSection";
 import AdminListingFormBuilder from "@/components/admin/AdminListingFormBuilder";
 import AdminListingApplicationView from "@/components/admin/AdminListingApplicationView";
@@ -45,6 +45,7 @@ export default function AdminListingDetailPanel({
   initialApplications,
 }: Props) {
   const router = useRouter();
+  const descriptionRef = useRef<HTMLTextAreaElement>(null);
   const [applications, setApplications] = useState(initialApplications);
   const [rulebookUrl, setRulebookUrl] = useState(initialRulebookUrl);
   const [description, setDescription] = useState(initialDescription ?? "");
@@ -64,6 +65,13 @@ export default function AdminListingDetailPanel({
   useEffect(() => {
     setDescription(initialDescription ?? "");
   }, [initialDescription]);
+
+  useEffect(() => {
+    const el = descriptionRef.current;
+    if (!el) return;
+    el.style.height = "auto";
+    el.style.height = `${Math.max(el.scrollHeight, 420)}px`;
+  }, [description]);
 
   useEffect(() => {
     setAutoManageTryout(initialAutoManageTryout);
@@ -166,10 +174,12 @@ export default function AdminListingDetailPanel({
 
       <AdminSection title="Description" showsOn="Public listing page">
         <p className="mb-3 text-sm text-white/45">
-          Shown on the public listing page exactly as you type or paste it — line breaks are preserved.
+          Shown on the public listing page exactly as you type or paste it. Line breaks are preserved.
         </p>
         <textarea
-          className={`${inputClass} min-h-[9rem] font-mono text-sm leading-relaxed`}
+          ref={descriptionRef}
+          rows={16}
+          className={`${inputClass} min-h-[26rem] resize-y overflow-hidden font-mono text-sm leading-relaxed`}
           placeholder={"Requirements, schedule, what applicants should know…"}
           value={description}
           onChange={(e) => setDescription(e.target.value)}
@@ -235,7 +245,7 @@ export default function AdminListingDetailPanel({
         <>
           <AdminSection title="Tryout schedule" showsOn="Public roster page + listing apply window">
             <p className="mb-4 text-sm text-white/45">
-              Like tournament registration — set when tryouts open and close. The roster page shows a
+              Like tournament registration: set when tryouts open and close. The roster page shows a
               countdown until opening, then an Apply button while live. Leave auto-schedule off to
               control Open/Closed manually from the listings list.
             </p>
@@ -269,7 +279,7 @@ export default function AdminListingDetailPanel({
                   min={1}
                   max={365}
                   className={inputClass}
-                  placeholder="Optional — e.g. 30 for monthly"
+                  placeholder="Optional, e.g. 30 for monthly"
                   value={tryoutRepeatDays}
                   onChange={(e) => setTryoutRepeatDays(e.target.value)}
                 />
@@ -325,7 +335,7 @@ export default function AdminListingDetailPanel({
 
           <AdminSection title="One-click tryout join" showsOn="Public tryout listing page">
           <p className="mb-4 text-sm text-white/45">
-            Players join tryouts with one button — they agree to NTG policy (and your rulebook if
+            Players join tryouts with one button. They agree to NTG policy (and your rulebook if
             uploaded). Their linked game profile is snapshotted automatically. No application form to
             fill out.
           </p>
@@ -349,7 +359,7 @@ export default function AdminListingDetailPanel({
       {tab === "form" && !isTryout ? (
         <AdminSection title="Form builder" showsOn="Public application page">
           <p className="mb-4 text-sm text-white/45">
-            Build the application form applicants see — sections, questions, choices, and required fields.
+            Build the application form applicants see: sections, questions, choices, and required fields.
           </p>
           <AdminListingFormBuilder
             slug={slug}

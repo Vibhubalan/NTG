@@ -433,7 +433,7 @@ export default function ProfileEditor() {
 
               <details className="group mt-6 border-t border-white/[0.06] pt-6">
                 <summary className="cursor-pointer text-[10px] font-bold uppercase tracking-[0.2em] text-white/35 hover:text-white/60 transition-colors select-none">
-                  Danger Zone — Delete Account
+                  Danger Zone: Delete Account
                 </summary>
                 <div className="mt-4 rounded-2xl border border-red-500/20 bg-red-500/[0.02] p-5">
                   <p className="text-xs leading-relaxed text-red-200/70">
