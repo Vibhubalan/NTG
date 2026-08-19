@@ -13,6 +13,7 @@ export type AuctionHeroInput = {
   name: string;
   registrationFormat: string | null;
   registrationOpensAt: Date | null;
+  registrationClosesAt?: Date | null;
   auctionStartsAt: Date | null;
   auctionEndsAt: Date | null;
   startsAt: Date | null;
@@ -22,26 +23,62 @@ export type AuctionHeroInput = {
 
 export type ResolvedHeroCupPhase = {
   phase: HeroCupPhase;
-  countdownEndsAt: Date;
+  countdownEndsAt: Date | null;
 };
 
+function resolveHeroPhaseFromStatus(t: AuctionHeroInput): ResolvedHeroCupPhase | null {
+  switch (t.status) {
+    case "REGISTRATION_OPEN":
+      return {
+        phase: "registration_open",
+        countdownEndsAt: t.registrationClosesAt ?? t.auctionStartsAt ?? null,
+      };
+    case "AUCTION_OPEN":
+      return { phase: "auction_soon", countdownEndsAt: t.auctionStartsAt ?? null };
+    case "AUCTION_LIVE":
+      return { phase: "auction_live", countdownEndsAt: t.auctionEndsAt ?? null };
+    case "AUCTION_COMPLETED":
+      return { phase: "awaiting_tournament", countdownEndsAt: t.startsAt ?? null };
+    case "IN_PROGRESS":
+      return { phase: "tournament_live", countdownEndsAt: t.endsAt ?? null };
+    default:
+      return null;
+  }
+}
+
+/**
+ * Homepage hero phase for an auction cup.
+ * Prefers the schedule window when all dates exist; otherwise uses stored status
+ * so manually managed cups (or incomplete schedules) still show instead of
+ * falling back to previous winners.
+ */
 export function resolveAuctionHeroPhase(
   t: AuctionHeroInput,
   now: Date = new Date(),
 ): ResolvedHeroCupPhase | null {
   if (t.registrationFormat !== "AUCTION") return null;
-  if (t.status === "CANCELLED" || t.status === "COMPLETED") return null;
-  if (!t.registrationOpensAt || !t.auctionStartsAt || !t.auctionEndsAt || !t.startsAt || !t.endsAt) {
+  if (t.status === "CANCELLED" || t.status === "COMPLETED" || t.status === "DRAFT") {
     return null;
   }
 
+  const hasFullSchedule =
+    Boolean(t.registrationOpensAt) &&
+    Boolean(t.auctionStartsAt) &&
+    Boolean(t.auctionEndsAt) &&
+    Boolean(t.startsAt) &&
+    Boolean(t.endsAt);
+
+  if (!hasFullSchedule) {
+    return resolveHeroPhaseFromStatus(t);
+  }
+
   const ts = now.getTime();
-  const opens = t.registrationOpensAt.getTime();
-  const regClose = getRegistrationCloseAt(t.auctionStartsAt).getTime();
-  const auctionStart = t.auctionStartsAt.getTime();
-  const auctionEnd = t.auctionEndsAt.getTime();
-  const cupStart = t.startsAt.getTime();
-  const cupEnd = t.endsAt.getTime();
+  const opens = t.registrationOpensAt!.getTime();
+  const regClose = getRegistrationCloseAt(t.auctionStartsAt!).getTime();
+  const auctionStart = t.auctionStartsAt!.getTime();
+  const auctionEnd = t.auctionEndsAt!.getTime();
+  const cupStart = t.startsAt!.getTime();
+  const cupEnd = t.endsAt!.getTime();
 
   if (ts < opens || ts >= cupEnd) return null;
 

@@ -76,7 +76,6 @@ export default function TournamentDetailView({
   // arrive asynchronously, so this is derived rather than seeded in useState —
   // at first render the list is usually still empty.
   const [pickedStageIndex, setPickedStageIndex] = useState<number | null>(null);
-  const [generatedFallback, setGeneratedFallback] = useState<TournamentBracketView | null>(null);
   const [brackets, setBrackets] = useState(initialBrackets);
   const [bracketsLoading, setBracketsLoading] = useState(false);
   const bracketsFetchStarted = useRef(false);
@@ -90,6 +89,17 @@ export default function TournamentDetailView({
     (tournament.game === "VALORANT" &&
       Boolean(tournament.yourGamesEnabled) &&
       (publishedGames?.length ?? 0) > 0);
+  // Brackets tab only when admin provided at least one Challonge/link URL.
+  const showBracketsTab = brackets.some((b) => Boolean(b.url?.trim()));
+  const tabCount = 1 + (showBracketsTab ? 1 : 0) + (showMatchesTab ? 2 : 0);
+  const tabGridClass =
+    tabCount <= 1
+      ? "grid-cols-1"
+      : tabCount === 2
+        ? "grid-cols-2"
+        : tabCount === 3
+          ? "grid-cols-3"
+          : "grid-cols-4";
   const meta = gameMetaFor(tournament.game);
   const dateStr = tournament.startsAt
     ? new Date(tournament.startsAt).toLocaleDateString("en-IN", {
@@ -294,10 +304,12 @@ export default function TournamentDetailView({
 
   // Warm the heavy bracket UI chunk while the user is still on Overview.
   useEffect(() => {
+    if (!showBracketsTab) return;
     void import("@/components/platform/tournament/TournamentBracket");
-  }, []);
+  }, [showBracketsTab]);
 
   useEffect(() => {
+    if (!showBracketsTab) return;
     if (bracketsFetchStarted.current) return;
     if (initialBrackets.length === 0) return;
     if (initialBrackets.some((b) => b.bracket != null)) {
@@ -324,40 +336,16 @@ export default function TournamentDetailView({
       cancelled = true;
       if (!finished) bracketsFetchStarted.current = false;
     };
-  }, [initialBrackets, tournament.slug]);
-
-  useEffect(() => {
-    if (bracketsLoading) return;
-    if (brackets.some((b) => b.bracket)) return;
-    if (!tournament.teams.length) return;
-
-    let cancelled = false;
-    void import("@/lib/challonge-bracket-gen").then(
-      ({ generateBracketFromParticipants, generateRoundRobinBracketFromParticipants }) => {
-        if (cancelled) return;
-        const isAuction =
-          tournament.registrationFormat === "AUCTION" || tournament.slug.includes("auc-cup");
-        const participants = tournament.teams.map((t, i) => ({ seed: i + 1, name: t }));
-        const fallback = isAuction
-          ? generateRoundRobinBracketFromParticipants(participants, tournament.name)
-          : generateBracketFromParticipants(participants, tournament.name);
-        setGeneratedFallback(fallback);
-      },
-    );
-
-    return () => {
-      cancelled = true;
-    };
-  }, [brackets, bracketsLoading, tournament.teams, tournament.registrationFormat, tournament.slug, tournament.name]);
+  }, [showBracketsTab, initialBrackets, tournament.slug]);
 
   useEffect(() => {
     if (
-      !showMatchesTab &&
-      (activeTab === "matches" || activeTab === "stats")
+      (!showMatchesTab && (activeTab === "matches" || activeTab === "stats")) ||
+      (!showBracketsTab && activeTab === "brackets")
     ) {
       setActiveTab("overview");
     }
-  }, [showMatchesTab, activeTab]);
+  }, [showMatchesTab, showBracketsTab, activeTab]);
 
   useEffect(() => {
     if (!showMatchesTab) {
@@ -439,9 +427,7 @@ export default function TournamentDetailView({
 
       <div className="mb-8 min-w-0 border-b border-white/[0.08] pb-4 sm:mb-10">
         <div
-          className={`grid w-full gap-1 overflow-hidden rounded-2xl border border-white/[0.06] bg-white/[0.03] p-1 sm:flex sm:w-fit sm:flex-wrap sm:items-center sm:gap-1.5 sm:p-1.5 ${
-            showMatchesTab ? "grid-cols-4" : "grid-cols-2"
-          }`}
+          className={`grid w-full gap-1 overflow-hidden rounded-2xl border border-white/[0.06] bg-white/[0.03] p-1 sm:flex sm:w-fit sm:flex-wrap sm:items-center sm:gap-1.5 sm:p-1.5 ${tabGridClass}`}
         >
           <button
             type="button"
@@ -454,17 +440,19 @@ export default function TournamentDetailView({
           >
             Overview
           </button>
-          <button
-            type="button"
-            onClick={() => setActiveTab("brackets")}
-            className={`rounded-xl px-1 py-2.5 text-center text-[9px] font-bold tracking-[0.08em] uppercase transition-all sm:px-6 sm:text-xs sm:tracking-[0.2em] ${
-              activeTab === "brackets"
-                ? "bg-[#22c55e] text-[#070a12] shadow-lg shadow-emerald-500/20"
-                : "text-white/50 hover:text-white"
-            }`}
-          >
-            Brackets
-          </button>
+          {showBracketsTab ? (
+            <button
+              type="button"
+              onClick={() => setActiveTab("brackets")}
+              className={`rounded-xl px-1 py-2.5 text-center text-[9px] font-bold tracking-[0.08em] uppercase transition-all sm:px-6 sm:text-xs sm:tracking-[0.2em] ${
+                activeTab === "brackets"
+                  ? "bg-[#22c55e] text-[#070a12] shadow-lg shadow-emerald-500/20"
+                  : "text-white/50 hover:text-white"
+              }`}
+            >
+              Brackets
+            </button>
+          ) : null}
           {showMatchesTab ? (
             <>
               <button
@@ -610,7 +598,7 @@ export default function TournamentDetailView({
             />
           )}
         </section>
-      ) : (
+      ) : activeTab === "brackets" && showBracketsTab ? (
         <section className="space-y-8">
           {brackets.length > 1 && (
             <div className="flex flex-wrap items-center gap-2 rounded-2xl bg-white/[0.03] p-1.5 border border-white/[0.06] w-fit mb-6">
@@ -634,82 +622,62 @@ export default function TournamentDetailView({
             </div>
           )}
 
-          {brackets.length > 0 ? (
-            (() => {
-              const currentItem = brackets[activeStageIndex] ?? brackets[0];
-              const { url, name: stageHeading, bracket: displayBracket } = currentItem;
-              const isAuction =
-                tournament.registrationFormat === "AUCTION" ||
-                tournament.slug.includes("auc-cup");
+          {(() => {
+            const currentItem = brackets[activeStageIndex] ?? brackets[0];
+            if (!currentItem) return <TournamentBracketEmpty />;
+            const { url, name: stageHeading, bracket: displayBracket } = currentItem;
+            const isAuction =
+              tournament.registrationFormat === "AUCTION" ||
+              tournament.slug.includes("auc-cup");
 
-              const bracketLabel =
-                stageHeading ||
-                (brackets.length > 1 ? `Bracket ${activeStageIndex + 1}` : null);
+            const bracketLabel =
+              stageHeading ||
+              (brackets.length > 1 ? `Bracket ${activeStageIndex + 1}` : null);
 
-              const displayName = bracketLabel
-                ? `${tournament.name}: ${bracketLabel}`
-                : tournament.name;
+            const displayName = bracketLabel
+              ? `${tournament.name}: ${bracketLabel}`
+              : tournament.name;
 
-              const tournamentTeamsList =
-                tournament.teams && tournament.teams.length > 0
-                  ? tournament.teams
-                  : tournament.teamDetails.map((t) => t.name);
+            const tournamentTeamsList =
+              tournament.teams && tournament.teams.length > 0
+                ? tournament.teams
+                : tournament.teamDetails.map((t) => t.name);
 
-              return (
-                <div key={url}>
-                  {displayBracket ? (
-                    <TournamentBracket
-                      bracket={displayBracket}
-                      accentHex={meta.hex}
-                      tournamentName={displayName}
-                      stageName={bracketLabel}
-                      fallbackTeams={tournamentTeamsList}
-                      format={
-                        displayBracket.tournamentType
-                          ?.toLowerCase()
-                          .includes("round")
-                          ? "Round Robin"
-                          : displayBracket.tournamentType
-                              ?.toLowerCase()
-                              .includes("double")
-                            ? "Double Elimination"
-                            : isAuction
-                              ? "Round Robin"
-                              : "Single Elimination"
-                      }
-                    />
-                  ) : bracketsLoading ? (
-                    <div className="rounded-2xl border border-white/10 bg-white/[0.02] p-12 text-center text-white/40">
-                      Loading brackets...
-                    </div>
-                  ) : (
-                    <TournamentBracketEmpty />
-                  )}
-                </div>
-              );
-            })()
-          ) : generatedFallback ? (
-            <TournamentBracket
-              bracket={generatedFallback}
-              accentHex={meta.hex}
-              tournamentName={tournament.name}
-              format={
-                tournament.registrationFormat === "AUCTION" || tournament.slug.includes("auc-cup")
-                  ? "Round Robin"
-                  : "Single Elimination"
-              }
-            />
-          ) : tournament.teams.length > 0 ? (
-            <div className="rounded-2xl border border-white/10 bg-white/[0.02] p-12 text-center text-white/40">
-              Loading brackets...
-            </div>
-          ) : (
-            <div className="rounded-2xl border border-white/10 bg-white/[0.02] p-8 text-center text-white/40">
-              No brackets or teams available yet for this tournament.
-            </div>
-          )}
+            return (
+              <div key={url}>
+                {displayBracket ? (
+                  <TournamentBracket
+                    bracket={displayBracket}
+                    accentHex={meta.hex}
+                    tournamentName={displayName}
+                    stageName={bracketLabel}
+                    fallbackTeams={tournamentTeamsList}
+                    format={
+                      displayBracket.tournamentType
+                        ?.toLowerCase()
+                        .includes("round")
+                        ? "Round Robin"
+                        : displayBracket.tournamentType
+                            ?.toLowerCase()
+                            .includes("double")
+                          ? "Double Elimination"
+                          : isAuction
+                            ? "Round Robin"
+                            : "Single Elimination"
+                    }
+                  />
+                ) : bracketsLoading ? (
+                  <div className="rounded-2xl border border-white/10 bg-white/[0.02] p-12 text-center text-white/40">
+                    Loading brackets...
+                  </div>
+                ) : (
+                  <TournamentBracketEmpty />
+                )}
+              </div>
+            );
+          })()}
         </section>
-      )}
+      ) : null}
     </article>
   );
 }

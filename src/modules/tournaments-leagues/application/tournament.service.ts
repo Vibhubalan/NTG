@@ -103,26 +103,24 @@ export type HeroCupStatus = {
   countdownEndsAt: string | null;
 };
 
-/** Nearest upcoming auction cup phase for the homepage hero CTA strip. */
+/** Active auction cup phase for the homepage hero — winners only when none resolve. */
 export async function getHeroCupStatus(): Promise<HeroCupStatus | null> {
   return withDbFallback("hero-cup-status", null, async () => {
   const now = new Date();
+  // Include manually managed cups even when schedule dates are incomplete.
+  // Date-complete cups still prefer schedule windows inside resolveAuctionHeroPhase.
   const tournaments = await prisma.tournament.findMany({
     where: {
       registrationFormat: "AUCTION",
-      status: { notIn: ["CANCELLED", "COMPLETED"] },
-      registrationOpensAt: { not: null },
-      auctionStartsAt: { not: null },
-      auctionEndsAt: { not: null },
-      startsAt: { not: null },
-      endsAt: { not: null },
+      status: { notIn: ["CANCELLED", "COMPLETED", "DRAFT"] },
     },
-    orderBy: { startsAt: "asc" },
+    orderBy: [{ startsAt: "asc" }, { createdAt: "desc" }],
     select: {
       slug: true,
       name: true,
       registrationFormat: true,
       registrationOpensAt: true,
+      registrationClosesAt: true,
       auctionStartsAt: true,
       auctionEndsAt: true,
       startsAt: true,
@@ -138,7 +136,7 @@ export async function getHeroCupStatus(): Promise<HeroCupStatus | null> {
       slug: t.slug,
       name: t.name,
       phase: resolved.phase,
-      countdownEndsAt: resolved.countdownEndsAt.toISOString(),
+      countdownEndsAt: resolved.countdownEndsAt?.toISOString() ?? null,
     };
   }
 
