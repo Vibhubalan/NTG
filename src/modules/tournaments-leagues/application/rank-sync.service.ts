@@ -226,6 +226,8 @@ async function fetchV3MmrByName(
 
 type HenrikV2MmrResponse = {
   data?: {
+    name?: string;
+    tag?: string;
     current_data?: {
       season?: string;
       currenttierpatched?: string;
@@ -251,6 +253,16 @@ export type HenrikV2MmrBundle = {
   lifetime: HenrikLifetimeRankMeta;
   bySeason: Record<string, HenrikActSeasonStats>;
   currentActSeason: string | null;
+  gameName?: string | null;
+  tagLine?: string | null;
+};
+
+type HenrikAccountSnapshot = {
+  gameName: string;
+  tagLine: string;
+  region?: string;
+  cardLarge?: string;
+  cardWide?: string;
 };
 
 function parseHenrikV2Body(
@@ -276,7 +288,99 @@ function parseHenrikV2Body(
     },
     bySeason: data.by_season ?? {},
     currentActSeason,
+    gameName: data.name?.trim() || null,
+    tagLine: data.tag?.trim() || null,
   };
+}
+
+/**
+ * When v3 MMR is missing, derive current-act rank from v2 by_season only.
+ * Missing act row → null (do not invent Unranked).
+ */
+export function deriveRankFromV2Act(
+  bundle: HenrikV2MmrBundle | null,
+):
+  | { status: "ranked"; snapshot: MmrSnapshot }
+  | { status: "unranked" }
+  | null {
+  if (!bundle?.currentActSeason) return null;
+  const stats = getActSeasonStats(bundle.bySeason, bundle.currentActSeason);
+  if (!stats) return null;
+
+  if (!isActSeasonRanked(stats)) {
+    return { status: "unranked" };
+  }
+
+  const tierId = stats.final_rank ?? stats.tier;
+  if (typeof tierId !== "number" || tierId <= 0) {
+    return { status: "unranked" };
+  }
+
+  const rankTier = stats.final_rank_patched?.trim() || UNRANKED_TIER_NAME;
+  return {
+    status: "ranked",
+    snapshot: {
+      mmr: estimateEloFromTier(tierId, 0),
+      rankTier,
+      rankTierId: tierId,
+    },
+  };
+}
+
+async function fetchHenrikAccountByPuuid(
+  puuid: string,
+): Promise<HenrikAccountSnapshot | null> {
+  if (!serverEnv.henrikdevApiKey) return null;
+
+  const res = await henrikFetch(
+    `https://api.henrikdev.xyz/valorant/v1/by-puuid/account/${puuid}`,
+    { headers: henrikHeaders(), next: { revalidate: 0 } },
+  );
+
+  if (res.status === 404) return null;
+  if (!res.ok) {
+    throw new Error(`Account lookup failed (${res.status})`);
+  }
+
+  const body = (await res.json()) as {
+    data?: {
+      name?: string;
+      tag?: string;
+      region?: string;
+      card?: { large?: string; wide?: string };
+    };
+  };
+
+  const gameName = body.data?.name?.trim();
+  const tagLine = body.data?.tag?.trim();
+  if (!gameName || !tagLine) return null;
+
+  return {
+    gameName,
+    tagLine,
+    region: body.data?.region ? normalizeHenrikRegion(body.data.region) : undefined,
+    cardLarge: body.data?.card?.large,
+    cardWide: body.data?.card?.wide,
+  };
+}
+
+async function fetchHenrikV2MmrBundleByPuuid(
+  region: string,
+  puuid: string,
+  options?: { currentActOverride?: string | null },
+): Promise<HenrikV2MmrBundle | null> {
+  if (!serverEnv.henrikdevApiKey) return null;
+
+  const reg = normalizeHenrikRegion(region);
+  const res = await henrikFetch(
+    `https://api.henrikdev.xyz/valorant/v2/by-puuid/mmr/${reg}/${puuid}`,
+    { headers: henrikHeaders(), next: { revalidate: 0 } },
+  );
+
+  if (!res.ok) return null;
+
+  const body = (await res.json()) as HenrikV2MmrResponse;
+  return parseHenrikV2Body(body, options?.currentActOverride);
 }
 
 /** Henrik v2/mmr — current act, lifetime peak, and per-act history. */
@@ -437,12 +541,47 @@ export async function syncUserRank(
   const auditContext = options?.context;
   const previousRank = auditContext ? await readTownRankSnapshot(userId) : null;
 
+  let auditGameName = user?.riotGameName ?? null;
+  let auditTagLine = user?.riotTagLine ?? null;
+
+  async function persistRiotIdentity(update: {
+    gameName?: string | null;
+    tagLine?: string | null;
+    region?: string | null;
+    cardLarge?: string | null;
+    cardWide?: string | null;
+  }): Promise<void> {
+    const userUpdateData: Prisma.UserUpdateInput = {};
+    if (update.gameName?.trim() && update.tagLine?.trim()) {
+      userUpdateData.riotGameName = update.gameName.trim();
+      userUpdateData.riotTagLine = update.tagLine.trim();
+      auditGameName = update.gameName.trim();
+      auditTagLine = update.tagLine.trim();
+    }
+    if (update.region && update.region !== user?.riotRegion) {
+      userUpdateData.riotRegion = update.region;
+    }
+    if (update.cardLarge) {
+      const cards = normalizeRiotPlayerCardUrls(update.cardLarge, update.cardWide);
+      if (cards.large) userUpdateData.riotPlayerCard = cards.large;
+      if (cards.wide) userUpdateData.riotPlayerCardWide = cards.wide;
+    } else if (update.cardWide) {
+      userUpdateData.riotPlayerCardWide = update.cardWide;
+    }
+
+    if (Object.keys(userUpdateData).length === 0) return;
+    await prisma.user.update({
+      where: { id: userId },
+      data: userUpdateData,
+    });
+  }
+
   async function fail(error: string): Promise<{ ok: false; error: string }> {
     if (auditContext) {
       await writeRankAudit({
         userId,
-        riotGameName: user?.riotGameName,
-        riotTagLine: user?.riotTagLine,
+        riotGameName: auditGameName,
+        riotTagLine: auditTagLine,
         context: auditContext,
         previous: previousRank,
         error,
@@ -455,18 +594,59 @@ export async function syncUserRank(
     return fail("Riot ID not linked.");
   }
 
-  const region = normalizeHenrikRegion(user.riotRegion);
-  const syncName = user.riotGameName;
-  const syncTag = user.riotTagLine;
+  let region = normalizeHenrikRegion(user.riotRegion);
+  let syncName = user.riotGameName;
+  let syncTag = user.riotTagLine;
   const strictHenrik = options?.requireAllHenrikCalls ?? false;
   const actOverride = options?.context?.currentActOverride ?? null;
   const v2Opts = { currentActOverride: actOverride };
+
+  // Resolve current Riot name/tag by PUUID first so renames work for v2 + cards.
+  let account: HenrikAccountSnapshot | null = null;
+  try {
+    account = await fetchHenrikAccountByPuuid(user.riotPuuid);
+    if (account) {
+      syncName = account.gameName;
+      syncTag = account.tagLine;
+      if (account.region) region = account.region;
+      await persistRiotIdentity({
+        gameName: account.gameName,
+        tagLine: account.tagLine,
+        region: account.region,
+        cardLarge: options?.skipPlayerCard ? undefined : account.cardLarge,
+        cardWide: options?.skipPlayerCard ? undefined : account.cardWide,
+      });
+    }
+  } catch (e) {
+    console.error("Failed to fetch Riot account by puuid on rank sync:", e);
+    if (strictHenrik && !options?.skipPlayerCard) {
+      return fail("Henrik player card request failed.");
+    }
+  }
 
   let v2Bundle: HenrikV2MmrBundle | null = null;
   try {
     v2Bundle = await fetchHenrikV2MmrBundle(region, syncName, syncTag, v2Opts);
   } catch {
     v2Bundle = null;
+  }
+
+  // Old DB name can make name-based v2 miss; fall back to by-puuid.
+  if (!v2Bundle) {
+    try {
+      v2Bundle = await fetchHenrikV2MmrBundleByPuuid(region, user.riotPuuid, v2Opts);
+    } catch {
+      v2Bundle = null;
+    }
+  }
+
+  if (v2Bundle?.gameName && v2Bundle.tagLine) {
+    syncName = v2Bundle.gameName;
+    syncTag = v2Bundle.tagLine;
+    await persistRiotIdentity({
+      gameName: v2Bundle.gameName,
+      tagLine: v2Bundle.tagLine,
+    }).catch(() => {});
   }
 
   let fetched:
@@ -485,13 +665,18 @@ export async function syncUserRank(
     return fail("Could not fetch rank from Riot.");
   }
 
-  if (!fetched && v2Bundle) {
-    fetched = {
-      status: "unranked",
-      region,
-      gameName: syncName,
-      tagLine: syncTag,
-    };
+  // v3 miss: only confirm Unranked from v2 act row. Do not invent ranked MMR
+  // from by_season (would mis-order the board vs real v3 elo).
+  if (!fetched) {
+    const fromV2 = deriveRankFromV2Act(v2Bundle);
+    if (fromV2?.status === "unranked") {
+      fetched = {
+        status: "unranked",
+        region,
+        gameName: syncName,
+        tagLine: syncTag,
+      };
+    }
   }
 
   if (!fetched) {
@@ -502,23 +687,22 @@ export async function syncUserRank(
   }
 
   const { region: resolvedRegion } = fetched;
-  const resolvedGameName =
+  const v3GameName =
     fetched.status === "ranked" ? fetched.snapshot.gameName : fetched.gameName;
-  const resolvedTagLine =
+  const v3TagLine =
     fetched.status === "ranked" ? fetched.snapshot.tagLine : fetched.tagLine;
 
-  const lookupName = resolvedGameName || syncName;
-  const lookupTag = resolvedTagLine || syncTag;
-  // Re-try v2 with resolved identity from v3 (or corrected region), even in strict mode.
-  // This avoids false failures when players changed Riot name/tag and DB still has old identity.
-  if (
-    resolvedRegion !== region ||
-    !v2Bundle ||
-    resolvedGameName !== syncName ||
-    resolvedTagLine !== syncTag
-  ) {
+  const resolvedGameName = account?.gameName || v3GameName || v2Bundle?.gameName || syncName;
+  const resolvedTagLine = account?.tagLine || v3TagLine || v2Bundle?.tagLine || syncTag;
+
+  const lookupName = resolvedGameName;
+  const lookupTag = resolvedTagLine;
+  // Re-try v2 only when region changed or the first pass missed.
+  if (resolvedRegion !== region || !v2Bundle) {
     try {
-      v2Bundle = await fetchHenrikV2MmrBundle(resolvedRegion, lookupName, lookupTag, v2Opts);
+      v2Bundle =
+        (await fetchHenrikV2MmrBundle(resolvedRegion, lookupName, lookupTag, v2Opts)) ??
+        (await fetchHenrikV2MmrBundleByPuuid(resolvedRegion, user.riotPuuid, v2Opts));
     } catch {
       /* keep prior bundle if any */
     }
@@ -539,61 +723,57 @@ export async function syncUserRank(
 
   const actFields = lifetimeDbFields(v2Bundle?.lifetime ?? null);
 
-  let cardLarge: string | undefined;
-  let cardWide: string | undefined;
-  let cardLookupHardFailed = false;
-  if (!options?.skipPlayerCard) {
+  // Fallback card fetch by name only when by-puuid account had no card and we want cards.
+  let cardLarge = account?.cardLarge;
+  let cardWide = account?.cardWide;
+  if (!options?.skipPlayerCard && !cardLarge && !cardWide) {
     try {
-      const name = resolvedGameName || user.riotGameName;
-      const tag = resolvedTagLine || user.riotTagLine;
-      const encodedName = encodeURIComponent(name);
-      const encodedTag = encodeURIComponent(tag);
+      const encodedName = encodeURIComponent(lookupName);
+      const encodedTag = encodeURIComponent(lookupTag);
       const res = await henrikFetch(
         `https://api.henrikdev.xyz/valorant/v1/account/${encodedName}/${encodedTag}`,
         { headers: henrikHeaders(), next: { revalidate: 0 } },
       );
       if (res.ok) {
-        const accData = (await res.json()) as { data?: { card?: { large?: string; wide?: string } } };
+        const accData = (await res.json()) as {
+          data?: {
+            name?: string;
+            tag?: string;
+            game_name?: string;
+            tag_line?: string;
+            card?: { large?: string; wide?: string };
+          };
+        };
         cardLarge = accData.data?.card?.large;
         cardWide = accData.data?.card?.wide;
-      } else if (strictHenrik && res.status !== 404) {
-        cardLookupHardFailed = true;
+        const nameFromCard = accData.data?.name ?? accData.data?.game_name;
+        const tagFromCard = accData.data?.tag ?? accData.data?.tag_line;
+        if (nameFromCard?.trim() && tagFromCard?.trim()) {
+          await persistRiotIdentity({
+            gameName: nameFromCard,
+            tagLine: tagFromCard,
+            cardLarge,
+            cardWide,
+          });
+        }
+      } else if (strictHenrik && res.status !== 404 && !account) {
         return fail(`Henrik player card request failed (${res.status}).`);
       }
     } catch (e) {
       console.error("Failed to fetch player card on rank sync:", e);
-      if (strictHenrik) {
-        cardLookupHardFailed = true;
+      if (strictHenrik && !account) {
         return fail("Henrik player card request failed.");
       }
     }
-    if (strictHenrik && cardLookupHardFailed && !cardLarge && !cardWide) {
-      return fail("Henrik player card request returned no card data.");
-    }
   }
 
-  const userUpdateData: Prisma.UserUpdateInput = {};
-  if (resolvedGameName && resolvedTagLine) {
-    userUpdateData.riotGameName = resolvedGameName;
-    userUpdateData.riotTagLine = resolvedTagLine;
-  }
-  if (resolvedRegion !== user.riotRegion) {
-    userUpdateData.riotRegion = resolvedRegion;
-  }
-  if (cardLarge) {
-    const cards = normalizeRiotPlayerCardUrls(cardLarge, cardWide);
-    if (cards.large) userUpdateData.riotPlayerCard = cards.large;
-    if (cards.wide) userUpdateData.riotPlayerCardWide = cards.wide;
-  } else if (cardWide) {
-    userUpdateData.riotPlayerCardWide = cardWide;
-  }
-
-  if (Object.keys(userUpdateData).length > 0) {
-    await prisma.user.update({
-      where: { id: userId },
-      data: userUpdateData,
-    });
-  }
+  await persistRiotIdentity({
+    gameName: resolvedGameName,
+    tagLine: resolvedTagLine,
+    region: resolvedRegion,
+    cardLarge: options?.skipPlayerCard ? undefined : cardLarge,
+    cardWide: options?.skipPlayerCard ? undefined : cardWide,
+  });
 
   const existing = await prisma.leaderboardEntry.findFirst({
     where: {
@@ -632,8 +812,8 @@ export async function syncUserRank(
     if (auditContext) {
       await writeRankAudit({
         userId,
-        riotGameName: user.riotGameName,
-        riotTagLine: user.riotTagLine,
+        riotGameName: auditGameName,
+        riotTagLine: auditTagLine,
         context: auditContext,
         previous: previousRank,
         snapshot: {
@@ -645,9 +825,9 @@ export async function syncUserRank(
     }
 
     await syncValorantRankSnapshots(userId, {
-    tier: v2Bundle?.lifetime.peakRankTier ?? null,
-    tierId: v2Bundle?.lifetime.peakRankTierId ?? null,
-  }).catch(() => {});
+      tier: v2Bundle?.lifetime.peakRankTier ?? null,
+      tierId: v2Bundle?.lifetime.peakRankTierId ?? null,
+    }).catch(() => {});
     return { ok: true };
   }
 
@@ -680,8 +860,8 @@ export async function syncUserRank(
   if (auditContext) {
     await writeRankAudit({
       userId,
-      riotGameName: user.riotGameName,
-      riotTagLine: user.riotTagLine,
+      riotGameName: auditGameName,
+      riotTagLine: auditTagLine,
       context: auditContext,
       previous: previousRank,
       snapshot: {
