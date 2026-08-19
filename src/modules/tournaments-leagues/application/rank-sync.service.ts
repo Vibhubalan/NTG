@@ -3,7 +3,7 @@ import { serverEnv } from "@core/config/env.server";
 import { sortValorantBoardEntries, computeValorantBoardSnapshotRanks } from "@/lib/leaderboard-sort";
 import { henrikFetch, henrikHeaders } from "@/lib/henrik-client";
 import { normalizeRiotPlayerCardUrls } from "@/lib/valorant-player-card";
-import { mmrRegionsToTry, normalizeHenrikRegion } from "@/lib/henrik-region";
+import { mmrRegionsToTry, normalizeHenrikRegion, type HenrikMmrRegion } from "@/lib/henrik-region";
 import {
   getActSeasonStats,
   isActSeasonRanked,
@@ -260,7 +260,7 @@ export type HenrikV2MmrBundle = {
 type HenrikAccountSnapshot = {
   gameName: string;
   tagLine: string;
-  region?: string;
+  region?: HenrikMmrRegion;
   cardLarge?: string;
   cardWide?: string;
 };
