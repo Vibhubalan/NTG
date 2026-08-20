@@ -302,6 +302,31 @@ export default function TournamentDetailView({
       </div>
     ) : null;
 
+  const showRulebookPromo =
+    Boolean(tournament.rulebookUrl?.trim()) && tournament.registrationOpen;
+
+  const rulebookPromoBlock = showRulebookPromo ? (
+    <div className="min-w-0 rounded-2xl border border-white/[0.08] bg-[#0A0A0A]/80 p-4 shadow-2xl backdrop-blur-xl sm:p-5">
+      <a
+        href={tournament.rulebookUrl!}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="inline-flex items-center gap-2 text-[12px] font-semibold tracking-[0.08em] text-amber-200/90 uppercase transition-colors hover:text-amber-100"
+      >
+        <svg className="h-3.5 w-3.5 shrink-0 opacity-80" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
+          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+          <path d="M14 2v6h6" />
+        </svg>
+        View rulebook
+      </a>
+      {tournament.rulebookDisclaimer?.trim() ? (
+        <p className="mt-2.5 text-[12px] leading-relaxed text-white/45">
+          {tournament.rulebookDisclaimer.trim()}
+        </p>
+      ) : null}
+    </div>
+  ) : null;
+
   // Warm the heavy bracket UI chunk while the user is still on Overview.
   useEffect(() => {
     if (!showBracketsTab) return;
@@ -532,6 +557,7 @@ export default function TournamentDetailView({
                 {auctionBlock}
                 <TournamentScheduleCard schedule={scheduleCard} variant="strip" />
                 {prizeBlock}
+                {rulebookPromoBlock}
               </div>
             ) : null}
 
@@ -561,6 +587,7 @@ export default function TournamentDetailView({
               <TournamentScheduleCard schedule={scheduleCard} />
               {auctionBlock}
               {prizeBlock}
+              {rulebookPromoBlock}
             </aside>
           ) : null}
 

@@ -532,6 +532,7 @@ export class TournamentRepository {
         };
       })(),
       rulebookUrl: t.rulebookUrl ?? null,
+      rulebookDisclaimer: t.rulebookDisclaimer?.trim() || null,
       teams,
       teamDetails,
       placements: t.placements.map((p) => {

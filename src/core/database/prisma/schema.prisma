@@ -397,6 +397,8 @@ model Tournament {
   /** Extra Challonge bracket URLs (string[]). First URL is also mirrored in bracketUrl. */
   bracketUrls          Json?
   rulebookUrl          String?
+  /** Short public note under prize split (shown with rulebook while registration is open). */
+  rulebookDisclaimer   String?
   teams                Json?
   createdAt            DateTime          @default(now())
   updatedAt            DateTime          @updatedAt

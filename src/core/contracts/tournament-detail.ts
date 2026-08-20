@@ -55,6 +55,7 @@ export type TournamentDetail = {
   /** Challonge bracket links (structured so isFinal / stage name survive). */
   bracketUrls: TournamentBracketLink[];
   rulebookUrl: string | null;
+  rulebookDisclaimer: string | null;
   teams: string[];
   teamDetails: TournamentTeamView[];
   placements: TournamentPlacementView[];

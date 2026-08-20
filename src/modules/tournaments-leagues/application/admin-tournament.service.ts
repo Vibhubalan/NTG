@@ -45,6 +45,7 @@ export type CreateTournamentInput = {
   bracketUrls?: string[] | null;
   posterUrl?: string;
   rulebookUrl?: string;
+  rulebookDisclaimer?: string;
   hubBannerUrl?: string;
   showOnEsportsHub?: boolean;
 };
@@ -60,6 +61,7 @@ export type UpdateTournamentInput = Partial<
     | "bracketUrls"
     | "posterUrl"
     | "rulebookUrl"
+    | "rulebookDisclaimer"
     | "hubBannerUrl"
     | "startsAt"
     | "endsAt"
@@ -77,6 +79,7 @@ export type UpdateTournamentInput = Partial<
   bracketUrls?: (string | import("@/lib/challonge").BracketUrlItem)[] | null;
   posterUrl?: string | null;
   rulebookUrl?: string | null;
+  rulebookDisclaimer?: string | null;
   hubBannerUrl?: string | null;
   startsAt?: string | null;
   endsAt?: string | null;
@@ -223,6 +226,7 @@ export async function createTournament(
       })(),
       posterUrl: input.posterUrl?.trim() || null,
       rulebookUrl: input.rulebookUrl?.trim() || null,
+      rulebookDisclaimer: input.rulebookDisclaimer?.trim() || null,
       hubBannerUrl: input.hubBannerUrl?.trim() || null,
       showOnEsportsHub: input.showOnEsportsHub ?? false,
       registrationFormat: (input.registrationFormat as import("@prisma/client").TournamentFormat | null) ?? null,
@@ -261,6 +265,7 @@ export type AdminCupFieldsSnapshot = {
   bracketUrl: string | null;
   bracketUrls: (string | import("@/lib/challonge").BracketUrlItem)[];
   rulebookUrl: string | null;
+  rulebookDisclaimer: string | null;
   format: BracketType | null;
   coCaptainSlots: number;
   startingBudget: number;
@@ -317,6 +322,7 @@ export function toAdminCupFieldsSnapshot(
       bracketUrls: (t as { bracketUrls?: unknown }).bracketUrls,
     }),
     rulebookUrl: t.rulebookUrl,
+    rulebookDisclaimer: t.rulebookDisclaimer,
     format: t.format,
     coCaptainSlots: t.coCaptainSlots,
     startingBudget: t.startingBudget,
@@ -412,6 +418,9 @@ export async function updateTournamentFull(
   }
   if (input.posterUrl !== undefined) data.posterUrl = input.posterUrl?.trim() || null;
   if (input.rulebookUrl !== undefined) data.rulebookUrl = input.rulebookUrl?.trim() || null;
+  if (input.rulebookDisclaimer !== undefined) {
+    data.rulebookDisclaimer = input.rulebookDisclaimer?.trim() || null;
+  }
   if (input.hubBannerUrl !== undefined) data.hubBannerUrl = input.hubBannerUrl?.trim() || null;
   if (input.showOnEsportsHub !== undefined) data.showOnEsportsHub = input.showOnEsportsHub;
   if (input.registrationFormat !== undefined) {

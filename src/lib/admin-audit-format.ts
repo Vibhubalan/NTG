@@ -43,6 +43,7 @@ const FIELD_LABELS: Record<string, string> = {
   showOnEsportsHub: "esports hub visibility",
   hideAfter: "hide-after date",
   rulebookUrl: "rulebook",
+  rulebookDisclaimer: "rulebook disclaimer",
   teams: "teams",
   registrationFormat: "registration format",
   phone: "phone number",

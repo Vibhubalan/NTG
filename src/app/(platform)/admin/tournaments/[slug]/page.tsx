@@ -76,6 +76,7 @@ export default async function AdminTournamentEditPage({ params }: Props) {
       bracketUrls: (t as { bracketUrls?: unknown }).bracketUrls,
     }),
     rulebookUrl: t.rulebookUrl,
+    rulebookDisclaimer: t.rulebookDisclaimer,
     tournamentTeams: t.tournamentTeams.map((team) => ({
       id: team.id,
       name: team.name,

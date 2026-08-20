@@ -95,6 +95,7 @@ type TournamentData = {
   bracketUrls: (string | BracketUrlItem)[];
   bracketLinks?: { name: string; url: string; isFinal: boolean }[];
   rulebookUrl: string | null;
+  rulebookDisclaimer: string | null;
   publicAuction?: boolean;
   yourGamesEnabled?: boolean;
   tournamentTeams: Team[];
@@ -214,6 +215,7 @@ function getSavePayload(form: TournamentData) {
     autoManageStatus: form.autoManageStatus,
     ...bracketUrlsPayload(form.bracketLinks),
     rulebookUrl: emptyToNull(form.rulebookUrl),
+    rulebookDisclaimer: emptyToNull(form.rulebookDisclaimer),
     registrationFormat: SUPPORTS_FORMAT.includes(form.game) ? form.registrationFormat : null,
     format: form.format || null,
     coCaptainSlots: form.coCaptainSlots,
@@ -297,6 +299,7 @@ export default function AdminTournamentEditor({
     return {
       ...initial,
       seasonId: null,
+      rulebookDisclaimer: initial.rulebookDisclaimer ?? null,
       bracketLinks: links,
       bracketUrls: initial.bracketUrls || [],
       bracketUrl: initial.bracketUrl || null,
@@ -689,6 +692,7 @@ export default function AdminTournamentEditor({
           hideAfter: null,
           ...bracketUrlsPayload(form.bracketLinks),
           rulebookUrl: emptyToNull(form.rulebookUrl),
+          rulebookDisclaimer: emptyToNull(form.rulebookDisclaimer),
           registrationFormat: SUPPORTS_FORMAT.includes(form.game) ? form.registrationFormat : null,
           format: form.format || null,
           coCaptainSlots: form.coCaptainSlots,
@@ -1376,7 +1380,7 @@ export default function AdminTournamentEditor({
 
             <AdminSection
               title="Cup rulebook"
-              showsOn="Linked from the registration form when players agree to rules"
+              showsOn="Linked from the registration form when players agree to rules; also shown under Prize Split while registration is open"
             >
               <RulebookUploadField
                 label="Rulebook (PDF or Word)"
@@ -1392,6 +1396,29 @@ export default function AdminTournamentEditor({
                 }}
                 hint="Upload the organizer's rulebook. Players must agree to it before registering."
               />
+              <div className="mt-4 space-y-1.5">
+                <label className="text-[10px] font-bold uppercase tracking-wider text-white/40">
+                  Prize-split disclaimer
+                </label>
+                <textarea
+                  value={form.rulebookDisclaimer ?? ""}
+                  onChange={(e) => setForm({ ...form, rulebookDisclaimer: e.target.value })}
+                  onBlur={async () => {
+                    await patchField(
+                      { rulebookDisclaimer: emptyToNull(form.rulebookDisclaimer) },
+                      "Rulebook disclaimer saved.",
+                    );
+                  }}
+                  rows={2}
+                  maxLength={280}
+                  placeholder="e.g. Prize distribution subject to rulebook terms and organizer verification."
+                  className="w-full rounded-xl border border-white/10 bg-white/[0.03] px-3 py-2.5 text-sm text-white/85 placeholder:text-white/25 outline-none focus:border-white/25"
+                />
+                <p className="text-[10px] leading-relaxed text-white/35">
+                  Shown under Prize Split with the rulebook link only while registration is open.
+                  Hidden automatically once the cup starts.
+                </p>
+              </div>
             </AdminSection>
 
             <AdminSection
