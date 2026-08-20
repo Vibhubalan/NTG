@@ -306,21 +306,30 @@ export default function TournamentDetailView({
     Boolean(tournament.rulebookUrl?.trim()) && tournament.registrationOpen;
 
   const rulebookPromoBlock = showRulebookPromo ? (
-    <div className="min-w-0 rounded-2xl border border-white/[0.08] bg-[#0A0A0A]/80 p-4 shadow-2xl backdrop-blur-xl sm:p-5">
+    <div className="min-w-0 space-y-2.5">
       <a
         href={tournament.rulebookUrl!}
         target="_blank"
         rel="noopener noreferrer"
-        className="inline-flex items-center gap-2 text-[12px] font-semibold tracking-[0.08em] text-amber-200/90 uppercase transition-colors hover:text-amber-100"
+        className="group flex w-full items-center justify-between gap-3 rounded-xl border border-[var(--color-brand)]/25 bg-[var(--color-brand)]/[0.06] px-4 py-3 text-left transition-colors hover:border-[var(--color-brand)]/40 hover:bg-[var(--color-brand)]/[0.12]"
       >
-        <svg className="h-3.5 w-3.5 shrink-0 opacity-80" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
-          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-          <path d="M14 2v6h6" />
-        </svg>
-        View rulebook
+        <span className="inline-flex min-w-0 items-center gap-2.5">
+          <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-[var(--color-brand)]/20 bg-[var(--color-brand)]/10 text-[var(--color-brand)]">
+            <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
+              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+              <path d="M14 2v6h6" />
+            </svg>
+          </span>
+          <span className="block text-[11px] font-bold tracking-[0.16em] text-white/90 uppercase">
+            View rulebook
+          </span>
+        </span>
+        <span className="shrink-0 text-[var(--color-brand)]/70 transition-transform group-hover:translate-x-0.5 group-hover:text-[var(--color-brand)]" aria-hidden>
+          →
+        </span>
       </a>
       {tournament.rulebookDisclaimer?.trim() ? (
-        <p className="mt-2.5 text-[12px] leading-relaxed text-white/45">
+        <p className="px-0.5 text-[12px] leading-relaxed text-white/45">
           {tournament.rulebookDisclaimer.trim()}
         </p>
       ) : null}
