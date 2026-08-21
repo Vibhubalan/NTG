@@ -518,21 +518,11 @@ export default function TournamentDetailView({
 
       {activeTab === "overview" ? (
         <div
-          className={`grid min-w-0 items-start gap-5 sm:gap-6 lg:gap-8 ${
+          className={`grid min-w-0 items-start gap-6 sm:gap-8 ${
             useSingleColOverview ? "lg:grid-cols-1" : "lg:grid-cols-[1fr_22rem]"
           }`}
         >
-          {/* Mobile: auction / prize / rulebook first so CTAs aren’t separated by tall form/schedule */}
-          {showMetaSidebar ? (
-            <div className="order-1 min-w-0 space-y-3 lg:hidden">
-              {auctionBlock}
-              {prizeBlock}
-              {rulebookPromoBlock}
-              <TournamentScheduleCard schedule={scheduleCard} variant="strip" />
-            </div>
-          ) : null}
-
-          <div className="order-2 min-w-0 space-y-5 sm:space-y-6 lg:order-1 lg:col-start-1 lg:row-start-1">
+          <div className="order-1 min-w-0 space-y-5 sm:space-y-6 lg:col-start-1 lg:row-start-1">
             {showResultsBlock ? (
               <section className="min-w-0 space-y-6 sm:space-y-8">
                 <div className="flex min-w-0 items-center gap-2 sm:gap-4">
@@ -578,9 +568,9 @@ export default function TournamentDetailView({
             {showOverviewMetaStack ? (
               <div className="min-w-0 space-y-3">
                 {auctionBlock}
+                <TournamentScheduleCard schedule={scheduleCard} variant="strip" />
                 {prizeBlock}
                 {rulebookPromoBlock}
-                <TournamentScheduleCard schedule={scheduleCard} variant="strip" />
               </div>
             ) : null}
 
@@ -606,7 +596,7 @@ export default function TournamentDetailView({
           </div>
 
           {showMetaSidebar ? (
-            <aside className="order-3 hidden min-w-0 space-y-3 self-start lg:order-2 lg:col-start-2 lg:row-span-2 lg:row-start-1 lg:block">
+            <aside className="order-2 min-w-0 space-y-3 self-start lg:col-start-2 lg:row-span-2 lg:row-start-1">
               <TournamentScheduleCard schedule={scheduleCard} />
               {auctionBlock}
               {prizeBlock}
@@ -615,11 +605,7 @@ export default function TournamentDetailView({
           ) : null}
 
           {showTeams ? (
-            <div
-              className={`order-4 min-w-0 lg:order-3 ${
-                showMetaSidebar ? "lg:col-start-1 lg:row-start-2" : ""
-              }`}
-            >
+            <div className={`order-3 min-w-0 ${showMetaSidebar ? "lg:col-start-1 lg:row-start-2" : ""}`}>
               <TournamentTeamsList
                 teams={tournament.teams}
                 teamDetails={tournament.teamDetails}
