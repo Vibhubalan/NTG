@@ -66,6 +66,15 @@ describe("getActSeasonStats", () => {
     };
     expect(getActSeasonStats(bySeason, "s26a4")?.final_rank_patched).toBe("Gold 1");
   });
+
+  it("treats Henrik error-only act rows as missing", () => {
+    expect(
+      getActSeasonStats(
+        { e11a5: { error: "No data available" } },
+        "e11a5",
+      ),
+    ).toBeNull();
+  });
 });
 
 describe("resolveCurrentActSeason", () => {

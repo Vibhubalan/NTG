@@ -26,6 +26,7 @@ function minimalDetail(overrides: Partial<TournamentDetail> = {}): TournamentDet
     bracketUrl: null,
     bracketUrls: [],
     rulebookUrl: null,
+    rulebookDisclaimer: null,
     teams: [],
     teamDetails: [],
     placements: [],

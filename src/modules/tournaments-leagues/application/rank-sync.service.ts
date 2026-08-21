@@ -130,6 +130,12 @@ export type MmrSnapshot = {
   tagLine?: string;
 };
 
+export type HenrikPeakMeta = {
+  peakRankTier: string | null;
+  peakRankTierId: number | null;
+  peakAct: string | null;
+};
+
 type HenrikV3MmrResponse = {
   status?: number;
   data?: {
@@ -139,6 +145,10 @@ type HenrikV3MmrResponse = {
       rr?: number;
       elo?: number;
     };
+    peak?: {
+      season?: { id?: string; short?: string };
+      tier?: { id?: number; name?: string };
+    };
   };
 };
 
@@ -147,10 +157,42 @@ function sleep(ms: number): Promise<void> {
 }
 
 type HenrikMmrParseResult =
-  | { kind: "ranked"; snapshot: MmrSnapshot }
-  | { kind: "unranked"; gameName?: string; tagLine?: string };
+  | { kind: "ranked"; snapshot: MmrSnapshot; peak: HenrikPeakMeta | null }
+  | { kind: "unranked"; gameName?: string; tagLine?: string; peak: HenrikPeakMeta | null };
+
+function parseV3Peak(body: HenrikV3MmrResponse): HenrikPeakMeta | null {
+  const peak = body.data?.peak;
+  const tierId = peak?.tier?.id;
+  const tierName = peak?.tier?.name?.trim();
+  if (!tierName || typeof tierId !== "number" || tierId <= 0) return null;
+  return {
+    peakRankTier: tierName,
+    peakRankTierId: tierId,
+    peakAct: peak?.season?.short?.trim() || null,
+  };
+}
+
+/** Prefer Henrik v3 peak; fall back to v2 highest_rank. */
+export function preferPeakMeta(
+  v3: HenrikPeakMeta | null | undefined,
+  v2: HenrikPeakMeta | null | undefined,
+): HenrikPeakMeta {
+  if (v3?.peakRankTier && v3.peakRankTierId != null && v3.peakRankTierId > 0) {
+    return {
+      peakRankTier: v3.peakRankTier,
+      peakRankTierId: v3.peakRankTierId,
+      peakAct: v3.peakAct ?? null,
+    };
+  }
+  return {
+    peakRankTier: v2?.peakRankTier ?? null,
+    peakRankTierId: v2?.peakRankTierId ?? null,
+    peakAct: v2?.peakAct ?? null,
+  };
+}
 
 function parseV3MmrBody(body: HenrikV3MmrResponse): HenrikMmrParseResult | null {
+  const peak = parseV3Peak(body);
   const current = body.data?.current;
   const tierId = current?.tier?.id;
 
@@ -159,6 +201,7 @@ function parseV3MmrBody(body: HenrikV3MmrResponse): HenrikMmrParseResult | null 
       kind: "unranked",
       gameName: body.data?.account?.name,
       tagLine: body.data?.account?.tag,
+      peak,
     };
   }
 
@@ -177,6 +220,7 @@ function parseV3MmrBody(body: HenrikV3MmrResponse): HenrikMmrParseResult | null 
       gameName: body.data?.account?.name,
       tagLine: body.data?.account?.tag,
     },
+    peak,
   };
 }
 
@@ -419,7 +463,8 @@ export async function fetchHenrikV2Lifetime(
 function currentActIsUnranked(bundle: HenrikV2MmrBundle | null): boolean {
   if (!bundle?.currentActSeason) return false;
   const stats = getActSeasonStats(bundle.bySeason, bundle.currentActSeason);
-  // Missing season row ≠ confirmed unranked — keep v3 current rank.
+  // Missing season row / Henrik "No data available" ≠ confirmed unranked —
+  // keep v3 current rank (same as Tracker).
   if (!stats) return false;
   return !isActSeasonRanked(stats);
 }
@@ -446,8 +491,14 @@ export async function fetchCompetitiveMmr(
   puuid?: string,
   options?: { tryAllRegions?: boolean },
 ): Promise<
-  | { status: "ranked"; snapshot: MmrSnapshot; region: string }
-  | { status: "unranked"; region: string; gameName?: string; tagLine?: string }
+  | { status: "ranked"; snapshot: MmrSnapshot; region: string; peak: HenrikPeakMeta | null }
+  | {
+      status: "unranked";
+      region: string;
+      gameName?: string;
+      tagLine?: string;
+      peak: HenrikPeakMeta | null;
+    }
   | null
 > {
   const apiKey = serverEnv.henrikdevApiKey;
@@ -476,6 +527,7 @@ export async function fetchCompetitiveMmr(
         rankTier: tiers[hash % tiers.length]!,
         rankTierId: tierId,
       },
+      peak: null,
     };
   }
 
@@ -490,7 +542,12 @@ export async function fetchCompetitiveMmr(
       if (puuid) {
         const byPuuid = await fetchV3MmrByPuuid(reg, puuid);
         if (byPuuid?.kind === "ranked") {
-          return { status: "ranked", snapshot: byPuuid.snapshot, region: reg };
+          return {
+            status: "ranked",
+            snapshot: byPuuid.snapshot,
+            region: reg,
+            peak: byPuuid.peak,
+          };
         }
         if (byPuuid?.kind === "unranked") {
           return {
@@ -498,6 +555,7 @@ export async function fetchCompetitiveMmr(
             region: reg,
             gameName: byPuuid.gameName,
             tagLine: byPuuid.tagLine,
+            peak: byPuuid.peak,
           };
         }
         continue;
@@ -505,7 +563,12 @@ export async function fetchCompetitiveMmr(
 
       const byName = await fetchV3MmrByName(reg, gameName, tagLine);
       if (byName?.kind === "ranked") {
-        return { status: "ranked", snapshot: byName.snapshot, region: reg };
+        return {
+          status: "ranked",
+          snapshot: byName.snapshot,
+          region: reg,
+          peak: byName.peak,
+        };
       }
       if (byName?.kind === "unranked") {
         return {
@@ -513,6 +576,7 @@ export async function fetchCompetitiveMmr(
           region: reg,
           gameName: byName.gameName,
           tagLine: byName.tagLine,
+          peak: byName.peak,
         };
       }
     } catch {
@@ -650,8 +714,14 @@ export async function syncUserRank(
   }
 
   let fetched:
-    | { status: "ranked"; snapshot: MmrSnapshot; region: string }
-    | { status: "unranked"; region: string; gameName?: string; tagLine?: string }
+    | { status: "ranked"; snapshot: MmrSnapshot; region: string; peak: HenrikPeakMeta | null }
+    | {
+        status: "unranked";
+        region: string;
+        gameName?: string;
+        tagLine?: string;
+        peak: HenrikPeakMeta | null;
+      }
     | null;
   try {
     fetched = await fetchCompetitiveMmr(
@@ -675,6 +745,7 @@ export async function syncUserRank(
         region,
         gameName: syncName,
         tagLine: syncTag,
+        peak: null,
       };
     }
   }
@@ -712,16 +783,25 @@ export async function syncUserRank(
     return fail("Henrik v2 request failed.");
   }
 
-  if (currentActIsUnranked(v2Bundle)) {
+  // Leaderboard current rank comes from v3. Never let incomplete seasonal /
+  // by_season (losses-only → "No data available") overwrite a ranked v3 result.
+  if (fetched.status !== "ranked" && currentActIsUnranked(v2Bundle)) {
     fetched = {
       status: "unranked",
       region: resolvedRegion,
       gameName: lookupName,
       tagLine: lookupTag,
+      peak: fetched.peak,
     };
   }
 
-  const actFields = lifetimeDbFields(v2Bundle?.lifetime ?? null);
+  const peak = preferPeakMeta(fetched.peak, v2Bundle?.lifetime ?? null);
+  const actFields = {
+    ...lifetimeDbFields(v2Bundle?.lifetime ?? null),
+    peakRankTier: peak.peakRankTier,
+    peakRankTierId: peak.peakRankTierId,
+    peakAct: peak.peakAct,
+  };
 
   // Fallback card fetch by name only when by-puuid account had no card and we want cards.
   let cardLarge = account?.cardLarge;
@@ -825,8 +905,8 @@ export async function syncUserRank(
     }
 
     await syncValorantRankSnapshots(userId, {
-      tier: v2Bundle?.lifetime.peakRankTier ?? null,
-      tierId: v2Bundle?.lifetime.peakRankTierId ?? null,
+      tier: peak.peakRankTier,
+      tierId: peak.peakRankTierId,
     }).catch(() => {});
     return { ok: true };
   }
@@ -873,8 +953,8 @@ export async function syncUserRank(
   }
 
   await syncValorantRankSnapshots(userId, {
-    tier: v2Bundle?.lifetime.peakRankTier ?? null,
-    tierId: v2Bundle?.lifetime.peakRankTierId ?? null,
+    tier: peak.peakRankTier,
+    tierId: peak.peakRankTierId,
   }).catch(() => {});
   return { ok: true };
 }

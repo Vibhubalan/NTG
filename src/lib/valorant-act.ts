@@ -85,7 +85,11 @@ export function getActSeasonStats(
   if (!bySeason) return null;
   for (const key of actSeasonKeyVariants(season)) {
     const stats = bySeason[key];
-    if (stats && typeof stats === "object") return stats;
+    if (!stats || typeof stats !== "object") continue;
+    // Henrik often inserts `{ error: "No data available" }` for acts with no
+    // competitive games. That is not "confirmed Unranked" — treat as missing.
+    if (stats.error) continue;
+    return stats;
   }
   return null;
 }

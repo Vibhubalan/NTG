@@ -3,6 +3,7 @@ import {
   RANK_SYNC_ADMIN_BATCH_SIZE,
   RANK_SYNC_MAX_BATCH_SIZE,
   deriveRankFromV2Act,
+  preferPeakMeta,
   type HenrikV2MmrBundle,
 } from "@tournaments-leagues/application/rank-sync.service";
 
@@ -13,6 +14,43 @@ describe("rank-sync batch config", () => {
 
   it("admin batch size does not exceed max batch size", () => {
     expect(RANK_SYNC_ADMIN_BATCH_SIZE).toBeLessThanOrEqual(RANK_SYNC_MAX_BATCH_SIZE);
+  });
+});
+
+describe("preferPeakMeta", () => {
+  it("prefers v3 peak over v2", () => {
+    expect(
+      preferPeakMeta(
+        {
+          peakRankTier: "Immortal 2",
+          peakRankTierId: 25,
+          peakAct: "e10a3",
+        },
+        {
+          peakRankTier: "Ascendant 1",
+          peakRankTierId: 21,
+          peakAct: "e11a4",
+        },
+      ),
+    ).toEqual({
+      peakRankTier: "Immortal 2",
+      peakRankTierId: 25,
+      peakAct: "e10a3",
+    });
+  });
+
+  it("falls back to v2 when v3 peak is missing", () => {
+    expect(
+      preferPeakMeta(null, {
+        peakRankTier: "Diamond 3",
+        peakRankTierId: 20,
+        peakAct: "e11a4",
+      }),
+    ).toEqual({
+      peakRankTier: "Diamond 3",
+      peakRankTierId: 20,
+      peakAct: "e11a4",
+    });
   });
 });
 
@@ -49,6 +87,19 @@ describe("deriveRankFromV2Act", () => {
               final_rank_patched: "Gold 1",
               final_rank: 12,
             },
+          },
+        }),
+      ),
+    ).toBeNull();
+  });
+
+  it("returns null when Henrik only has an error placeholder for the act", () => {
+    expect(
+      deriveRankFromV2Act(
+        bundle({
+          currentActSeason: "e11a5",
+          bySeason: {
+            e11a5: { error: "No data available" },
           },
         }),
       ),
