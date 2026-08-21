@@ -109,28 +109,26 @@ async function failStaleRun(
     await clearLeaderboardRefreshLock(lockKey);
   }
 
-  if (kind === "daily") {
-    await markLeaderboardCronError({
-      runStartedAt: run.startedAt,
-      currentAct: getEnvValorantActKey(),
-      synced: run.successCount,
-      failed: run.failedCount,
-      pending: Math.max(0, run.totalPlayers - run.successCount - run.failedCount),
-      totalPlayers: run.totalPlayers,
-      errorMessage: message,
-    }).catch(() => {});
-    void notifyLeaderboardSyncComplete({
-      runStartedAt: run.startedAt,
-      finishedAt,
-      synced: run.successCount,
-      failed: run.failedCount,
-      skipped: 0,
-      batches: 0,
-      pending: Math.max(0, run.totalPlayers - run.successCount - run.failedCount),
-      status: "error",
-      errorMessage: message,
-    }).catch(() => {});
-  }
+  await markLeaderboardCronError({
+    runStartedAt: run.startedAt,
+    currentAct: getEnvValorantActKey(),
+    synced: run.successCount,
+    failed: run.failedCount,
+    pending: Math.max(0, run.totalPlayers - run.successCount - run.failedCount),
+    totalPlayers: run.totalPlayers,
+    errorMessage: message,
+  }).catch(() => {});
+  void notifyLeaderboardSyncComplete({
+    runStartedAt: run.startedAt,
+    finishedAt,
+    synced: run.successCount,
+    failed: run.failedCount,
+    skipped: 0,
+    batches: 0,
+    pending: Math.max(0, run.totalPlayers - run.successCount - run.failedCount),
+    status: "error",
+    errorMessage: message,
+  }).catch(() => {});
 }
 
 async function resumeRunningRefresh(
@@ -288,26 +286,24 @@ async function processRunSegment(
     await setLeaderboardLastCompletedRefresh(finishedAt);
     await clearLeaderboardRefreshLock(lockKey);
 
-    if (kind === "daily") {
-      await markLeaderboardCronComplete({
-        runStartedAt: run.startedAt,
-        currentAct,
-        synced: successCount,
-        failed: failedCount,
-        skipped: 0,
-        totalPlayers,
-      }).catch(() => {});
-      void notifyLeaderboardSyncComplete({
-        runStartedAt: run.startedAt,
-        finishedAt,
-        synced: successCount,
-        failed: failedCount,
-        skipped: 0,
-        batches: processedThisSegment,
-        pending: 0,
-        status: "ok",
-      }).catch(() => {});
-    }
+    await markLeaderboardCronComplete({
+      runStartedAt: run.startedAt,
+      currentAct,
+      synced: successCount,
+      failed: failedCount,
+      skipped: 0,
+      totalPlayers,
+    }).catch(() => {});
+    void notifyLeaderboardSyncComplete({
+      runStartedAt: run.startedAt,
+      finishedAt,
+      synced: successCount,
+      failed: failedCount,
+      skipped: 0,
+      batches: processedThisSegment,
+      pending: 0,
+      status: "ok",
+    }).catch(() => {});
 
     console.info(`${prefix} complete`, {
       runId,
@@ -342,17 +338,15 @@ async function processRunSegment(
     },
   });
 
-  if (kind === "daily") {
-    await markLeaderboardCronProgress({
-      runStartedAt: run.startedAt,
-      currentAct,
-      synced: successCount,
-      failed: failedCount,
-      skipped: 0,
-      pending,
-      totalPlayers,
-    }).catch(() => {});
-  }
+  await markLeaderboardCronProgress({
+    runStartedAt: run.startedAt,
+    currentAct,
+    synced: successCount,
+    failed: failedCount,
+    skipped: 0,
+    pending,
+    totalPlayers,
+  }).catch(() => {});
 
   return {
     status: "continued",
@@ -450,6 +444,28 @@ export async function runLeaderboardRefresh(
     };
   }
 
+  // Hourly must not start while a daily full refresh is still running.
+  if (kind === "hourly") {
+    const dailyRunning = await getRunningRun("daily");
+    if (dailyRunning) {
+      return {
+        status: "skipped",
+        reason: "daily_running",
+        runId: dailyRunning.id,
+        totalPlayers: dailyRunning.totalPlayers,
+        processed: dailyRunning.successCount + dailyRunning.failedCount,
+        successCount: dailyRunning.successCount,
+        failedCount: dailyRunning.failedCount,
+        pending: Math.max(
+          0,
+          dailyRunning.totalPlayers - dailyRunning.successCount - dailyRunning.failedCount,
+        ),
+        henrikRequestCount: dailyRunning.henrikRequestCount,
+        complete: false,
+      };
+    }
+  }
+
   const staleRun = await getRunningRun(kind);
   if (staleRun) {
     if (kind === "daily") {
@@ -513,18 +529,16 @@ export async function runLeaderboardRefresh(
     };
   }
 
-  if (kind === "daily") {
-    void markLeaderboardCronStarted({
-      runStartedAt: run.startedAt,
-      currentAct,
-      totalPlayers: allIds.length,
-    }).catch(() => {});
-    void notifyLeaderboardSyncStarted({
-      runStartedAt: run.startedAt,
-      totalPlayers: allIds.length,
-      currentAct,
-    }).catch(() => {});
-  }
+  void markLeaderboardCronStarted({
+    runStartedAt: run.startedAt,
+    currentAct,
+    totalPlayers: allIds.length,
+  }).catch(() => {});
+  void notifyLeaderboardSyncStarted({
+    runStartedAt: run.startedAt,
+    totalPlayers: allIds.length,
+    currentAct,
+  }).catch(() => {});
 
   console.info(`${prefix} started`, {
     runId: run.id,
@@ -549,13 +563,13 @@ export async function runDailyLeaderboardRefresh(
 }
 
 /**
- * Repairs stale daily runs that are fully processed but left RUNNING due to an invocation timeout
+ * Repairs runs that are fully processed but left RUNNING due to an invocation timeout
  * between progress/write and completion/finalize steps.
  */
-export async function reconcileStaleDailyRefreshRun(): Promise<void> {
+async function reconcileStaleRefreshRun(kind: LeaderboardRefreshKind): Promise<void> {
   const run = await prisma.leaderboardRefreshRun.findFirst({
     where: {
-      kind: LeaderboardRefreshRunKind.DAILY,
+      kind: prismaKind(kind),
       status: LeaderboardRefreshRunStatus.RUNNING,
     },
     orderBy: { startedAt: "desc" },
@@ -578,7 +592,7 @@ export async function reconcileStaleDailyRefreshRun(): Promise<void> {
   });
 
   await setLeaderboardLastCompletedRefresh(finishedAt);
-  await clearLeaderboardRefreshLock(LEADERBOARD_DAILY_REFRESH_LOCK_KEY);
+  await clearLeaderboardRefreshLock(lockKeyForKind(kind));
 
   await markLeaderboardCronComplete({
     runStartedAt: run.startedAt,
@@ -588,6 +602,12 @@ export async function reconcileStaleDailyRefreshRun(): Promise<void> {
     skipped: 0,
     totalPlayers: run.totalPlayers,
   }).catch(() => {});
+}
+
+/** Prefer hourly; also heals any leftover daily emergency runs. */
+export async function reconcileStaleDailyRefreshRun(): Promise<void> {
+  await reconcileStaleRefreshRun("hourly");
+  await reconcileStaleRefreshRun("daily");
 }
 
 export async function listLeaderboardRefreshRuns(

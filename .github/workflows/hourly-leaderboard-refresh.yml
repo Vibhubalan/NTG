@@ -1,20 +1,36 @@
-name: Daily leaderboard refresh
+name: Hourly leaderboard refresh
 
 on:
-  # Manual / emergency full sync via /api/cron/sync-ranks (daily kind).
-  # Primary board refresh is hourly-leaderboard-refresh.yml (6 AM–3 AM IST).
+  # 6:00 AM → 3:00 AM IST (quiet 4–6 AM). IST = UTC+5:30 → :30 past each UTC hour 0–21.
+  schedule:
+    - cron: "30 0-21 * * *"
+  # Vercel cron at 6:00 AM IST also dispatches this workflow.
   workflow_dispatch:
 
 concurrency:
-  group: daily-leaderboard-refresh
+  group: hourly-leaderboard-refresh
   cancel-in-progress: false
 
 jobs:
   refresh:
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 55
     steps:
-      - name: Run full leaderboard sync
+      - name: Skip during IST quiet window (4–6 AM)
+        id: gate
+        run: |
+          set -euo pipefail
+          HOUR_IST="$(TZ=Asia/Kolkata date +%H)"
+          echo "IST hour=${HOUR_IST}"
+          if [ "$HOUR_IST" = "04" ] || [ "$HOUR_IST" = "05" ]; then
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            echo "Quiet window — skipping hourly refresh."
+          else
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Run full leaderboard sync (hourly)
+        if: steps.gate.outputs.skip != 'true'
         env:
           SITE_URL: ${{ secrets.SITE_URL }}
           CRON_SECRET: ${{ secrets.CRON_SECRET }}
@@ -26,22 +42,20 @@ jobs:
             exit 1
           fi
 
-          # Strip whitespace, CR/LF, and accidental wrapping quotes from secret values.
           SITE_URL="$(printf '%s' "$SITE_URL" | tr -d '\r\n' | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//' -e 's/^"//' -e 's/"$//' -e "s/^'//" -e "s/'$//")"
           CRON_SECRET="$(printf '%s' "$CRON_SECRET" | tr -d '\r\n' | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//' -e 's/^"//' -e 's/"$//' -e "s/^'//" -e "s/'$//")"
 
           if ! printf '%s' "$SITE_URL" | grep -qE '^https?://[^[:space:]]+$'; then
             echo "SITE_URL secret is malformed."
             echo "Set it to: https://www.ntgesports.com"
-            echo "No quotes, no trailing slash, no spaces or newlines."
             exit 1
           fi
 
-          BASE="${SITE_URL%/}/api/cron/sync-ranks"
+          BASE="${SITE_URL%/}/api/cron/leaderboard-hourly"
           AUTH_HEADER="$(printf 'Authorization: Bearer %s' "$CRON_SECRET")"
-          echo "Calling ${BASE} (SITE_URL length: ${#SITE_URL}, CRON_SECRET length: ${#CRON_SECRET})"
+          echo "Calling ${BASE}"
           ATTEMPTS=0
-          MAX_ATTEMPTS=80
+          MAX_ATTEMPTS=100
           MODE="start"
           COMPLETE="false"
 
@@ -57,11 +71,18 @@ jobs:
             echo ""
 
             if [ "$HTTP_CODE" -ge 400 ]; then
+              if [ "$HTTP_CODE" -eq 503 ]; then
+                ERR=$(jq -r '.error // empty' /tmp/sync-response.json)
+                if printf '%s' "$ERR" | grep -qi 'not enabled'; then
+                  echo "Hourly refresh is not enabled on this deployment (set LEADERBOARD_HOURLY_REFRESH_ENABLED=true)."
+                  exit 1
+                fi
+              fi
               if [ "$HTTP_CODE" -eq 504 ] || [ "$HTTP_CODE" -eq 502 ] || [ "$HTTP_CODE" -eq 503 ]; then
-                echo "HTTP ${HTTP_CODE} — function timed out or gateway error; retrying with mode=continue."
+                echo "HTTP ${HTTP_CODE} — retrying with mode=continue."
                 MODE="continue"
                 ATTEMPTS=$((ATTEMPTS + 1))
-                sleep 15
+                sleep 10
                 continue
               fi
               echo "HTTP ${HTTP_CODE} from sync endpoint"
@@ -78,29 +99,37 @@ jobs:
             fi
 
             if [ "$COMPLETE" = "true" ] || [ "$STATUS" = "complete" ]; then
-              echo "Leaderboard refresh complete."
+              echo "Hourly leaderboard refresh complete."
               exit 0
             fi
 
-            if [ "$STATUS" = "skipped" ] && [ "$REASON" = "no_active_run" ] && [ "$MODE" = "continue" ]; then
-              echo "No active run to continue — starting a fresh sync."
-              MODE="start"
-              ATTEMPTS=$((ATTEMPTS + 1))
-              sleep 5
-              continue
-            fi
-
-            if [ "$STATUS" = "skipped" ] && [ "$REASON" = "lock_missing" ]; then
-              echo "Refresh lock missing — retrying continue after recovery."
-              MODE="continue"
-              ATTEMPTS=$((ATTEMPTS + 1))
-              sleep 5
-              continue
+            if [ "$STATUS" = "skipped" ]; then
+              case "$REASON" in
+                quiet_window_ist|already_running|daily_running)
+                  echo "Skipped (${REASON}) — exiting successfully."
+                  exit 0
+                  ;;
+                no_active_run)
+                  if [ "$MODE" = "continue" ]; then
+                    echo "No active run — starting fresh."
+                    MODE="start"
+                    ATTEMPTS=$((ATTEMPTS + 1))
+                    sleep 5
+                    continue
+                  fi
+                  ;;
+                lock_missing)
+                  MODE="continue"
+                  ATTEMPTS=$((ATTEMPTS + 1))
+                  sleep 5
+                  continue
+                  ;;
+              esac
             fi
 
             MODE="continue"
             ATTEMPTS=$((ATTEMPTS + 1))
-            sleep 15
+            sleep 10
           done
 
           echo "Exceeded max continue attempts (${MAX_ATTEMPTS})."

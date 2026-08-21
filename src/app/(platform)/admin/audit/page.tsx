@@ -1,5 +1,5 @@
 import AdminAuditLogPanel from "@/components/admin/AdminAuditLogPanel";
-import DailyRefreshRunsPanel from "@/components/admin/DailyRefreshRunsPanel";
+import HourlyRefreshRunsPanel from "@/components/admin/HourlyRefreshRunsPanel";
 import RankChangeAuditPanel from "@/components/admin/RankChangeAuditPanel";
 import { getSession } from "@core/auth/session";
 import { isSuperAdminEmail } from "@/lib/superadmin";
@@ -21,14 +21,14 @@ export default async function AdminAuditPage() {
           System Audit
         </h1>
         <p className="mt-1.5 max-w-xl text-sm text-white/40">
-          Track system changes, daily synchronizations, and player activities.
+          Track system changes, hourly leaderboard syncs, and player activities.
         </p>
       </div>
 
       {/* Stack of Logs */}
       <div className="space-y-8">
         <AdminAuditLogPanel />
-        {isSuperAdmin && <DailyRefreshRunsPanel />}
+        {isSuperAdmin && <HourlyRefreshRunsPanel />}
         {isSuperAdmin && <RankChangeAuditPanel />}
       </div>
     </div>

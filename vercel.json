@@ -12,6 +12,9 @@
     },
     "src/app/api/cron/trigger-daily-leaderboard/route.ts": {
       "maxDuration": 30
+    },
+    "src/app/api/cron/trigger-hourly-leaderboard/route.ts": {
+      "maxDuration": 30
     }
   },
   "crons": [
@@ -20,8 +23,8 @@
       "schedule": "0 19 * * *"
     },
     {
-      "path": "/api/cron/trigger-daily-leaderboard",
-      "schedule": "0 21 * * *"
+      "path": "/api/cron/trigger-hourly-leaderboard",
+      "schedule": "30 0 * * *"
     }
   ]
 }
