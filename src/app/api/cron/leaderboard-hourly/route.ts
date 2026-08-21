@@ -1,10 +1,11 @@
 import { isCronAuthorized } from "@/lib/cron-auth";
+import { isLeaderboardQuietWindowIst } from "@/lib/leaderboard-quiet-window";
 import { serverEnv } from "@core/config/env.server";
 import { runHourlyLeaderboardRefresh } from "@tournaments-leagues/application/leaderboard-hourly-refresh.service";
 import { NextResponse } from "next/server";
 
 export const dynamic = "force-dynamic";
-/** Process ~7–8 players per segment (3 Henrik calls each, 26/min). */
+/** Process players in segments (3 Henrik calls each). GHA calls mode=continue until complete. */
 export const maxDuration = 60;
 
 export async function GET(req: Request) {
@@ -31,10 +32,25 @@ export async function GET(req: Request) {
   const modeParam = searchParams.get("mode");
   const mode = modeParam === "continue" ? "continue" : "start";
 
+  // Quiet window 4–6 AM IST: do not start a new full board; allow continue to finish.
+  if (mode === "start" && isLeaderboardQuietWindowIst()) {
+    return NextResponse.json({
+      ok: true,
+      status: "skipped",
+      reason: "quiet_window_ist",
+      complete: false,
+      totalPlayers: 0,
+      processed: 0,
+      successCount: 0,
+      failedCount: 0,
+      pending: 0,
+      henrikRequestCount: 0,
+    });
+  }
+
   try {
     const result = await runHourlyLeaderboardRefresh(mode);
-    const status =
-      result.status === "error" ? 500 : result.status === "skipped" ? 200 : 200;
+    const status = result.status === "error" ? 500 : 200;
 
     return NextResponse.json({ ok: result.status !== "error", ...result }, { status });
   } catch (err) {

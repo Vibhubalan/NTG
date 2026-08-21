@@ -77,7 +77,7 @@ function buildEmailHtml(payload: LeaderboardSyncNotifyPayload, siteUrl: string):
         <a href="${siteUrl}/esports/leaderboard" style="color:#0891b2">View leaderboard</a>
       </p>
       <p style="margin:24px 0 0;color:#888;font-size:12px">
-        Daily cron: Vercel <code>/api/cron/sync-ranks</code>. Disable with LEADERBOARD_SYNC_NOTIFY=0.
+        Hourly cron: GitHub Actions → <code>/api/cron/leaderboard-hourly</code>. Disable with LEADERBOARD_SYNC_NOTIFY=0.
       </p>
     </div>
   `;

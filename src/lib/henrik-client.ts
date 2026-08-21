@@ -1,7 +1,18 @@
 import { serverEnv } from "@core/config/env.server";
 
-/** Henrik free tier ≈ 30 req/min — stay under 26/min globally. */
-export const HENRIK_MAX_REQUESTS_PER_MINUTE = 26;
+/**
+ * Henrik extended free tier ≈ 60 req/min.
+ * Default 55 leaves headroom for admin sync / match scan / retries.
+ * Override with HENRIK_MAX_REQUESTS_PER_MINUTE (1–60).
+ */
+function resolveHenrikMaxPerMinute(): number {
+  const raw = process.env.HENRIK_MAX_REQUESTS_PER_MINUTE?.trim();
+  const parsed = raw ? Number.parseInt(raw, 10) : 55;
+  if (!Number.isFinite(parsed) || parsed < 1) return 55;
+  return Math.min(60, parsed);
+}
+
+export const HENRIK_MAX_REQUESTS_PER_MINUTE = resolveHenrikMaxPerMinute();
 const WINDOW_MS = 60_000;
 const MIN_GAP_MS = Math.ceil(WINDOW_MS / HENRIK_MAX_REQUESTS_PER_MINUTE);
 export const HENRIK_MIN_GAP_MS = MIN_GAP_MS;
@@ -89,8 +100,8 @@ export function henrikHeaders(): Record<string, string> {
 }
 
 /**
- * Serialized Henrik API fetch with global 26/min rate limit (Upstash or per-instance gap).
- * Retries on 429 with Retry-After backoff.
+ * Serialized Henrik API fetch with global rate limit (Upstash or per-instance gap).
+ * Default ~55/min for extended tier; Retries on 429 with Retry-After backoff.
  */
 export function henrikFetch(
   url: string,

@@ -52,9 +52,13 @@ export const serverEnv = {
   get cronSecret() {
     return optional("CRON_SECRET");
   },
-  /** Enable /api/cron/leaderboard-hourly (staging + cron-job.org). */
+  /** Enable /api/cron/leaderboard-hourly (prod + local). */
   get leaderboardHourlyRefreshEnabled() {
     return optional("LEADERBOARD_HOURLY_REFRESH_ENABLED") === "true";
+  },
+  /** Optional override for Henrik global rate limit (default 55, max 60). */
+  get henrikMaxRequestsPerMinute() {
+    return optional("HENRIK_MAX_REQUESTS_PER_MINUTE");
   },
   get youtubeChannelId() {
     return optional("YOUTUBE_CHANNEL_ID");

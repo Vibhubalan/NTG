@@ -163,14 +163,14 @@ export default function AdminLeaderboardSyncPanel({
       const key = `${nextCron.runStartedAt}:${nextCron.phase}`;
       if (prev !== key) {
         if (nextCron.phase === "running" && !prev?.endsWith(":running")) {
-          setCronFlash("Daily cron started. Refreshing all linked players…");
+          setCronFlash("Hourly cron started. Refreshing all linked players…");
           setDismissedCronRunId(null);
         } else if (nextCron.phase === "complete" && !prev?.endsWith(":complete")) {
           setCronFlash(
-            `Daily cron finished. ${nextCron.synced} refreshed${nextCron.failed > 0 ? `, ${nextCron.failed} failed` : ""}.`,
+            `Hourly cron finished. ${nextCron.synced} refreshed${nextCron.failed > 0 ? `, ${nextCron.failed} failed` : ""}.`,
           );
         } else if (nextCron.phase === "error" && !prev?.endsWith(":error")) {
-          setCronFlash(nextCron.errorMessage ?? "Daily cron failed.");
+          setCronFlash(nextCron.errorMessage ?? "Hourly cron failed.");
         }
         prevCronPhaseRef.current = key;
       }
@@ -283,8 +283,8 @@ export default function AdminLeaderboardSyncPanel({
           </p>
           <h2 className="mt-1 font-display text-xl font-bold text-white">Rank sync</h2>
           <p className="mt-1 max-w-lg text-sm text-white/45">
-            Ranks sync when members link Riot on their profile or register for a cup. The automatic daily
-            refresh updates rank, MMR, and player cards for every linked player.
+            Ranks sync when members link Riot on their profile or register for a cup. The automatic hourly
+            refresh updates rank, MMR, and player cards for every linked player (6 AM–3 AM IST).
           </p>
         </div>
         <Link
@@ -325,10 +325,10 @@ export default function AdminLeaderboardSyncPanel({
                   </span>
                 ) : null}
                 {cronRun.phase === "running"
-                  ? "Daily cron running"
+                  ? "Hourly cron running"
                   : cronRun.phase === "complete"
-                    ? "Daily cron complete"
-                    : "Daily cron failed"}
+                    ? "Hourly cron complete"
+                    : "Hourly cron failed"}
               </p>
               <p className="mt-1 text-xs text-white/50">
                 Started {formatWhen(cronRun.runStartedAt)}
