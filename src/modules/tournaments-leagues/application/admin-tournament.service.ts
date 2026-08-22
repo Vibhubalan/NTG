@@ -2,7 +2,6 @@ import { prisma } from "@core/database/client";
 import { safeExpireTag } from "@/lib/safe-revalidate";
 import { tournamentDetailTag } from "./tournament.service";
 import type { PrizeSplitRow } from "@core/contracts";
-import type { PrizePoolMode } from "@prisma/client";
 import type {
   BracketType,
   GameSlug,
