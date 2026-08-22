@@ -133,7 +133,7 @@ export async function dispatchDailyLeaderboardWorkflow(
 }
 
 /**
- * Triggers the hourly full-board GitHub Actions workflow (6 AM IST kick from Vercel).
+ * Triggers the hourly full-board GitHub Actions workflow (staging/manual only).
  */
 export async function dispatchHourlyLeaderboardWorkflow(): Promise<DispatchHourlyLeaderboardResult> {
   return dispatchWorkflow(HOURLY_WORKFLOW_FILE, {

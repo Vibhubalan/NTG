@@ -7,13 +7,7 @@
     "src/app/api/cron/sync-ranks/route.ts": {
       "maxDuration": 60
     },
-    "src/app/api/cron/leaderboard-hourly/route.ts": {
-      "maxDuration": 60
-    },
     "src/app/api/cron/trigger-daily-leaderboard/route.ts": {
-      "maxDuration": 30
-    },
-    "src/app/api/cron/trigger-hourly-leaderboard/route.ts": {
       "maxDuration": 30
     }
   },
@@ -23,8 +17,8 @@
       "schedule": "0 19 * * *"
     },
     {
-      "path": "/api/cron/trigger-hourly-leaderboard",
-      "schedule": "30 0 * * *"
+      "path": "/api/cron/trigger-daily-leaderboard",
+      "schedule": "0 21 * * *"
     }
   ]
 }

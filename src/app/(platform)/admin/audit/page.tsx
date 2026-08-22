@@ -21,7 +21,7 @@ export default async function AdminAuditPage() {
           System Audit
         </h1>
         <p className="mt-1.5 max-w-xl text-sm text-white/40">
-          Track system changes, hourly leaderboard syncs, and player activities.
+          Track system changes, daily leaderboard syncs, and player activities.
         </p>
       </div>
 

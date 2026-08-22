@@ -100,7 +100,7 @@ function formatDuration(ms: number | null): string {
 function sourceLabel(source: string): string {
   switch (source) {
     case "HOURLY_CRON":
-      return "Hourly cron";
+      return "Daily cron";
     case "CRON":
       return "Daily cron";
     case "MANUAL":
@@ -163,14 +163,14 @@ export default function AdminLeaderboardSyncPanel({
       const key = `${nextCron.runStartedAt}:${nextCron.phase}`;
       if (prev !== key) {
         if (nextCron.phase === "running" && !prev?.endsWith(":running")) {
-          setCronFlash("Hourly cron started. Refreshing all linked players…");
+          setCronFlash("Daily cron started. Refreshing all linked players…");
           setDismissedCronRunId(null);
         } else if (nextCron.phase === "complete" && !prev?.endsWith(":complete")) {
           setCronFlash(
-            `Hourly cron finished. ${nextCron.synced} refreshed${nextCron.failed > 0 ? `, ${nextCron.failed} failed` : ""}.`,
+            `Daily cron finished. ${nextCron.synced} refreshed${nextCron.failed > 0 ? `, ${nextCron.failed} failed` : ""}.`,
           );
         } else if (nextCron.phase === "error" && !prev?.endsWith(":error")) {
-          setCronFlash(nextCron.errorMessage ?? "Hourly cron failed.");
+          setCronFlash(nextCron.errorMessage ?? "Daily cron failed.");
         }
         prevCronPhaseRef.current = key;
       }
@@ -283,8 +283,8 @@ export default function AdminLeaderboardSyncPanel({
           </p>
           <h2 className="mt-1 font-display text-xl font-bold text-white">Rank sync</h2>
           <p className="mt-1 max-w-lg text-sm text-white/45">
-            Ranks sync when members link Riot on their profile or register for a cup. The automatic hourly
-            refresh updates rank, MMR, and player cards for every linked player (6 AM–3 AM IST).
+            Ranks sync when members link Riot on their profile or register for a cup. The automatic daily
+            refresh updates rank, MMR, and player cards for every linked player at 2:30 AM IST.
           </p>
         </div>
         <Link
@@ -325,10 +325,10 @@ export default function AdminLeaderboardSyncPanel({
                   </span>
                 ) : null}
                 {cronRun.phase === "running"
-                  ? "Hourly cron running"
+                  ? "Daily cron running"
                   : cronRun.phase === "complete"
-                    ? "Hourly cron complete"
-                    : "Hourly cron failed"}
+                    ? "Daily cron complete"
+                    : "Daily cron failed"}
               </p>
               <p className="mt-1 text-xs text-white/50">
                 Started {formatWhen(cronRun.runStartedAt)}
@@ -383,6 +383,9 @@ export default function AdminLeaderboardSyncPanel({
         <div className="rounded-xl border border-white/[0.06] bg-white/[0.02] px-4 py-3">
           <dt className="text-[10px] uppercase tracking-wider text-white/40">Last sync</dt>
           <dd className="mt-1 text-sm font-medium text-white/80">{formatWhen(stats?.lastSyncedAt ?? null)}</dd>
+          {stats?.cronScheduleIst ? (
+            <p className="mt-1 text-[10px] text-white/35">{stats.cronScheduleIst}</p>
+          ) : null}
         </div>
       </dl>
 

@@ -1,10 +1,8 @@
 name: Hourly leaderboard refresh
 
 on:
-  # 6:00 AM → 3:00 AM IST (quiet 4–6 AM). IST = UTC+5:30 → :30 past each UTC hour 0–21.
-  schedule:
-    - cron: "30 0-21 * * *"
-  # Vercel cron at 6:00 AM IST also dispatches this workflow.
+  # Production uses daily-leaderboard-refresh.yml at 2:30 AM IST.
+  # Keep this workflow for manual/staging use only — do not schedule it.
   workflow_dispatch:
 
 concurrency:

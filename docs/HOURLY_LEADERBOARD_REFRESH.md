@@ -1,6 +1,8 @@
-# Hourly leaderboard refresh (staging)
+# Hourly leaderboard refresh (staging only)
 
-Refreshes all linked Valorant players every hour at **:50**, using external [cron-job.org](https://cron-job.org) jobs against `/api/cron/leaderboard-hourly`. Production daily cron (`/api/cron/sync-ranks`) is unchanged.
+Production uses a **daily** refresh at **2:30 AM IST** (`/api/cron/sync-ranks`). Do not enable `LEADERBOARD_HOURLY_REFRESH_ENABLED` on production.
+
+Staging can still refresh hourly at **:50** via [cron-job.org](https://cron-job.org) against `/api/cron/leaderboard-hourly`.
 
 ## What you need to provide
 

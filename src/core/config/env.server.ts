@@ -52,7 +52,7 @@ export const serverEnv = {
   get cronSecret() {
     return optional("CRON_SECRET");
   },
-  /** Enable /api/cron/leaderboard-hourly (prod + local). */
+  /** Enable /api/cron/leaderboard-hourly (staging only; production uses daily 2:30 AM IST). */
   get leaderboardHourlyRefreshEnabled() {
     return optional("LEADERBOARD_HOURLY_REFRESH_ENABLED") === "true";
   },

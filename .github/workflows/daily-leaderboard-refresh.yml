@@ -1,8 +1,8 @@
 name: Daily leaderboard refresh
 
 on:
-  # Manual / emergency full sync via /api/cron/sync-ranks (daily kind).
-  # Primary board refresh is hourly-leaderboard-refresh.yml (6 AM–3 AM IST).
+  # Started by Vercel cron at 2:30 AM IST (`0 21 * * *` UTC) via /api/cron/trigger-daily-leaderboard.
+  # Use "Run workflow" for a manual full refresh.
   workflow_dispatch:
 
 concurrency:

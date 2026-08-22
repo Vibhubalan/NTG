@@ -58,13 +58,13 @@ export default function HourlyRefreshRunsPanel() {
   const loadRefreshRuns = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await fetch("/api/admin/leaderboard/refresh-runs?limit=15&kind=hourly");
+      const res = await fetch("/api/admin/leaderboard/refresh-runs?limit=15&kind=daily");
       const parsed = await parseApiJson(res);
       if (!parsed.ok || !res.ok) return;
       setRefreshRuns((parsed.data.runs as RefreshRunRow[]) ?? []);
       setLastCompletedRefreshAt((parsed.data.lastCompletedRefreshAt as string | null) ?? null);
     } catch (e) {
-      console.error("Failed to load hourly refresh runs", e);
+      console.error("Failed to load daily refresh runs", e);
     } finally {
       setLoading(false);
     }
@@ -79,9 +79,9 @@ export default function HourlyRefreshRunsPanel() {
       <div className="flex items-start justify-between border-b border-white/[0.06] pb-4 shrink-0">
         <div>
           <p className="text-[10px] font-bold uppercase tracking-widest text-cyan-400/90">Leaderboard Cron</p>
-          <h3 className="mt-1 font-display text-base font-bold text-white">Hourly refresh runs</h3>
+          <h3 className="mt-1 font-display text-base font-bold text-white">Daily refresh runs</h3>
           <p className="mt-0.5 text-[10px] text-white/40">
-            Full board · 6 AM–3 AM IST (quiet 4–6 AM) · Last completed:{" "}
+            Full board · 2:30 AM IST · Last completed:{" "}
             <span className="font-semibold text-white/60">{formatWhen(lastCompletedRefreshAt)}</span>
           </p>
         </div>
@@ -109,7 +109,7 @@ export default function HourlyRefreshRunsPanel() {
             {refreshRuns.length === 0 ? (
               <tr>
                 <td colSpan={4} className="px-3 py-6 text-center text-white/35">
-                  {loading ? "Loading runs…" : "No hourly runs yet."}
+                  {loading ? "Loading runs…" : "No daily runs yet."}
                 </td>
               </tr>
             ) : (
