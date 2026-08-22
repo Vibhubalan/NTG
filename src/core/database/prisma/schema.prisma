@@ -63,6 +63,11 @@ enum TournamentFormat {
   DUO
 }
 
+enum PrizePoolMode {
+  MANUAL
+  DYNAMIC
+}
+
 enum RegistrationGameIntent {
   VALORANT
   CS2
@@ -380,6 +385,9 @@ model Tournament {
   hubCarouselImages    Json?
   showOnEsportsHub     Boolean           @default(false)
   prizePool            Decimal?          @db.Decimal(10, 2)
+  /** MANUAL = admin-set total. DYNAMIC = prizePerPlayer × approved registrations. */
+  prizePoolMode        PrizePoolMode      @default(MANUAL)
+  prizePerPlayer       Decimal?          @db.Decimal(10, 2)
   prizeNotes           String?
   prizeSplit           Json?
   startsAt             DateTime?

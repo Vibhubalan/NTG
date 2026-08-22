@@ -8,6 +8,7 @@ import { teamNamesMatch } from "@/lib/tournament-champion";
 import { pickRiotPlayerCardFields } from "@/lib/valorant-player-card";
 import { isTournamentRegistrationLive } from "../domain/registration-window";
 import { slugWhere } from "@/lib/slug-utils";
+import { computeDisplayedPrizePool } from "@/lib/prize-pool";
 
 function parsePrizeSplit(value: unknown): PrizeSplitRow[] | null {
   if (!Array.isArray(value)) return null;
@@ -512,9 +513,18 @@ export class TournamentRepository {
       posterUrl: t.posterUrl,
       startsAt: t.startsAt?.toISOString() ?? null,
       endsAt: t.endsAt?.toISOString() ?? null,
-      prizePool: t.prizePool?.toString() ?? null,
+      prizePoolMode: t.prizePoolMode ?? "MANUAL",
+      prizePerPlayer: t.prizePerPlayer?.toString() ?? null,
+      prizePool:
+        computeDisplayedPrizePool({
+          mode: t.prizePoolMode ?? "MANUAL",
+          manualAmount: t.prizePool != null ? Number(t.prizePool) : null,
+          perPlayer: t.prizePerPlayer != null ? Number(t.prizePerPlayer) : null,
+          registeredCount: allRegs.length,
+        })?.toString() ?? null,
       prizeNotes: t.prizeNotes,
-      prizeSplit: parsePrizeSplit(t.prizeSplit),
+      prizeSplit: t.prizePoolMode === "DYNAMIC" ? null : parsePrizeSplit(t.prizeSplit),
+      registrationCount: allRegs.length,
       registrationOpen: isRegistrationOpen(t),
       registrationOpensAt: t.registrationOpensAt?.toISOString() ?? null,
       registrationClosesAt: t.registrationClosesAt?.toISOString() ?? null,
@@ -575,7 +585,6 @@ export class TournamentRepository {
               `Slot ${p.slot}`,
           })),
         })) ?? [],
-      registrationCount: t._count.registrations,
       // Personalized per-request in tournament.service.ts from registrationRoleByUserId.
       userRegistered: false,
       userParticipantRole: null,

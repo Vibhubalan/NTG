@@ -76,7 +76,7 @@ export function formatValorantRolesList(roles: ValorantRole[]): string | null {
   return roles.map((r) => VALORANT_ROLE_LABELS[r] ?? r).join(", ");
 }
 
-/** Roles from live profile (user-editable); rank from synced leaderboard, then snapshot. */
+/** Roles from live profile (user-editable); current rank from leaderboard, then snapshot. */
 export function displayValorantRegistration(
   profile: { valorantRoles: ValorantRole[] } | null | undefined,
   leaderboard: { rankTier: string | null; rankTierId: number | null } | null | undefined,
@@ -91,17 +91,34 @@ export function displayValorantRegistration(
     : [];
   const roles = profile?.valorantRoles?.length ? profile.valorantRoles : snapshotRoles;
 
-  // Prefer the live rank when the player is actually ranked; otherwise fall back to the
-  // snapshot, which already holds their peak (or last-known) rank.
-  const liveRanked =
-    (leaderboard?.rankTierId ?? 0) > 0 &&
-    !!leaderboard?.rankTier &&
-    leaderboard.rankTier.trim().toLowerCase() !== "unranked";
-
   return {
     valorantRoles: formatValorantRolesList(roles),
-    rankTier: liveRanked ? leaderboard!.rankTier : snapshot?.rankTier ?? leaderboard?.rankTier ?? null,
+    rankTier: displayCurrentValorantRank(leaderboard, snapshot?.rankTier ?? null),
   };
+}
+
+/**
+ * Admin/current-rank display. Auction bidding still uses peak when current is Unranked.
+ * If the live board has a current rank (including Unranked), show that — never substitute peak.
+ */
+export function displayCurrentValorantRank(
+  leaderboard: { rankTier: string | null; rankTierId: number | null } | null | undefined,
+  snapshotRankTier?: string | null,
+): string | null {
+  const hasLiveCurrent =
+    leaderboard != null &&
+    (leaderboard.rankTierId != null || Boolean(leaderboard.rankTier?.trim()));
+  if (!hasLiveCurrent) return snapshotRankTier ?? null;
+
+  const id = leaderboard.rankTierId;
+  const name = leaderboard.rankTier?.trim() ?? "";
+  const unranked =
+    (id != null && id <= 0) ||
+    !name ||
+    name.toLowerCase() === "unranked" ||
+    name.toLowerCase() === "unused";
+  if (unranked) return "Unranked";
+  return name;
 }
 
 function isRankNa(value: string | null | undefined): boolean {

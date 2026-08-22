@@ -85,6 +85,8 @@ type TournamentData = {
   prizePool: string | null;
   prizeNotes: string | null;
   prizeSplit: PrizeSplitRow[] | null;
+  prizePoolMode?: "MANUAL" | "DYNAMIC";
+  prizePerPlayer?: string | null;
   startsAt: string | null;
   endsAt: string | null;
   registrationOpensAt: string | null;
@@ -208,7 +210,12 @@ function getSavePayload(form: TournamentData) {
     showOnEsportsHub: form.showOnEsportsHub,
     prizePool: form.prizePool ? Number(form.prizePool) : null,
     prizeNotes: emptyToNull(form.prizeNotes),
-    prizeSplit: prizeSplitForSave(form.prizePool, form.prizeSplit, defaultSplit),
+    prizeSplit:
+      (form.prizePoolMode ?? "MANUAL") === "DYNAMIC"
+        ? form.prizeSplit
+        : prizeSplitForSave(form.prizePool, form.prizeSplit, defaultSplit),
+    prizePoolMode: form.prizePoolMode ?? "MANUAL",
+    prizePerPlayer: form.prizePerPlayer ? Number(form.prizePerPlayer) : null,
     startsAt: form.startsAt || null,
     endsAt: form.endsAt || null,
     registrationOpensAt: form.registrationOpensAt || null,
@@ -684,7 +691,12 @@ export default function AdminTournamentEditor({
           showOnEsportsHub: form.showOnEsportsHub,
           prizePool: form.prizePool ? Number(form.prizePool) : null,
           prizeNotes: emptyToNull(form.prizeNotes),
-          prizeSplit: prizeSplitForSave(form.prizePool, form.prizeSplit, defaultSplit),
+          prizeSplit:
+            (form.prizePoolMode ?? "MANUAL") === "DYNAMIC"
+              ? form.prizeSplit
+              : prizeSplitForSave(form.prizePool, form.prizeSplit, defaultSplit),
+          prizePoolMode: form.prizePoolMode ?? "MANUAL",
+          prizePerPlayer: form.prizePerPlayer ? Number(form.prizePerPlayer) : null,
           startsAt: form.startsAt || null,
           endsAt: form.endsAt || null,
           registrationOpensAt: form.registrationOpensAt || null,
@@ -1805,21 +1817,68 @@ export default function AdminTournamentEditor({
               showsOn="Prize money cards on the cup sidebar and info tables"
               viewHref={cupUrl}
             >
+              <div className="flex flex-wrap gap-2">
+                {(
+                  [
+                    { id: "MANUAL" as const, label: "Manual" },
+                    { id: "DYNAMIC" as const, label: "Dynamic prizepool" },
+                  ] as const
+                ).map((opt) => {
+                  const active = (form.prizePoolMode ?? "MANUAL") === opt.id;
+                  return (
+                    <button
+                      key={opt.id}
+                      type="button"
+                      onClick={() => setForm({ ...form, prizePoolMode: opt.id })}
+                      className={`rounded-lg border px-3 py-2 text-[10px] font-bold uppercase tracking-wider transition-colors ${
+                        active
+                          ? "border-amber-400/50 bg-amber-400/15 text-amber-100"
+                          : "border-white/10 bg-black/30 text-white/45 hover:border-white/20 hover:text-white/80"
+                      }`}
+                    >
+                      {opt.label}
+                    </button>
+                  );
+                })}
+              </div>
+              <p className="text-xs text-white/40">
+                {(form.prizePoolMode ?? "MANUAL") === "DYNAMIC"
+                  ? "Prizepool on the cup overview grows as each player registers: per-player amount × approved registrations."
+                  : "Set a fixed prizepool total. This is the current behaviour."}
+              </p>
+
               <div className="grid gap-4 sm:grid-cols-2">
-                <div className="space-y-1">
-                  <label className="text-[10px] font-bold uppercase tracking-wider text-white/40">Total Prizepool (₹)</label>
-                  <input
-                    type="number"
-                    className={inputClass}
-                    value={form.prizePool ?? ""}
-                    onChange={(e) => {
-                      const val = e.target.value;
-                      const cleaned = (val.length > 1 && val.startsWith("0")) ? val.replace(/^0+/, "") : val;
-                      setForm({ ...form, prizePool: cleaned || null });
-                    }}
-                    placeholder="e.g. 15000"
-                  />
-                </div>
+                {(form.prizePoolMode ?? "MANUAL") === "DYNAMIC" ? (
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-bold uppercase tracking-wider text-white/40">Per player (₹)</label>
+                    <input
+                      type="number"
+                      className={inputClass}
+                      value={form.prizePerPlayer ?? ""}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        const cleaned = (val.length > 1 && val.startsWith("0")) ? val.replace(/^0+/, "") : val;
+                        setForm({ ...form, prizePerPlayer: cleaned || null });
+                      }}
+                      placeholder="e.g. 200"
+                    />
+                  </div>
+                ) : (
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-bold uppercase tracking-wider text-white/40">Total Prizepool (₹)</label>
+                    <input
+                      type="number"
+                      className={inputClass}
+                      value={form.prizePool ?? ""}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        const cleaned = (val.length > 1 && val.startsWith("0")) ? val.replace(/^0+/, "") : val;
+                        setForm({ ...form, prizePool: cleaned || null });
+                      }}
+                      placeholder="e.g. 15000"
+                    />
+                  </div>
+                )}
                 <div className="space-y-1">
                   <label className="text-[10px] font-bold uppercase tracking-wider text-white/40">Prizepool Notes</label>
                   <input
@@ -1831,6 +1890,7 @@ export default function AdminTournamentEditor({
                 </div>
               </div>
 
+              {(form.prizePoolMode ?? "MANUAL") === "MANUAL" ? (
               <div className="border-t border-white/[0.04] pt-5 space-y-4">
                 <div>
                   <h3 className="text-xs font-bold uppercase tracking-wider text-white/60">Payout Distribution</h3>
@@ -1887,6 +1947,11 @@ export default function AdminTournamentEditor({
                   + Add place
                 </button>
               </div>
+              ) : (
+                <p className="text-xs text-white/35">
+                  Payout split is hidden on a dynamic prizepool because the total changes with each registration.
+                </p>
+              )}
             </AdminSection>
           </div>
         )}

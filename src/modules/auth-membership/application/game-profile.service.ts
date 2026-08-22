@@ -227,8 +227,9 @@ export function effectiveValorantRank(
 
 /**
  * Push the player's latest Valorant rank into their registrations/applications so
- * the admin table (and the auction app, which reads snapshotRankTier) stay live.
- * When the player is unranked this act, we keep their peak rank instead of "Unranked".
+ * admin current-rank display stays live. snapshotRankTier is current rank
+ * (including Unranked). Peak is stored separately; auction bidding still uses
+ * peak via resolveAuctionDisplayRank when current is Unranked.
  */
 export async function syncValorantRankSnapshots(
   userId: string,
@@ -243,14 +244,12 @@ export async function syncValorantRankSnapshots(
     tier: entry?.rankTier ?? null,
     tierId: entry?.rankTierId ?? null,
   };
-  const peakPair: ValorantRankPair = peak ?? { tier: null, tierId: null };
-  const effective = effectiveValorantRank(current, peakPair);
 
   await prisma.tournamentRegistration.updateMany({
     where: { userId, tournament: { game: "VALORANT" } },
     data: {
-      snapshotRankTier: effective.tier,
-      snapshotRankTierId: effective.tierId,
+      snapshotRankTier: current.tier,
+      snapshotRankTierId: current.tierId,
       ...(peak
         ? { snapshotPeakRankTier: peak.tier, snapshotPeakRankTierId: peak.tierId }
         : {}),
@@ -260,8 +259,8 @@ export async function syncValorantRankSnapshots(
   await prisma.listingApplication.updateMany({
     where: { userId, listing: { gameKey: "valorant" } },
     data: {
-      snapshotRankTier: effective.tier,
-      snapshotRankTierId: effective.tierId,
+      snapshotRankTier: current.tier,
+      snapshotRankTierId: current.tierId,
     },
   });
 }

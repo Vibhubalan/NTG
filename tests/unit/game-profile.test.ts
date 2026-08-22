@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  displayCurrentValorantRank,
   normalizeCs2FaceitRank,
   normalizeCs2PeakPremierRank,
   parsePlayedGames,
@@ -7,6 +8,30 @@ import {
   validateCs2RanksForRegistration,
   validateValorantRoles,
 } from "@auth-membership/domain/game-profile";
+
+describe("displayCurrentValorantRank", () => {
+  it("shows Unranked when live current is unranked, even if snapshot holds peak", () => {
+    expect(
+      displayCurrentValorantRank(
+        { rankTier: "Unranked", rankTierId: 0 },
+        "Immortal 1",
+      ),
+    ).toBe("Unranked");
+  });
+
+  it("shows live current when ranked this act", () => {
+    expect(
+      displayCurrentValorantRank(
+        { rankTier: "Diamond 2", rankTierId: 18 },
+        "Immortal 1",
+      ),
+    ).toBe("Diamond 2");
+  });
+
+  it("falls back to snapshot only when live rank is missing", () => {
+    expect(displayCurrentValorantRank(null, "Ascendant 3")).toBe("Ascendant 3");
+  });
+});
 
 describe("parsePlayedGames", () => {
   it("maps booleans to PlayedGame array", () => {

@@ -2,10 +2,12 @@ import { prisma } from "@core/database/client";
 import { safeExpireTag } from "@/lib/safe-revalidate";
 import { tournamentDetailTag } from "./tournament.service";
 import type { PrizeSplitRow } from "@core/contracts";
+import type { PrizePoolMode } from "@prisma/client";
 import type {
   BracketType,
   GameSlug,
   PlacementRole,
+  PrizePoolMode,
   TournamentFormat,
   TournamentStatus,
 } from "@prisma/client";
@@ -41,6 +43,8 @@ export type CreateTournamentInput = {
   prizePool?: number;
   prizeNotes?: string;
   prizeSplit?: PrizeSplitRow[] | null;
+  prizePoolMode?: PrizePoolMode;
+  prizePerPlayer?: number | null;
   bracketUrl?: string;
   bracketUrls?: string[] | null;
   posterUrl?: string;
@@ -86,6 +90,8 @@ export type UpdateTournamentInput = Partial<
   registrationOpensAt?: string | null;
   registrationClosesAt?: string | null;
   prizePool?: number | null;
+  prizePoolMode?: PrizePoolMode;
+  prizePerPlayer?: number | null;
   hideAfter?: string | null;
   teams?: string[];
   registrationFormat?: TournamentFormat | null;
@@ -257,6 +263,8 @@ export type AdminCupFieldsSnapshot = {
   prizePool: string | null;
   prizeNotes: string | null;
   prizeSplit: PrizeSplitRow[] | null;
+  prizePoolMode: PrizePoolMode;
+  prizePerPlayer: string | null;
   startsAt: string | null;
   endsAt: string | null;
   registrationOpensAt: string | null;
@@ -311,6 +319,8 @@ export function toAdminCupFieldsSnapshot(
     prizePool: t.prizePool?.toString() ?? null,
     prizeNotes: t.prizeNotes,
     prizeSplit: parsePrizeSplit(t.prizeSplit),
+    prizePoolMode: t.prizePoolMode ?? "MANUAL",
+    prizePerPlayer: t.prizePerPlayer?.toString() ?? null,
     startsAt: t.startsAt?.toISOString() ?? null,
     endsAt: t.endsAt?.toISOString() ?? null,
     registrationOpensAt: t.registrationOpensAt?.toISOString() ?? null,
@@ -385,6 +395,8 @@ export async function updateTournamentFull(
   if (input.prizePool !== undefined) {
     data.prizePool = input.prizePool;
   }
+  if (input.prizePoolMode !== undefined) data.prizePoolMode = input.prizePoolMode;
+  if (input.prizePerPlayer !== undefined) data.prizePerPlayer = input.prizePerPlayer;
   if (input.prizeNotes !== undefined) data.prizeNotes = input.prizeNotes?.trim() || null;
   if (input.prizeSplit !== undefined) {
     data.prizeSplit =

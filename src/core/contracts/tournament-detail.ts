@@ -46,6 +46,8 @@ export type TournamentDetail = {
   prizePool: string | null;
   prizeNotes: string | null;
   prizeSplit: PrizeSplitRow[] | null;
+  prizePoolMode?: "MANUAL" | "DYNAMIC";
+  prizePerPlayer?: string | null;
   registrationOpen: boolean;
   registrationOpensAt: string | null;
   registrationClosesAt: string | null;

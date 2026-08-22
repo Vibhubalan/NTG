@@ -2,6 +2,7 @@ export {
   listTournamentPreviews,
   getTournamentBySlug,
   getTournamentDetail,
+  getTournamentPrizeLive,
   getActiveRegistrationBanner,
   getActiveAuction,
   getHeroCupStatus,

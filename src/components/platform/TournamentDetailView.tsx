@@ -9,6 +9,7 @@ import TournamentBracketEmpty from "@/components/platform/tournament/TournamentB
 import TournamentChampionSection from "@/components/platform/tournament/TournamentChampionSection";
 import TournamentFinalResults from "@/components/platform/tournament/TournamentFinalResults";
 import TournamentScheduleCard from "@/components/platform/tournament/TournamentScheduleCard";
+import TournamentPrizePoolCard from "@/components/platform/tournament/TournamentPrizePoolCard";
 import TournamentTeamsList from "@/components/platform/tournament/TournamentTeamsList";
 import TournamentGamesSection, {
   type PublicGame,
@@ -158,15 +159,17 @@ export default function TournamentDetailView({
   );
 
   const prizeSplit =
-    tournament.prizeSplit && tournament.prizeSplit.length > 0
-      ? tournament.prizeSplit
-      : tournament.prizePool && !isNaN(Number(tournament.prizePool))
-        ? [
-            { place: 1, label: "Winner", amount: Math.round(Number(tournament.prizePool) * 0.6) },
-            { place: 2, label: "Runner Up", amount: Math.round(Number(tournament.prizePool) * 0.3) },
-            { place: 3, label: "3rd Place", amount: Math.round(Number(tournament.prizePool) * 0.1) },
-          ]
-        : [];
+    tournament.prizePoolMode === "DYNAMIC"
+      ? []
+      : tournament.prizeSplit && tournament.prizeSplit.length > 0
+        ? tournament.prizeSplit
+        : tournament.prizePool && !isNaN(Number(tournament.prizePool))
+          ? [
+              { place: 1, label: "Winner", amount: Math.round(Number(tournament.prizePool) * 0.6) },
+              { place: 2, label: "Runner Up", amount: Math.round(Number(tournament.prizePool) * 0.3) },
+              { place: 3, label: "3rd Place", amount: Math.round(Number(tournament.prizePool) * 0.1) },
+            ]
+          : [];
 
   const showChampion = Boolean(championData);
   const showFinalResults = !showChampion && (standings.length > 0 || Boolean(mvp));
@@ -253,54 +256,21 @@ export default function TournamentDetailView({
     </div>
   ) : null;
 
-  const prizeBlock =
-    tournament.prizePool || tournament.prizeNotes ? (
-      <div className="min-w-0 rounded-2xl border border-white/[0.08] bg-[#0A0A0A]/80 p-4 shadow-2xl backdrop-blur-xl sm:p-5">
-        <p className="text-[10px] font-medium tracking-[0.2em] text-white/40 uppercase">
-          Prizepool
-        </p>
-        {tournament.prizePool ? (
-          <p className="mt-1.5 break-words font-display text-2xl font-black tracking-tight text-white drop-shadow-md sm:text-3xl">
-            ₹{Number(tournament.prizePool).toLocaleString("en-IN")}
-          </p>
-        ) : null}
-        {tournament.prizeNotes ? (
-          <p className="mt-2 text-[13px] leading-snug font-medium break-words text-white/50">
-            {tournament.prizeNotes}
-          </p>
-        ) : null}
-
-        {prizeSplit.length > 0 ? (
-          <div className="mt-3.5 border-t border-white/[0.06] pt-3.5">
-            <p className="mb-2 text-[10px] font-bold tracking-[0.2em] text-white/30 uppercase">
-              Prize Split
-            </p>
-            <div className="space-y-2">
-              {prizeSplit.map((row, i) => (
-                <div
-                  key={row.place}
-                  className="flex min-w-0 items-center justify-between gap-3"
-                >
-                  <span
-                    className={`flex min-w-0 items-center gap-2 text-[13px] font-medium ${splitColors[i] ?? "text-white/70"}`}
-                  >
-                    <span
-                      className={`flex h-5 w-5 shrink-0 items-center justify-center rounded text-[10px] font-bold ${splitBadgeColors[i] ?? "bg-white/10 text-white/70"}`}
-                    >
-                      {row.place}
-                    </span>
-                    <span className="truncate">{row.label}</span>
-                  </span>
-                  <span className="shrink-0 font-display text-sm font-bold text-white/90">
-                    ₹{row.amount.toLocaleString("en-IN")}
-                  </span>
-                </div>
-              ))}
-            </div>
-          </div>
-        ) : null}
-      </div>
-    ) : null;
+  const prizeBlock = (
+    <TournamentPrizePoolCard
+      slug={tournament.slug}
+      initial={{
+        mode: tournament.prizePoolMode === "DYNAMIC" ? "DYNAMIC" : "MANUAL",
+        prizePool: tournament.prizePool != null ? Number(tournament.prizePool) : null,
+        prizePerPlayer: tournament.prizePerPlayer != null ? Number(tournament.prizePerPlayer) : null,
+        registeredCount: tournament.registrationCount,
+      }}
+      prizeNotes={tournament.prizeNotes}
+      prizeSplit={prizeSplit}
+      splitColors={splitColors}
+      splitBadgeColors={splitBadgeColors}
+    />
+  );
 
   const showRulebookPromo =
     Boolean(tournament.rulebookUrl?.trim()) && tournament.registrationOpen;

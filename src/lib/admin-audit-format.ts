@@ -37,6 +37,8 @@ const FIELD_LABELS: Record<string, string> = {
   prizePool: "prize pool",
   prizeNotes: "prize notes",
   prizeSplit: "prize split",
+  prizePoolMode: "prize pool mode",
+  prizePerPlayer: "per player prize",
   bracketUrl: "bracket link",
   posterUrl: "poster image",
   hubBannerUrl: "hub banner",

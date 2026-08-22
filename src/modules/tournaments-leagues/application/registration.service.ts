@@ -14,7 +14,8 @@ import {
   normalizeCs2PeakPremierRank,
   normalizeCs2FaceitRank,
 } from "@auth-membership/application/registration-helpers";
-import { ensureCs2RankDefaults, effectiveValorantRank } from "@auth-membership/application/game-profile.service";
+import { ensureCs2RankDefaults } from "@auth-membership/application/game-profile.service";
+import { displayCurrentValorantRank } from "@auth-membership/domain/game-profile";
 import { isTournamentRegistrationLive } from "../domain/registration-window";
 import { syncUserRank, fetchHenrikV2MmrBundle } from "./rank-sync.service";
 import { logUserActivity } from "@/lib/user-audit";
@@ -1794,7 +1795,10 @@ export async function getValorantRegistrationProfileCard(
     valorantRoles: roles,
     riotPlayerCard: user.riotPlayerCard,
     riotPlayerCardWide: user.riotPlayerCardWide,
-    currentRankTier: current.tier,
+    currentRankTier: displayCurrentValorantRank(
+      { rankTier: current.tier, rankTierId: current.tierId },
+      current.tier,
+    ),
     currentRankTierId: current.tierId,
     peakRankTier: peak.tier,
     peakRankTierId: peak.tierId,

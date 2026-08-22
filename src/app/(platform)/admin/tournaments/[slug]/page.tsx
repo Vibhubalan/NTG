@@ -50,6 +50,8 @@ export default async function AdminTournamentEditPage({ params }: Props) {
     prizePool: t.prizePool?.toString() ?? null,
     prizeNotes: t.prizeNotes,
     prizeSplit: parsePrizeSplit(t.prizeSplit) as PrizeSplitRow[] | null,
+    prizePoolMode: t.prizePoolMode ?? "MANUAL",
+    prizePerPlayer: t.prizePerPlayer?.toString() ?? null,
     startsAt: t.startsAt?.toISOString() ?? null,
     endsAt: t.endsAt?.toISOString() ?? null,
     registrationOpensAt: t.registrationOpensAt?.toISOString() ?? null,

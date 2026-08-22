@@ -76,6 +76,14 @@ export async function PATCH(req: Request, { params }: Props) {
         : (body.prizePool as number | undefined),
     prizeNotes: normalizeOptionalString(body.prizeNotes),
     prizeSplit: body.prizeSplit as PrizeSplitRow[] | null | undefined,
+    prizePoolMode:
+      body.prizePoolMode === "DYNAMIC" || body.prizePoolMode === "MANUAL"
+        ? body.prizePoolMode
+        : undefined,
+    prizePerPlayer:
+      body.prizePerPlayer === null || body.prizePerPlayer === ""
+        ? null
+        : (body.prizePerPlayer as number | undefined),
     bracketUrl: normalizeOptionalString(body.bracketUrl),
     bracketUrls: Array.isArray(body.bracketUrls)
         ? (body.bracketUrls as unknown[]).filter(

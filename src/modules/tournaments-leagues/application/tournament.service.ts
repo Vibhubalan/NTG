@@ -10,6 +10,8 @@ import type {
 import { TournamentRepository } from "../infrastructure/tournament.repository";
 import { LeaderboardRepository } from "../infrastructure/leaderboard.repository";
 import { resolveAuctionHeroPhase, type HeroCupPhase } from "../domain/auction-hero-phase";
+import { slugWhere } from "@/lib/slug-utils";
+import { computeDisplayedPrizePool } from "@/lib/prize-pool";
 
 const tournamentRepo = new TournamentRepository();
 const leaderboardRepo = new LeaderboardRepository();
@@ -229,6 +231,46 @@ export async function recordMatchResult(
 /** Open registration cup for the hero tournament slide, if any. */
 export async function getHeroOpenCup(): Promise<TournamentRegistrationBanner | null> {
   return withDbFallback("hero-open-cup", null, () => getActiveRegistrationBanner());
+}
+
+export type TournamentPrizeLive = {
+  mode: "MANUAL" | "DYNAMIC";
+  prizePool: number | null;
+  prizePerPlayer: number | null;
+  registeredCount: number;
+};
+
+/** Uncached read so the overview prize counter can tick as people register. */
+export async function getTournamentPrizeLive(slug: string): Promise<TournamentPrizeLive | null> {
+  const tournament = await prisma.tournament.findFirst({
+    where: slugWhere(slug),
+    select: {
+      id: true,
+      prizePool: true,
+      prizePoolMode: true,
+      prizePerPlayer: true,
+    },
+  });
+  if (!tournament) return null;
+
+  const registeredCount = await prisma.tournamentRegistration.count({
+    where: { tournamentId: tournament.id, status: "APPROVED" },
+  });
+  const perPlayer = tournament.prizePerPlayer != null ? Number(tournament.prizePerPlayer) : null;
+  const manual = tournament.prizePool != null ? Number(tournament.prizePool) : null;
+  const mode = tournament.prizePoolMode === "DYNAMIC" ? "DYNAMIC" : "MANUAL";
+
+  return {
+    mode,
+    prizePerPlayer: perPlayer,
+    registeredCount,
+    prizePool: computeDisplayedPrizePool({
+      mode,
+      manualAmount: manual,
+      perPlayer,
+      registeredCount,
+    }),
+  };
 }
 
 /**

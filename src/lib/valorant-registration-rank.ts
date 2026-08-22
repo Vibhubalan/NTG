@@ -21,7 +21,7 @@ export function isValorantRanked(
   return name !== "unranked" && name !== "unused";
 }
 
-/** Display-only: current rank if ranked this act, otherwise peak. */
+/** Auction bidding rank: current if ranked this act, otherwise peak. Not for current-rank UI. */
 export function resolveAuctionDisplayRank(
   current: ValorantRankSnapshot,
   peak: ValorantRankSnapshot,
