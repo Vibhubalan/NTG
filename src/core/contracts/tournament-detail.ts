@@ -60,6 +60,8 @@ export type TournamentDetail = {
   rulebookDisclaimer: string | null;
   teams: string[];
   teamDetails: TournamentTeamView[];
+  /** Approved solo (1v1) registrations — one row per player, no teams. */
+  soloPlayers: TournamentTeamPlayerView[];
   placements: TournamentPlacementView[];
   matches: TournamentMatchView[];
   registrationCount: number;

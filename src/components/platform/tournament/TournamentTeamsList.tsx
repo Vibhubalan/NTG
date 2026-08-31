@@ -8,6 +8,7 @@ import type { TournamentTeamView, TournamentTeamPlayerView } from "@core/contrac
 type Props = {
   teams: string[];
   teamDetails?: TournamentTeamView[];
+  soloPlayers?: TournamentTeamPlayerView[];
   accentHex?: string;
   game?: GameSlug;
   registrationFormat?: string | null;
@@ -150,6 +151,56 @@ function teamFooterLabel(team: TournamentTeamView, index: number): string {
     return `${team.players.length} ${team.players.length === 1 ? "player" : "players"}`;
   }
   return `Team #${index + 1}`;
+}
+
+function SoloPlayersList({
+  players,
+  accentHex,
+  game,
+}: {
+  players: TournamentTeamPlayerView[];
+  accentHex: string;
+  game?: GameSlug;
+}) {
+  const isFifa = game === "EA_FC26";
+
+  return (
+    <ul className="flex flex-wrap justify-center gap-3 sm:gap-4">
+      {players.map((player, index) => {
+        const secondary = isFifa ? player.olympusId : player.riotId;
+
+        return (
+          <li
+            key={player.id}
+            className="w-[min(calc(50%-0.375rem),11.5rem)] sm:w-40 md:w-44 lg:w-48"
+          >
+            <div className="flex min-h-full w-full items-center gap-3 rounded-xl border border-white/10 bg-[#0A0A0A] px-4 py-3.5">
+              <span
+                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-xs font-black tabular-nums text-white"
+                style={{
+                  background: `${accentHex}18`,
+                  boxShadow: `inset 0 0 0 1px ${accentHex}44`,
+                }}
+              >
+                {String(index + 1).padStart(2, "0")}
+              </span>
+              <div className="min-w-0 flex-1">
+                <p
+                  title={player.displayName}
+                  className="truncate font-display text-sm font-semibold text-white/90 sm:text-[15px]"
+                >
+                  {player.displayName}
+                </p>
+                {secondary ? (
+                  <p className="mt-0.5 truncate text-[11px] text-white/40">{secondary}</p>
+                ) : null}
+              </div>
+            </div>
+          </li>
+        );
+      })}
+    </ul>
+  );
 }
 
 function ParticipatingTeamsGrid({
@@ -315,11 +366,13 @@ function ClassicTeamsList({
 export default function TournamentTeamsList({
   teams,
   teamDetails = [],
+  soloPlayers = [],
   accentHex = "#7c3aed",
   game,
   registrationFormat,
 }: Props) {
   const [previewTeam, setPreviewTeam] = useState<TournamentTeamView | null>(null);
+  const isSoloCup = registrationFormat === "SOLO";
 
   const rows: TournamentTeamView[] =
     teamDetails.length > 0
@@ -332,20 +385,31 @@ export default function TournamentTeamsList({
           players: [],
         }));
 
-  const isDuoTeamCup = game === "EA_FC26";
-  const showLogoGrid = rows.some((team) => Boolean(team.logoUrl));
+  const showLogoGrid = !isSoloCup && rows.some((team) => Boolean(team.logoUrl));
+  const sectionTitle = isSoloCup ? "Players" : showLogoGrid ? "Participating Teams" : "Teams";
+  const emptyMessage = isSoloCup
+    ? "Players will appear here once they register."
+    : "Teams will appear here once players register.";
 
   return (
     <section className="min-w-0">
       <div className="mb-6 flex min-w-0 items-center gap-3">
         <div className="h-px w-6 shrink-0 bg-gradient-to-r from-transparent to-cyan-400 sm:w-8" />
         <h2 className="font-display text-xl font-bold tracking-widest text-white uppercase sm:text-2xl">
-          {showLogoGrid ? "Participating Teams" : "Teams"}
+          {sectionTitle}
         </h2>
         <div className="h-px min-w-0 flex-1 bg-gradient-to-r from-cyan-400 to-transparent opacity-30" />
       </div>
 
-      {rows.length > 0 ? (
+      {isSoloCup ? (
+        soloPlayers.length > 0 ? (
+          <SoloPlayersList players={soloPlayers} accentHex={accentHex} game={game} />
+        ) : (
+          <div className="rounded-[1.25rem] border border-dashed border-white/10 bg-white/[0.02] px-6 py-10 text-center">
+            <p className="text-sm text-white/45">{emptyMessage}</p>
+          </div>
+        )
+      ) : rows.length > 0 ? (
         showLogoGrid ? (
           <ParticipatingTeamsGrid
             rows={rows}
@@ -357,9 +421,7 @@ export default function TournamentTeamsList({
         )
       ) : (
         <div className="rounded-[1.25rem] border border-dashed border-white/10 bg-white/[0.02] px-6 py-10 text-center">
-          <p className="text-sm text-white/45">
-            Teams will appear here once players register.
-          </p>
+          <p className="text-sm text-white/45">{emptyMessage}</p>
         </div>
       )}
 
