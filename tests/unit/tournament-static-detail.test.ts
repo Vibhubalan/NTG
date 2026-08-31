@@ -29,6 +29,7 @@ function minimalDetail(overrides: Partial<TournamentDetail> = {}): TournamentDet
     rulebookDisclaimer: null,
     teams: [],
     teamDetails: [],
+    soloPlayers: [],
     placements: [],
     matches: [],
     registrationCount: 0,

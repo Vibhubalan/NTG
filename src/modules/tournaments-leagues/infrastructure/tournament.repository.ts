@@ -485,9 +485,11 @@ export class TournamentRepository {
     if (!t) return null;
 
     const allRegs = t.registrations;
-    const teamDetails = await enrichMissingRosterCards(
-      buildTeamDetailsFromData(t.tournamentTeams, allRegs),
-    );
+    const isSoloCup = t.registrationFormat === "SOLO";
+    const soloPlayers = isSoloCup ? allRegs.map(mapRegistrationToPlayerView) : [];
+    const teamDetails = isSoloCup
+      ? []
+      : await enrichMissingRosterCards(buildTeamDetailsFromData(t.tournamentTeams, allRegs));
 
     const teams = teamDetails.map((team) => team.name);
 
@@ -545,6 +547,7 @@ export class TournamentRepository {
       rulebookDisclaimer: t.rulebookDisclaimer?.trim() || null,
       teams,
       teamDetails,
+      soloPlayers,
       placements: t.placements.map((p) => {
         const reg = p.user?.registrations?.[0];
         const lb = p.user?.leaderboard?.[0];
