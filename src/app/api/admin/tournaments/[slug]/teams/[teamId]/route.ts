@@ -20,7 +20,7 @@ export async function PATCH(req: Request, { params }: Props) {
   if (!isAuthedAdmin(auth)) return guardResponse(auth)!;
 
   const { teamId } = await params;
-  let body: { name?: string; seed?: number | null; sortOrder?: number };
+  let body: { name?: string; seed?: number | null; sortOrder?: number; logoUrl?: string | null };
   try {
     body = await req.json();
   } catch {

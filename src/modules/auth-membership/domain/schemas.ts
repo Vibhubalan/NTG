@@ -113,9 +113,16 @@ const registrationTermsField = {
   }),
 };
 
-export const fifaRegisterSchema = z.object({
+export const duoRegisterSchema = z.object({
   teamName: sanitizedString.pipe(z.string().min(2).max(48)),
   partnerUsername: usernameSchema,
+  ...registrationTermsField,
+});
+
+/** @deprecated use duoRegisterSchema */
+export const fifaRegisterSchema = duoRegisterSchema;
+
+export const soloRegisterSchema = z.object({
   ...registrationTermsField,
 });
 

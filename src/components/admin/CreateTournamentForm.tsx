@@ -13,7 +13,16 @@ const GAME_OPTIONS = [
   { value: "OTHER", label: "Other" },
 ];
 
-const SUPPORTS_FORMAT = ["VALORANT", "CS2"];
+type RegistrationFormat = "AUCTION" | "STANDARD" | "DUO" | "SOLO";
+
+function defaultFormatForGame(game: string): RegistrationFormat {
+  if (game === "EA_FC26") return "DUO";
+  return "AUCTION";
+}
+
+function supportsRegistrationFormat(game: string): boolean {
+  return game === "VALORANT" || game === "CS2" || game === "EA_FC26";
+}
 
 export default function CreateTournamentForm() {
   const router = useRouter();
@@ -21,7 +30,7 @@ export default function CreateTournamentForm() {
   const [name, setName] = useState("");
   const [slug, setSlug] = useState("");
   const [game, setGame] = useState("VALORANT");
-  const [registrationFormat, setRegistrationFormat] = useState<"AUCTION" | "STANDARD" | "SOLO" | "DUO">("AUCTION");
+  const [registrationFormat, setRegistrationFormat] = useState<RegistrationFormat>("AUCTION");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -37,12 +46,12 @@ export default function CreateTournamentForm() {
           name,
           slug: slug || name,
           game,
-          registrationFormat: SUPPORTS_FORMAT.includes(game) ? registrationFormat : null,
+          registrationFormat: supportsRegistrationFormat(game) ? registrationFormat : null,
         }),
       });
-      const data = await res.json();
+      const data = await res.json().catch(() => ({}));
       if (!res.ok) {
-        setError(data.error ?? "Failed to create.");
+        setError((data as { error?: string }).error ?? `Failed to create (${res.status}).`);
         return;
       }
       setIsOpen(false);
@@ -50,8 +59,8 @@ export default function CreateTournamentForm() {
       setSlug("");
       router.push(`/admin/tournaments/${data.slug}`);
       router.refresh();
-    } catch {
-      setError("Something went wrong.");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Something went wrong.");
     } finally {
       setLoading(false);
     }
@@ -112,7 +121,9 @@ export default function CreateTournamentForm() {
           onChange={(e) => {
             const next = e.target.value;
             setGame(next);
-            if (SUPPORTS_FORMAT.includes(next)) setRegistrationFormat("AUCTION");
+            if (supportsRegistrationFormat(next)) {
+              setRegistrationFormat(defaultFormatForGame(next));
+            }
           }}
         >
           {GAME_OPTIONS.map((g) => (
@@ -121,34 +132,90 @@ export default function CreateTournamentForm() {
         </select>
       </div>
 
-      {/* Registration Format — only for Valorant & CS2 */}
-      {SUPPORTS_FORMAT.includes(game) && (
+      {game === "VALORANT" && (
+        <div className="space-y-2">
+          <label className="text-[10px] font-bold uppercase tracking-wider text-white/45">Registration Format</label>
+          <div className="grid grid-cols-2 gap-2">
+            {(
+              [
+                ["AUCTION", "Auction Draft"],
+                ["STANDARD", "Standard (5v5)"],
+                ["DUO", "2v2 Duo"],
+                ["SOLO", "1v1 Solo"],
+              ] as const
+            ).map(([value, title]) => (
+              <button
+                key={value}
+                type="button"
+                onClick={() => setRegistrationFormat(value)}
+                className={`rounded-xl border px-4 py-3 text-left text-sm font-semibold transition-all ${
+                  registrationFormat === value
+                    ? "border-cyan-500/40 bg-cyan-500/[0.08] text-cyan-200"
+                    : "border-white/10 bg-white/[0.02] text-white/50 hover:border-white/20"
+                }`}
+              >
+                {title}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {game === "CS2" && (
         <div className="space-y-2">
           <label className="text-[10px] font-bold uppercase tracking-wider text-white/45">Registration Format</label>
           <div className="grid grid-cols-2 gap-2">
             <button
               type="button"
               onClick={() => setRegistrationFormat("AUCTION")}
-              className={`rounded-xl border px-4 py-3 text-left transition-all ${
+              className={`rounded-xl border px-4 py-3 text-left text-sm font-semibold transition-all ${
                 registrationFormat === "AUCTION"
                   ? "border-cyan-500/40 bg-cyan-500/[0.08] text-cyan-200"
                   : "border-white/10 bg-white/[0.02] text-white/50 hover:border-white/20"
               }`}
             >
-              <p className="text-sm font-semibold">Auction Draft</p>
-              <p className="mt-0.5 text-[10px] leading-relaxed text-white/40">Captains register team name + co-captain. Players join the pool. Admin assigns after auction.</p>
+              Auction Draft
             </button>
             <button
               type="button"
               onClick={() => setRegistrationFormat("STANDARD")}
-              className={`rounded-xl border px-4 py-3 text-left transition-all ${
+              className={`rounded-xl border px-4 py-3 text-left text-sm font-semibold transition-all ${
                 registrationFormat === "STANDARD"
                   ? "border-indigo-500/40 bg-indigo-500/[0.08] text-indigo-200"
                   : "border-white/10 bg-white/[0.02] text-white/50 hover:border-white/20"
               }`}
             >
-              <p className="text-sm font-semibold">Standard (5v5)</p>
-              <p className="mt-0.5 text-[10px] leading-relaxed text-white/40">Captain registers full 5-player team upfront. All 5 must have NTG accounts.</p>
+              Standard (5v5)
+            </button>
+          </div>
+        </div>
+      )}
+
+      {game === "EA_FC26" && (
+        <div className="space-y-2">
+          <label className="text-[10px] font-bold uppercase tracking-wider text-white/45">Registration Format</label>
+          <div className="grid grid-cols-2 gap-2">
+            <button
+              type="button"
+              onClick={() => setRegistrationFormat("DUO")}
+              className={`rounded-xl border px-4 py-3 text-left text-sm font-semibold transition-all ${
+                registrationFormat === "DUO"
+                  ? "border-emerald-500/40 bg-emerald-500/[0.08] text-emerald-200"
+                  : "border-white/10 bg-white/[0.02] text-white/50 hover:border-white/20"
+              }`}
+            >
+              2v2 Duo
+            </button>
+            <button
+              type="button"
+              onClick={() => setRegistrationFormat("SOLO")}
+              className={`rounded-xl border px-4 py-3 text-left text-sm font-semibold transition-all ${
+                registrationFormat === "SOLO"
+                  ? "border-amber-500/40 bg-amber-500/[0.08] text-amber-200"
+                  : "border-white/10 bg-white/[0.02] text-white/50 hover:border-white/20"
+              }`}
+            >
+              1v1 Solo
             </button>
           </div>
         </div>

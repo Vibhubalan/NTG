@@ -132,6 +132,16 @@ const checkboxLabelClass =
   "flex items-center gap-3 rounded-xl border border-white/[0.05] bg-[#0a1020]/30 px-4 py-3 text-sm text-white/70 hover:bg-white/[0.02] cursor-pointer transition-colors";
 
 const SUPPORTS_FORMAT = ["VALORANT", "CS2"];
+const FIFA_FORMAT_GAME = "EA_FC26";
+
+function supportsRegistrationFormat(game: string): boolean {
+  return SUPPORTS_FORMAT.includes(game) || game === FIFA_FORMAT_GAME;
+}
+
+function defaultRegistrationFormatForGame(game: string): "AUCTION" | "STANDARD" | "DUO" | "SOLO" {
+  if (game === FIFA_FORMAT_GAME) return "DUO";
+  return "AUCTION";
+}
 
 const DEFAULT_VALORANT_RANK_POINTS: { rank: string; floor: number }[] = [
   { rank: "Immortal", floor: 12 },
@@ -223,7 +233,7 @@ function getSavePayload(form: TournamentData) {
     ...bracketUrlsPayload(form.bracketLinks),
     rulebookUrl: emptyToNull(form.rulebookUrl),
     rulebookDisclaimer: emptyToNull(form.rulebookDisclaimer),
-    registrationFormat: SUPPORTS_FORMAT.includes(form.game) ? form.registrationFormat : null,
+    registrationFormat: supportsRegistrationFormat(form.game) ? form.registrationFormat : null,
     format: form.format || null,
     coCaptainSlots: form.coCaptainSlots,
     startingBudget: form.startingBudget,
@@ -580,6 +590,30 @@ export default function AdminTournamentEditor({
     return ok;
   }
 
+  async function patchTeamLogo(teamId: string, logoUrl: string | null, teamName: string) {
+    try {
+      const res = await fetch(`/api/admin/tournaments/${form.slug}/teams/${teamId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ logoUrl }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setMessage(data.error ?? "Failed to save team logo.");
+        return false;
+      }
+      setTournamentTeams((teams) =>
+        teams.map((team) => (team.id === teamId ? { ...team, logoUrl } : team)),
+      );
+      setMessage(logoUrl ? `Logo saved for ${teamName}.` : `Logo removed for ${teamName}.`);
+      router.refresh();
+      return true;
+    } catch {
+      setMessage("Failed to save team logo.");
+      return false;
+    }
+  }
+
   async function createAuction() {
     // The auction app reads settings (incl. rank points) straight from the DB, not from
     // this form's in-memory state — save first so unsaved edits aren't sent as stale defaults.
@@ -705,7 +739,7 @@ export default function AdminTournamentEditor({
           ...bracketUrlsPayload(form.bracketLinks),
           rulebookUrl: emptyToNull(form.rulebookUrl),
           rulebookDisclaimer: emptyToNull(form.rulebookDisclaimer),
-          registrationFormat: SUPPORTS_FORMAT.includes(form.game) ? form.registrationFormat : null,
+          registrationFormat: supportsRegistrationFormat(form.game) ? form.registrationFormat : null,
           format: form.format || null,
           coCaptainSlots: form.coCaptainSlots,
           startingBudget: form.startingBudget,
@@ -1230,7 +1264,9 @@ export default function AdminTournamentEditor({
                       setForm({
                         ...form,
                         game: next,
-                        registrationFormat: SUPPORTS_FORMAT.includes(next) ? "AUCTION" : form.registrationFormat,
+                        registrationFormat: supportsRegistrationFormat(next)
+                          ? defaultRegistrationFormatForGame(next)
+                          : form.registrationFormat,
                       });
                     }}
                   >
@@ -1244,8 +1280,59 @@ export default function AdminTournamentEditor({
 
 
 
-              {/* Registration Format — Valorant & CS2 */}
-              {SUPPORTS_FORMAT.includes(form.game) && (
+              {/* Registration Format */}
+              {form.game === "VALORANT" && (
+                <div className="space-y-2">
+                  <label className="text-[10px] font-bold uppercase tracking-wider text-white/40">Registration Format</label>
+                  <div className="grid grid-cols-2 gap-2">
+                    {(
+                      [
+                        {
+                          value: "AUCTION" as const,
+                          title: "Auction Draft",
+                          desc: "Captains + player pool. Admin assigns after auction.",
+                          activeClass: "border-cyan-500/40 bg-cyan-500/[0.08] text-cyan-200",
+                        },
+                        {
+                          value: "STANDARD" as const,
+                          title: "Standard (5v5)",
+                          desc: "Captain registers full 5-player team upfront.",
+                          activeClass: "border-indigo-500/40 bg-indigo-500/[0.08] text-indigo-200",
+                        },
+                        {
+                          value: "DUO" as const,
+                          title: "2v2 Duo",
+                          desc: "Captain + one partner by username (like FIFA).",
+                          activeClass: "border-emerald-500/40 bg-emerald-500/[0.08] text-emerald-200",
+                        },
+                        {
+                          value: "SOLO" as const,
+                          title: "1v1 Solo",
+                          desc: "Solo registration — no team or partner.",
+                          activeClass: "border-amber-500/40 bg-amber-500/[0.08] text-amber-200",
+                        },
+                      ] as const
+                    ).map((opt) => (
+                      <button
+                        key={opt.value}
+                        type="button"
+                        onClick={() => setForm({ ...form, registrationFormat: opt.value })}
+                        className={`rounded-xl border px-4 py-3 text-left transition-all ${
+                          form.registrationFormat === opt.value ||
+                          (opt.value === "AUCTION" && !form.registrationFormat)
+                            ? opt.activeClass
+                            : "border-white/10 bg-white/[0.02] text-white/50 hover:border-white/20"
+                        }`}
+                      >
+                        <p className="text-sm font-semibold">{opt.title}</p>
+                        <p className="mt-0.5 text-[10px] leading-relaxed text-white/40">{opt.desc}</p>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {form.game === "CS2" && (
                 <div className="space-y-2">
                   <label className="text-[10px] font-bold uppercase tracking-wider text-white/40">Registration Format</label>
                   <div className="grid grid-cols-2 gap-2">
@@ -1272,6 +1359,38 @@ export default function AdminTournamentEditor({
                     >
                       <p className="text-sm font-semibold">Standard (5v5)</p>
                       <p className="mt-0.5 text-[10px] leading-relaxed text-white/40">Captain registers full 5-player team upfront. All 5 must have NTG accounts.</p>
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {form.game === FIFA_FORMAT_GAME && (
+                <div className="space-y-2">
+                  <label className="text-[10px] font-bold uppercase tracking-wider text-white/40">Registration Format</label>
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setForm({ ...form, registrationFormat: "DUO" })}
+                      className={`rounded-xl border px-4 py-3 text-left transition-all ${
+                        form.registrationFormat === "DUO" || !form.registrationFormat
+                          ? "border-emerald-500/40 bg-emerald-500/[0.08] text-emerald-200"
+                          : "border-white/10 bg-white/[0.02] text-white/50 hover:border-white/20"
+                      }`}
+                    >
+                      <p className="text-sm font-semibold">2v2 Duo</p>
+                      <p className="mt-0.5 text-[10px] leading-relaxed text-white/40">Captain registers with one partner by NTG username.</p>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setForm({ ...form, registrationFormat: "SOLO" })}
+                      className={`rounded-xl border px-4 py-3 text-left transition-all ${
+                        form.registrationFormat === "SOLO"
+                          ? "border-amber-500/40 bg-amber-500/[0.08] text-amber-200"
+                          : "border-white/10 bg-white/[0.02] text-white/50 hover:border-white/20"
+                      }`}
+                    >
+                      <p className="text-sm font-semibold">1v1 Solo</p>
+                      <p className="mt-0.5 text-[10px] leading-relaxed text-white/40">Each player registers individually — no partner.</p>
                     </button>
                   </div>
                 </div>
@@ -1801,10 +1920,48 @@ export default function AdminTournamentEditor({
                   }}
                 />
 
-
-
                 {/* Carousel slides section removed — hub banner is sufficient */}
               </div>
+            </AdminSection>
+
+            <AdminSection
+              title="Team Logos"
+              showsOn="Participating teams grid on the cup overview when at least one logo is uploaded"
+              viewHref={cupUrl}
+              viewLabel="Cup Overview"
+            >
+              {tournamentTeams.length === 0 ? (
+                <p className="text-sm text-white/40">
+                  Teams will appear here once players register. Upload logos per team to show the
+                  participating teams grid on the cup page.
+                </p>
+              ) : (
+                <div className="grid gap-5 sm:grid-cols-2 xl:grid-cols-3">
+                  {tournamentTeams.map((team) => (
+                    <ImageUploadField
+                      key={team.id}
+                      label={team.name}
+                      hint="Square or wide logo on white background works best"
+                      prefix={`tournaments/${form.slug}/team-logos`}
+                      currentUrl={team.logoUrl}
+                      onUploaded={(url) => {
+                        setTournamentTeams((teams) =>
+                          teams.map((t) => (t.id === team.id ? { ...t, logoUrl: url } : t)),
+                        );
+                      }}
+                      onUploadedComplete={async (url) => {
+                        await patchTeamLogo(team.id, url, team.name);
+                      }}
+                      onClear={async () => {
+                        setTournamentTeams((teams) =>
+                          teams.map((t) => (t.id === team.id ? { ...t, logoUrl: null } : t)),
+                        );
+                        await patchTeamLogo(team.id, null, team.name);
+                      }}
+                    />
+                  ))}
+                </div>
+              )}
             </AdminSection>
           </div>
         )}

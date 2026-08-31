@@ -916,11 +916,19 @@ export async function registerForTournament(
   }
 
   if (tournament.game === GameSlug.EA_FC26) {
-    return { ok: false, error: "Use the FIFA team registration form." };
+    return { ok: false, error: "Use the FIFA registration form." };
   }
 
   if (tournament.registrationFormat === "STANDARD") {
     return { ok: false, error: "Use the standard team registration form." };
+  }
+
+  if (tournament.registrationFormat === "DUO") {
+    return { ok: false, error: "Use the 2v2 team registration form." };
+  }
+
+  if (tournament.registrationFormat === "SOLO") {
+    return { ok: false, error: "Use the 1v1 solo registration form." };
   }
 
   const user = await prisma.user.findUnique({
@@ -1125,14 +1133,108 @@ export async function registerFifaTeam(
   userId: string,
   input: FifaRegisterInput,
 ): Promise<RegistrationResult> {
-  return registerPartnerDuoCup(slug, userId, input, GameSlug.EA_FC26);
+  return registerDuoCup(slug, userId, input, GameSlug.EA_FC26);
+}
+
+export async function registerDuoCup(
+  slug: string,
+  userId: string,
+  input: FifaRegisterInput,
+  game: typeof GameSlug.EA_FC26 | typeof GameSlug.VALORANT,
+): Promise<RegistrationResult> {
+  return registerPartnerDuoCup(slug, userId, input, game);
+}
+
+export async function registerSoloCup(
+  slug: string,
+  userId: string,
+): Promise<RegistrationResult> {
+  const tournament = await prisma.tournament.findUnique({ where: { slug } });
+
+  if (!tournament) {
+    return { ok: false, error: "Tournament not found." };
+  }
+
+  if (tournament.registrationFormat !== "SOLO") {
+    return { ok: false, error: "This cup does not use 1v1 solo registration." };
+  }
+
+  if (tournament.game !== GameSlug.EA_FC26 && tournament.game !== GameSlug.VALORANT) {
+    return { ok: false, error: "Solo registration is only available for FIFA and Valorant cups." };
+  }
+
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    include: { playerProfile: true },
+  });
+
+  if (!user) {
+    return { ok: false, error: "Account not found." };
+  }
+
+  if (!user.emailVerified || !user.signupCompleted) {
+    return { ok: false, error: "Complete signup before registering for cups." };
+  }
+
+  if (!isTournamentRegistrationLive(tournament)) {
+    return { ok: false, error: "Registration is not open for this tournament." };
+  }
+
+  const missing = validateGameProfile(tournament.game, user);
+  if (missing.length > 0) {
+    return { ok: false, error: missing[0] };
+  }
+
+  const snapshot = await buildRegistrationSnapshotForUser(userId, tournament.game);
+  if (!snapshot.ok) return snapshot;
+
+  const existing = await prisma.tournamentRegistration.findUnique({
+    where: {
+      tournamentId_userId: { tournamentId: tournament.id, userId },
+    },
+  });
+  if (existing) {
+    return { ok: false, error: "You are already registered for this tournament." };
+  }
+
+  try {
+    const reg = await prisma.tournamentRegistration.create({
+      data: {
+        tournamentId: tournament.id,
+        userId,
+        participantRole: "PLAYER",
+        status: "APPROVED",
+        ...snapshot.data,
+        snapshotValorantRoles: snapshot.data.snapshotValorantRoles
+          ? (snapshot.data.snapshotValorantRoles as unknown as import("@prisma/client").Prisma.InputJsonValue)
+          : undefined,
+      },
+    });
+
+    await logUserActivity({
+      userId,
+      email: user.email,
+      name: user.name,
+      action: "TOURNAMENT_REGISTER",
+      target: slug,
+      details: `Registered for cup "${tournament.name}" (1v1 solo).`,
+    });
+
+    return { ok: true, registrationId: reg.id };
+  } catch (e: unknown) {
+    const code = (e as { code?: string })?.code;
+    if (code === "P2002") {
+      return { ok: false, error: "You are already registered for this tournament." };
+    }
+    throw e;
+  }
 }
 
 async function registerPartnerDuoCup(
   slug: string,
   userId: string,
   input: FifaRegisterInput,
-  game: typeof GameSlug.EA_FC26,
+  game: typeof GameSlug.EA_FC26 | typeof GameSlug.VALORANT,
 ): Promise<RegistrationResult> {
   const tournament = await prisma.tournament.findUnique({
     where: { slug },
@@ -1143,8 +1245,19 @@ async function registerPartnerDuoCup(
     return { ok: false, error: "Tournament not found." };
   }
 
+  const expectedFormat = tournament.registrationFormat ?? "DUO";
+  if (expectedFormat !== "DUO") {
+    return { ok: false, error: "This cup does not use 2v2 team registration." };
+  }
+
   if (tournament.game !== game) {
-    return { ok: false, error: "This registration flow is for FIFA cups only." };
+    return {
+      ok: false,
+      error:
+        game === GameSlug.EA_FC26
+          ? "This registration flow is for FIFA cups only."
+          : "This registration flow is for Valorant cups only.",
+    };
   }
 
   const initiator = await prisma.user.findUnique({
@@ -1211,6 +1324,12 @@ async function registerPartnerDuoCup(
     return { ok: false, error: "Your partner is already registered for this tournament." };
   }
 
+  const captainSnapshot = await buildRegistrationSnapshotForUser(userId, game);
+  if (!captainSnapshot.ok) return captainSnapshot;
+
+  const partnerSnapshot = await buildRegistrationSnapshotForUser(partner.id, game);
+  if (!partnerSnapshot.ok) return partnerSnapshot;
+
   const teamName = input.teamName.trim();
   const sortOrder = (tournament.tournamentTeams[0]?.sortOrder ?? -1) + 1;
   const partnerDisplayName =
@@ -1239,7 +1358,10 @@ async function registerPartnerDuoCup(
           partnerUserId: partner.id,
           partnerName: partnerDisplayName,
           snapshotPartnerUsername: partnerDisplayName,
-          ...userSnapshotFields(initiator),
+          ...captainSnapshot.data,
+          snapshotValorantRoles: captainSnapshot.data.snapshotValorantRoles
+            ? (captainSnapshot.data.snapshotValorantRoles as unknown as import("@prisma/client").Prisma.InputJsonValue)
+            : undefined,
           status: "APPROVED",
         },
       });
@@ -1254,7 +1376,10 @@ async function registerPartnerDuoCup(
           partnerUserId: initiator.id,
           partnerName: initiatorDisplayName,
           snapshotPartnerUsername: initiatorDisplayName,
-          ...userSnapshotFields(partner),
+          ...partnerSnapshot.data,
+          snapshotValorantRoles: partnerSnapshot.data.snapshotValorantRoles
+            ? (partnerSnapshot.data.snapshotValorantRoles as unknown as import("@prisma/client").Prisma.InputJsonValue)
+            : undefined,
           status: "APPROVED",
         },
       });
@@ -1506,6 +1631,10 @@ export async function switchPlayerToCaptain(
 
   if (tournament.game === GameSlug.EA_FC26) {
     return { ok: false, error: "This action is not available for FIFA cups." };
+  }
+
+  if (tournament.registrationFormat === "DUO" || tournament.registrationFormat === "SOLO") {
+    return { ok: false, error: "This action is not available for 1v1 or 2v2 cups." };
   }
 
   if (!isTournamentRegistrationLive(tournament)) {
