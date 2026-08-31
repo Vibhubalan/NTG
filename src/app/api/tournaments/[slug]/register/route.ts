@@ -6,12 +6,15 @@ import {
   registerForTournament,
   registerStandardTeam,
   registerFifaTeam,
+  registerDuoCup,
+  registerSoloCup,
   getValorantRegistrationProfileCard,
 } from "@tournaments-leagues/index";
 import {
   tournamentRegisterSchema,
   standardTournamentRegisterSchema,
-  fifaRegisterSchema,
+  duoRegisterSchema,
+  soloRegisterSchema,
 } from "@auth-membership/domain/schemas";
 import { NextResponse } from "next/server";
 
@@ -60,19 +63,53 @@ export async function POST(req: Request, { params }: Props) {
     return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
   }
 
-  if (tournament.game === "EA_FC26") {
-    const parsed = fifaRegisterSchema.safeParse(body);
+  const format = tournament.registrationFormat ?? (tournament.game === "EA_FC26" ? "DUO" : null);
+
+  if (format === "SOLO") {
+    const parsed = soloRegisterSchema.safeParse(body);
     if (!parsed.success) {
       return NextResponse.json(
         { error: parsed.error.issues[0]?.message ?? "Invalid registration." },
         { status: 400 },
       );
     }
-    const result = await registerFifaTeam(slug, auth.userId, parsed.data);
+    const result = await registerSoloCup(slug, auth.userId);
     if (!result.ok) {
       return NextResponse.json({ error: result.error }, { status: 400 });
     }
     return registrationResponse(slug, auth.userId, result.registrationId, tournament.game);
+  }
+
+  if (format === "DUO") {
+    const parsed = duoRegisterSchema.safeParse(body);
+    if (!parsed.success) {
+      return NextResponse.json(
+        { error: parsed.error.issues[0]?.message ?? "Invalid registration." },
+        { status: 400 },
+      );
+    }
+    if (tournament.game === "EA_FC26") {
+      const result = await registerFifaTeam(slug, auth.userId, parsed.data);
+      if (!result.ok) {
+        return NextResponse.json({ error: result.error }, { status: 400 });
+      }
+      return registrationResponse(slug, auth.userId, result.registrationId, tournament.game);
+    }
+    if (tournament.game === "VALORANT") {
+      const result = await registerDuoCup(slug, auth.userId, parsed.data, "VALORANT");
+      if (!result.ok) {
+        return NextResponse.json({ error: result.error }, { status: 400 });
+      }
+      return registrationResponse(slug, auth.userId, result.registrationId, tournament.game);
+    }
+    return NextResponse.json({ error: "2v2 registration is not supported for this game." }, { status: 400 });
+  }
+
+  if (tournament.game === "EA_FC26") {
+    return NextResponse.json(
+      { error: "This FIFA cup does not have a supported registration format." },
+      { status: 400 },
+    );
   }
 
   if (tournament.registrationFormat === "STANDARD") {

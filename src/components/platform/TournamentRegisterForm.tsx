@@ -280,11 +280,13 @@ export default function TournamentRegisterForm({
       : "rounded-xl border border-white/10 bg-white/[0.03] px-4 py-4 text-left transition-colors hover:border-[var(--color-brand)]/40";
 
   const effectiveRole = switchedToCaptain ? "CAPTAIN" : userParticipantRole;
+  const resolvedFormat =
+    registrationFormat ?? (game === "EA_FC26" ? "DUO" : registrationFormat);
   const canSwitchToCaptain =
     (alreadyRegistered || success) &&
     effectiveRole === "PLAYER" &&
     registrationOpen &&
-    game !== "EA_FC26";
+    resolvedFormat === "AUCTION";
 
   if (!isLoggedIn) {
     return (
@@ -448,6 +450,40 @@ export default function TournamentRegisterForm({
     );
   }
 
+  async function submitSoloRegistration() {
+    if (submitting.current || loading || !acceptedTerms) return;
+    submitting.current = true;
+    setLoading(true);
+    setError(null);
+
+    try {
+      const res = await fetch(`/api/tournaments/${slug}/register`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ acceptedTerms: true }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setError(
+          (data as { error?: string }).error ??
+            (res.status >= 500
+              ? "Server error. Restart dev after running prisma generate."
+              : "Registration failed."),
+        );
+        submitting.current = false;
+        setLoading(false);
+        return;
+      }
+      setSuccess(true);
+      if (data.profileCard) setProfileCard(data.profileCard);
+      router.refresh();
+    } catch {
+      setError("Something went wrong. Try again.");
+      submitting.current = false;
+      setLoading(false);
+    }
+  }
+
   async function submitDuoRegistration() {
     if (submitting.current || loading || !acceptedTerms) return;
     submitting.current = true;
@@ -524,10 +560,6 @@ export default function TournamentRegisterForm({
     }
   }
 
-  async function submitFifaRegistration() {
-    return submitDuoRegistration();
-  }
-
   async function submitRegistration() {
     if (submitting.current || loading || !participantRole || !acceptedTerms) return;
     submitting.current = true;
@@ -580,14 +612,48 @@ export default function TournamentRegisterForm({
 
   const standardMembersComplete = memberUsernames.every((u) => u.trim().length >= 2);
 
-  if (game === "EA_FC26") {
+  if (resolvedFormat === "SOLO") {
     return (
       <div className="shine-border rounded-[1.35rem] lg:sticky lg:top-28">
         <div className="shine-border-inner space-y-4 rounded-[1.35rem] bg-[#0a1020]/85 p-6 backdrop-blur-sm">
           <div>
             <p className="text-[10px] font-medium uppercase tracking-[0.32em] text-[var(--color-brand)]/85">Register</p>
             <p className="mt-2 text-sm text-white/45">
-              Register your 2v2 team. Your partner must have an NTG account. Add them by username.
+              1v1 solo registration. You compete on your own — no team or partner required.
+            </p>
+          </div>
+
+          <ProfilePreview preview={preview} game={game} />
+
+          <RegistrationTermsAgreement
+            checked={acceptedTerms}
+            onChange={setAcceptedTerms}
+            rulebookUrl={rulebookUrl}
+            disabled={loading}
+          />
+          <button
+            type="button"
+            onClick={submitSoloRegistration}
+            disabled={loading || !acceptedTerms}
+            className="cta w-full rounded-full py-3 text-xs font-semibold uppercase tracking-[0.18em] disabled:opacity-50"
+          >
+            {loading ? "Registering…" : "Register for 1v1"}
+          </button>
+
+          {error ? <p className="text-sm text-red-400/90">{error}</p> : null}
+        </div>
+      </div>
+    );
+  }
+
+  if (resolvedFormat === "DUO") {
+    return (
+      <div className="shine-border rounded-[1.35rem] lg:sticky lg:top-28">
+        <div className="shine-border-inner space-y-4 rounded-[1.35rem] bg-[#0a1020]/85 p-6 backdrop-blur-sm">
+          <div>
+            <p className="text-[10px] font-medium uppercase tracking-[0.32em] text-[var(--color-brand)]/85">Register</p>
+            <p className="mt-2 text-sm text-white/45">
+              Register your 2v2 team. You are the captain. Your partner must have an NTG account — add them by username.
             </p>
           </div>
 
@@ -617,15 +683,25 @@ export default function TournamentRegisterForm({
             />
             <button
               type="button"
-              onClick={submitFifaRegistration}
+              onClick={submitDuoRegistration}
               disabled={loading || !teamName.trim() || !partnerUsername.trim() || !acceptedTerms}
               className="cta w-full rounded-full py-3 text-xs font-semibold uppercase tracking-[0.18em] disabled:opacity-50"
             >
-              {loading ? "Registering…" : "Register team"}
+              {loading ? "Registering…" : "Register 2v2 team"}
             </button>
           </div>
 
           {error ? <p className="text-sm text-red-400/90">{error}</p> : null}
+        </div>
+      </div>
+    );
+  }
+
+  if (game === "EA_FC26") {
+    return (
+      <div className="shine-border rounded-[1.35rem] lg:sticky lg:top-28">
+        <div className="shine-border-inner space-y-4 rounded-[1.35rem] bg-[#0a1020]/85 p-6 backdrop-blur-sm">
+          <p className="text-sm text-white/45">This cup does not have a supported registration format yet.</p>
         </div>
       </div>
     );

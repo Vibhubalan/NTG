@@ -144,6 +144,174 @@ function TeamPreviewScreen({
   );
 }
 
+function teamFooterLabel(team: TournamentTeamView, index: number): string {
+  if (team.seed != null) return `Seed #${team.seed}`;
+  if (team.players.length > 0) {
+    return `${team.players.length} ${team.players.length === 1 ? "player" : "players"}`;
+  }
+  return `Team #${index + 1}`;
+}
+
+function ParticipatingTeamsGrid({
+  rows,
+  accentHex,
+  onPreview,
+}: {
+  rows: TournamentTeamView[];
+  accentHex: string;
+  onPreview: (team: TournamentTeamView) => void;
+}) {
+  return (
+    <ul className="flex flex-wrap justify-center gap-3 sm:gap-4">
+      {rows.map((team, index) => {
+        const hasPlayers = team.players.length > 0;
+        const canPreview = hasPlayers;
+
+        return (
+          <li
+            key={team.id}
+            className="w-[min(calc(50%-0.375rem),11.5rem)] sm:w-40 md:w-44 lg:w-48"
+          >
+            <button
+              type="button"
+              onClick={() => canPreview && onPreview(team)}
+              disabled={!canPreview}
+              className={`flex h-full w-full min-w-0 flex-col overflow-hidden rounded-xl border border-white/10 bg-[#0A0A0A] text-left transition-colors ${
+                canPreview
+                  ? "cursor-pointer hover:border-white/20 hover:bg-[#111111] active:scale-[0.995]"
+                  : "cursor-default"
+              }`}
+            >
+              <div className="border-b border-white/10 px-3 py-2 text-center">
+                <span
+                  title={team.name}
+                  className="block truncate font-display text-xs font-bold uppercase tracking-wide text-cyan-300 sm:text-sm"
+                >
+                  {team.name}
+                </span>
+              </div>
+
+              <div className="relative aspect-square w-full overflow-hidden">
+                {team.logoUrl ? (
+                  <Image
+                    src={team.logoUrl}
+                    alt=""
+                    fill
+                    sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
+                    className="object-cover"
+                  />
+                ) : (
+                  <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-white/[0.04] to-white/[0.01]">
+                    <span
+                      className="flex h-14 w-14 items-center justify-center rounded-full text-lg font-black tabular-nums text-white sm:h-16 sm:w-16 sm:text-xl"
+                      style={{
+                        background: `${accentHex}22`,
+                        boxShadow: `inset 0 0 0 2px ${accentHex}55`,
+                      }}
+                    >
+                      {String(index + 1).padStart(2, "0")}
+                    </span>
+                  </div>
+                )}
+              </div>
+
+              <div className="border-t border-white/10 px-3 py-2 text-center">
+                <span className="text-[10px] font-semibold uppercase tracking-[0.14em] text-cyan-300/70 sm:text-[11px]">
+                  {teamFooterLabel(team, index)}
+                </span>
+              </div>
+            </button>
+          </li>
+        );
+      })}
+    </ul>
+  );
+}
+
+function ClassicTeamsList({
+  rows,
+  accentHex,
+  onPreview,
+}: {
+  rows: TournamentTeamView[];
+  accentHex: string;
+  onPreview: (team: TournamentTeamView) => void;
+}) {
+  return (
+    <ul className="grid min-w-0 gap-3 sm:grid-cols-2">
+      {rows.map((team, index) => {
+        const hasPlayers = team.players.length > 0;
+        const canPreview = hasPlayers;
+        const captainName = team.players.find((p) => p.participantRole === "CAPTAIN")?.displayName;
+
+        return (
+          <li key={team.id} className="min-w-0">
+            <button
+              type="button"
+              onClick={() => canPreview && onPreview(team)}
+              disabled={!canPreview}
+              className={`flex w-full min-w-0 items-center gap-3 rounded-[1.15rem] border border-white/[0.06] bg-[#0A0A0A]/70 px-4 py-3.5 text-left backdrop-blur-sm transition-colors sm:gap-4 sm:px-5 sm:py-4 ${
+                canPreview
+                  ? "cursor-pointer hover:border-white/[0.12] hover:bg-[#0A0A0A]/85 active:scale-[0.99]"
+                  : "cursor-default"
+              }`}
+            >
+              {team.logoUrl ? (
+                <Image
+                  src={team.logoUrl}
+                  alt=""
+                  width={40}
+                  height={40}
+                  className="h-10 w-10 shrink-0 rounded-xl object-cover"
+                />
+              ) : (
+                <span
+                  className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-sm font-black tabular-nums text-white"
+                  style={{
+                    background: `${accentHex}18`,
+                    boxShadow: `inset 0 0 0 1px ${accentHex}44`,
+                  }}
+                >
+                  {String(index + 1).padStart(2, "0")}
+                </span>
+              )}
+              <div className="min-w-0 flex-1">
+                <span
+                  title={team.name}
+                  className="block truncate font-display text-lg font-semibold tracking-[-0.01em] text-white/90"
+                >
+                  {team.name}
+                </span>
+                {hasPlayers ? (
+                  <p className="mt-0.5 truncate text-xs text-white/40">
+                    {captainName ? <span className="text-white/55">{captainName}</span> : null}
+                    {captainName ? " · " : ""}
+                    {team.players.length} {team.players.length === 1 ? "player" : "players"}
+                  </p>
+                ) : (
+                  <p className="mt-0.5 text-xs text-white/30">Registration in progress</p>
+                )}
+              </div>
+              {canPreview ? (
+                <svg
+                  className="h-4 w-4 shrink-0 text-white/30"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  viewBox="0 0 24 24"
+                  aria-hidden
+                >
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+                </svg>
+              ) : null}
+            </button>
+          </li>
+        );
+      })}
+    </ul>
+  );
+}
+
 export default function TournamentTeamsList({
   teams,
   teamDetails = [],
@@ -165,89 +333,28 @@ export default function TournamentTeamsList({
         }));
 
   const isDuoTeamCup = game === "EA_FC26";
+  const showLogoGrid = rows.some((team) => Boolean(team.logoUrl));
 
   return (
     <section className="min-w-0">
       <div className="mb-6 flex min-w-0 items-center gap-3">
         <div className="h-px w-6 shrink-0 bg-gradient-to-r from-transparent to-cyan-400 sm:w-8" />
         <h2 className="font-display text-xl font-bold tracking-widest text-white uppercase sm:text-2xl">
-          Teams
+          {showLogoGrid ? "Participating Teams" : "Teams"}
         </h2>
         <div className="h-px min-w-0 flex-1 bg-gradient-to-r from-cyan-400 to-transparent opacity-30" />
       </div>
 
       {rows.length > 0 ? (
-        <ul className="grid min-w-0 gap-3 sm:grid-cols-2">
-          {rows.map((team, index) => {
-            const hasPlayers = team.players.length > 0;
-            const canPreview = hasPlayers;
-            const captainName = team.players.find((p) => p.participantRole === "CAPTAIN")?.displayName;
-
-            return (
-              <li key={team.id} className="min-w-0">
-                <button
-                  type="button"
-                  onClick={() => canPreview && setPreviewTeam(team)}
-                  disabled={!canPreview}
-                  className={`flex w-full min-w-0 items-center gap-3 rounded-[1.15rem] border border-white/[0.06] bg-[#0A0A0A]/70 px-4 py-3.5 text-left backdrop-blur-sm transition-colors sm:gap-4 sm:px-5 sm:py-4 ${
-                    canPreview
-                      ? "cursor-pointer hover:border-white/[0.12] hover:bg-[#0A0A0A]/85 active:scale-[0.99]"
-                      : "cursor-default"
-                  }`}
-                >
-                  {team.logoUrl ? (
-                    <Image
-                      src={team.logoUrl}
-                      alt=""
-                      width={40}
-                      height={40}
-                      className="h-10 w-10 shrink-0 rounded-xl object-cover"
-                    />
-                  ) : (
-                    <span
-                      className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-sm font-black tabular-nums text-white"
-                      style={{
-                        background: `${accentHex}18`,
-                        boxShadow: `inset 0 0 0 1px ${accentHex}44`,
-                      }}
-                    >
-                      {String(index + 1).padStart(2, "0")}
-                    </span>
-                  )}
-                  <div className="min-w-0 flex-1">
-                    <span
-                      title={team.name}
-                      className="block truncate font-display text-lg font-semibold tracking-[-0.01em] text-white/90"
-                    >
-                      {team.name}
-                    </span>
-                    {hasPlayers ? (
-                      <p className="mt-0.5 truncate text-xs text-white/40">
-                        {captainName ? <span className="text-white/55">{captainName}</span> : null}
-                        {captainName ? " · " : ""}
-                        {team.players.length} {team.players.length === 1 ? "player" : "players"}
-                      </p>
-                    ) : (
-                      <p className="mt-0.5 text-xs text-white/30">Registration in progress</p>
-                    )}
-                  </div>
-                  {canPreview ? (
-                    <svg
-                      className="h-4 w-4 shrink-0 text-white/30"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                      viewBox="0 0 24 24"
-                      aria-hidden
-                    >
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
-                    </svg>
-                  ) : null}
-                </button>
-              </li>
-            );
-          })}
-        </ul>
+        showLogoGrid ? (
+          <ParticipatingTeamsGrid
+            rows={rows}
+            accentHex={accentHex}
+            onPreview={setPreviewTeam}
+          />
+        ) : (
+          <ClassicTeamsList rows={rows} accentHex={accentHex} onPreview={setPreviewTeam} />
+        )
       ) : (
         <div className="rounded-[1.25rem] border border-dashed border-white/10 bg-white/[0.02] px-6 py-10 text-center">
           <p className="text-sm text-white/45">

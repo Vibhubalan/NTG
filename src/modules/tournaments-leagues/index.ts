@@ -49,6 +49,8 @@ export {
   registerForTournament,
   registerStandardTeam,
   registerFifaTeam,
+  registerDuoCup,
+  registerSoloCup,
   getRegistrationEligibility,
   getValorantRegistrationProfileCard,
   switchPlayerToCaptain,

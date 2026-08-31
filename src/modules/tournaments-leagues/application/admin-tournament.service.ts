@@ -681,7 +681,7 @@ export async function createTournamentTeam(
 
 export async function updateTournamentTeam(
   teamId: string,
-  input: { name?: string; seed?: number | null; sortOrder?: number },
+  input: { name?: string; seed?: number | null; sortOrder?: number; logoUrl?: string | null },
 ): Promise<{ ok: true } | { ok: false; error: string }> {
   const team = await prisma.tournamentTeam.findUnique({ where: { id: teamId } });
   if (!team) return { ok: false, error: "Team not found." };
@@ -693,8 +693,9 @@ export async function updateTournamentTeam(
       where: { id: teamId },
       data: {
         ...(newName ? { name: newName } : {}),
-        seed: input.seed,
-        sortOrder: input.sortOrder,
+        ...(input.seed !== undefined ? { seed: input.seed } : {}),
+        ...(input.sortOrder !== undefined ? { sortOrder: input.sortOrder } : {}),
+        ...(input.logoUrl !== undefined ? { logoUrl: input.logoUrl } : {}),
       },
     });
 
