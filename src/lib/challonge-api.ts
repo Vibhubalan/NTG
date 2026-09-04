@@ -539,7 +539,7 @@ const REDIS_TTL_COMPLETED_SEC = 600;
 
 function redisBracketKey(slug: string): string {
   // v2: hide duplicate completed grand-final resets
-  return `challonge:bracket:v2:${slug}`;
+  return `challonge:bracket:v3:${slug}`;
 }
 
 /** Store a freshly fetched bracket in memory, disk, and Redis (cross-instance). */
@@ -841,6 +841,29 @@ function buildGroupRoundsFromModuleMatches(
   });
 }
 
+function standingsFromGroupRounds(rounds: BracketRoundView[]): GroupStandingView[] {
+  const names = new Set<string>();
+  for (const round of rounds) {
+    for (const match of round.matches) {
+      for (const slot of match.slots) {
+        const name = slot.name?.trim();
+        if (name && name !== "TBD" && name !== "BYE") names.add(name);
+      }
+    }
+  }
+  return [...names].map((name) => ({
+    rank: 0,
+    name,
+    matchRecord: "0 - 0 - 0",
+    ptsDiff: 0,
+    pts: 0,
+    tb: 0,
+    setWins: 0,
+    setTies: 0,
+    matchHistory: [],
+  }));
+}
+
 function normalizeModuleStore(
   url: string,
   store: ModuleStore,
@@ -853,8 +876,10 @@ function normalizeModuleStore(
   if (storeGroups && storeGroups.length > 0) {
     groups = storeGroups.map((g, idx) => {
       const groupName = g.name || `Group ${String.fromCharCode(65 + idx)}`;
-      const standings = g.scorecard_html ? parseScorecardHtml(g.scorecard_html) : [];
       const gRounds = g.matches_by_round ? buildGroupRoundsFromModuleMatches(g.matches_by_round) : [];
+      const parsed = g.scorecard_html ? parseScorecardHtml(g.scorecard_html) : [];
+      const standings =
+        parsed.length > 0 ? parsed : standingsFromGroupRounds(gRounds);
       return {
         id: `group-${idx + 1}`,
         name: groupName,
@@ -1072,6 +1097,22 @@ function normalizeModuleStore(
         record: `${r.wins} - ${r.losses}`,
       }))
     : [];
+
+  if (groups) {
+    for (const group of groups) {
+      for (const standing of group.standings) {
+        if (standing.name.trim()) participants.add(standing.name);
+      }
+      for (const round of group.rounds) {
+        for (const match of round.matches) {
+          for (const slot of match.slots) {
+            const name = slot.name?.trim();
+            if (name && name !== "TBD" && name !== "BYE") participants.add(name);
+          }
+        }
+      }
+    }
+  }
 
   return {
     tournamentName: store.tournament?.name || "Tournament",

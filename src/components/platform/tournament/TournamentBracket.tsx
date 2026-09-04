@@ -461,8 +461,50 @@ function compareChallongeStandings(a: GroupStandingView, b: GroupStandingView): 
   return a.name.localeCompare(b.name);
 }
 
+function namesFromGroupMatches(group: GroupView): string[] {
+  const names = new Set<string>();
+  for (const round of group.rounds) {
+    for (const match of round.matches) {
+      for (const slot of match.slots) {
+        const name = slot.name?.trim();
+        if (name && name !== "TBD" && name !== "BYE") names.add(name);
+      }
+    }
+  }
+  return Array.from(names);
+}
+
+function emptyGroupStanding(name: string): GroupStandingView {
+  return {
+    rank: 0,
+    name,
+    matchRecord: "0 - 0 - 0",
+    ptsDiff: 0,
+    pts: 0,
+    tb: 0,
+    setWins: 0,
+    setTies: 0,
+    matchHistory: [],
+  };
+}
+
+function groupHasMatchResults(group: GroupView): boolean {
+  return group.rounds.some((round) =>
+    round.matches.some((match) =>
+      match.slots.some((slot) => {
+        const name = slot.name?.trim();
+        return Boolean(name && name !== "TBD" && name !== "BYE");
+      }),
+    ),
+  );
+}
+
 function computeGroupHistoryAndStats(group: GroupView): GroupStandingView[] {
-  const standings = group.standings.map((s) => {
+  const source =
+    group.standings.length > 0
+      ? group.standings
+      : namesFromGroupMatches(group).map(emptyGroupStanding);
+  const standings = source.map((s) => {
     const history: ("W" | "L" | "T")[] = [];
     let wins = 0;
     let losses = 0;
@@ -589,7 +631,7 @@ function RoundRobinBracketView({
   if (
     bracket.groups &&
     bracket.groups.length > 0 &&
-    bracket.groups.some((g) => g.standings.length > 0)
+    bracket.groups.some((g) => g.standings.length > 0 || groupHasMatchResults(g))
   ) {
     groups = bracket.groups;
   } else if (bracket.rounds && bracket.rounds.length > 0) {
