@@ -92,6 +92,8 @@ export {
   listPublishedTournamentGames,
   listTournamentStatsEligibility,
   scanTournamentGamesChunk,
+  listPlayerStandardCustomGames,
+  importStandardCustomMatches,
   publishTournamentGames,
   setTournamentGameStatus,
   deleteTournamentGame,
@@ -99,6 +101,7 @@ export {
   type TournamentGameView,
   type TournamentGamePlayerView,
   type ScanChunkResult,
+  type PlayerStandardCustomPreview,
   type TournamentStatsEligibility,
   type StatsTeamMembership,
 } from "./application/tournament-games.service";
