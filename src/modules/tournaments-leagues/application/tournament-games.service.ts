@@ -49,8 +49,6 @@ const IMPORT_DETAILS_PER_CHUNK = 10;
 const DEFAULT_HISTORY_SIZE = 20;
 const DEFAULT_MIN_PLAYERS = 5;
 const DEFAULT_HISTORY_MODES = ["custom"] as const;
-/** Encodes roster player index + match index for stateless chunked scans. */
-const SCANNER_CURSOR_STRIDE = 10_000;
 
 /** Henrik history mode param (scan uses custom only). */
 export type HenrikHistoryMode = "custom" | "unrated";
@@ -349,6 +347,103 @@ async function resolveTeamRoster(
   }
 
   return { teamName: team.name, players, region };
+}
+
+async function resolveTeamPlayerRowIdentity(
+  row: {
+    userId: string | null;
+    riotGameName: string | null;
+    riotTagLine: string | null;
+    user: {
+      riotPuuid: string | null;
+      riotGameName: string | null;
+      riotTagLine: string | null;
+      riotRegion: string | null;
+    } | null;
+    registration: { snapshotRiotId: string | null } | null;
+  },
+  teamId: string,
+  region: string,
+): Promise<{ player: RosterPlayerIdentity; region: string } | null> {
+  const fromUser = row.user
+    ? splitRiotFields(row.user.riotGameName, row.user.riotTagLine, null)
+    : null;
+  const fromRow = splitRiotFields(row.riotGameName, row.riotTagLine, null);
+  const fromReg = splitRiotFields(null, null, row.registration?.snapshotRiotId ?? null);
+  const identity = fromUser ?? fromRow ?? fromReg;
+  let puuid = row.user?.riotPuuid ?? null;
+  let resolvedRegion = region;
+
+  if (!puuid && identity) {
+    try {
+      const account = await resolveRiotAccount(identity.gameName, identity.tagLine);
+      if (account?.puuid) {
+        puuid = account.puuid;
+        if (account.region) resolvedRegion = normalizeHenrikRegion(account.region);
+        if (row.userId) {
+          await prisma.user.update({
+            where: { id: row.userId },
+            data: {
+              riotPuuid: account.puuid,
+              riotGameName: account.gameName,
+              riotTagLine: account.tagLine,
+              riotRegion: account.region ?? undefined,
+            },
+          });
+        }
+      }
+    } catch {
+      return null;
+    }
+  } else if (row.user?.riotRegion) {
+    resolvedRegion = normalizeHenrikRegion(row.user.riotRegion);
+  }
+
+  if (!puuid || !identity) return null;
+
+  return {
+    player: {
+      puuid,
+      userId: row.userId,
+      teamId,
+      riotGameName: identity.gameName,
+      riotTagLine: identity.tagLine,
+    },
+    region: resolvedRegion,
+  };
+}
+
+async function resolveScannerPlayer(opts: {
+  teamAId: string;
+  teamBId: string;
+  rosterA: Awaited<ReturnType<typeof resolveTeamRoster>>;
+  rosterB: Awaited<ReturnType<typeof resolveTeamRoster>>;
+  region: string;
+  scannerPlayerId?: string | null;
+}): Promise<{ ok: true; scanner: RosterPlayerIdentity; region: string } | { ok: false; error: string }> {
+  if (opts.scannerPlayerId) {
+    const row = await prisma.tournamentTeamPlayer.findFirst({
+      where: {
+        id: opts.scannerPlayerId,
+        teamId: { in: [opts.teamAId, opts.teamBId] },
+      },
+      include: { user: true, registration: true },
+    });
+    if (!row) {
+      return { ok: false, error: "Scanner player not found on either team." };
+    }
+    const resolved = await resolveTeamPlayerRowIdentity(row, row.teamId, opts.region);
+    if (!resolved) {
+      return { ok: false, error: "Scanner player has no resolvable Riot identity." };
+    }
+    return { ok: true, scanner: resolved.player, region: resolved.region };
+  }
+
+  const defaultPlayer = opts.rosterA.players[0];
+  if (!defaultPlayer) {
+    return { ok: false, error: "Team A has no resolvable players. Pick a scanner player." };
+  }
+  return { ok: true, scanner: defaultPlayer, region: opts.region };
 }
 
 function dedupeRosterScanners(
@@ -879,35 +974,17 @@ export async function listPublishedTournamentGames(slug: string): Promise<{
   );
 }
 
-export type ScannedMatchPreview = {
-  matchId: string;
-  mapName: string | null;
-  startedAt: string | null;
-  matched: boolean;
-};
-
 export type ScanChunkResult = {
   done: boolean;
   cursor: number;
   total: number;
   checked: number;
   found: TournamentGameView[];
-  scanned: ScannedMatchPreview[];
   progress: string;
   teamAResolved: number;
   teamBResolved: number;
+  scannerLabel: string;
 };
-
-function decodeScanCursor(cursor: number): { playerIndex: number; matchIndex: number } {
-  return {
-    playerIndex: Math.floor(cursor / SCANNER_CURSOR_STRIDE),
-    matchIndex: cursor % SCANNER_CURSOR_STRIDE,
-  };
-}
-
-function encodeScanCursor(playerIndex: number, matchIndex: number): number {
-  return playerIndex * SCANNER_CURSOR_STRIDE + matchIndex;
-}
 
 export type GameSearchCandidate = {
   matchId: string;
@@ -1145,6 +1222,7 @@ export async function scanTournamentGamesChunk(opts: {
   cursor?: number;
   minPlayersPerTeam?: number;
   historySize?: number;
+  scannerPlayerId?: string | null;
 }): Promise<{ ok: true; result: ScanChunkResult } | { ok: false; error: string }> {
   try {
     const ctx = await resolveTeamPairContext({
@@ -1155,36 +1233,27 @@ export async function scanTournamentGamesChunk(opts: {
     });
     if (!ctx.ok) return ctx;
 
+    const scannerPick = await resolveScannerPlayer({
+      teamAId: opts.teamAId,
+      teamBId: opts.teamBId,
+      rosterA: ctx.rosterA,
+      rosterB: ctx.rosterB,
+      region: ctx.region,
+      scannerPlayerId: opts.scannerPlayerId,
+    });
+    if (!scannerPick.ok) return scannerPick;
+
     const started = Date.now();
     const historySize = opts.historySize ?? DEFAULT_HISTORY_SIZE;
-    const cursor = Math.max(0, opts.cursor ?? 0);
-    const scanners = dedupeRosterScanners(ctx.rosterA.players, ctx.rosterB.players);
-    const { playerIndex, matchIndex } = decodeScanCursor(cursor);
-
-    if (playerIndex >= scanners.length) {
-      return {
-        ok: true,
-        result: {
-          done: true,
-          cursor,
-          total: scanners.length * historySize,
-          checked: 0,
-          found: [],
-          scanned: [],
-          progress: `Finished scanning ${scanners.length} roster player(s).`,
-          teamAResolved: ctx.rosterA.players.length,
-          teamBResolved: ctx.rosterB.players.length,
-        },
-      };
-    }
-
-    const scanner = scanners[playerIndex]!;
+    const matchIndex = Math.max(0, opts.cursor ?? 0);
+    const scanner = scannerPick.scanner;
+    const region = scannerPick.region;
     const scannerLabel = `${scanner.riotGameName}#${scanner.riotTagLine}`;
 
     let history: HenrikMatchHistoryItem[] = [];
     try {
       history = await fetchCustomMatchHistory({
-        region: ctx.region,
+        region,
         puuid: scanner.puuid,
         gameName: scanner.riotGameName,
         tagLine: scanner.riotTagLine,
@@ -1198,52 +1267,32 @@ export async function scanTournamentGamesChunk(opts: {
     }
 
     if (matchIndex >= history.length) {
-      const nextPlayerIndex = playerIndex + 1;
-      const nextCursor = encodeScanCursor(nextPlayerIndex, 0);
-      const done = nextPlayerIndex >= scanners.length;
       return {
         ok: true,
         result: {
-          done,
-          cursor: nextCursor,
-          total: scanners.length * historySize,
+          done: true,
+          cursor: matchIndex,
+          total: history.length,
           checked: 0,
           found: [],
-          scanned: [],
-          progress: done
-            ? `Finished scanning ${scanners.length} roster player(s).`
-            : `Moving to roster player ${nextPlayerIndex + 1}/${scanners.length}…`,
+          progress: `Finished scanning ${history.length} custom match(es) for ${scannerLabel}.`,
           teamAResolved: ctx.rosterA.players.length,
           teamBResolved: ctx.rosterB.players.length,
+          scannerLabel,
         },
       };
     }
 
     const foundIds: string[] = [];
-    const scanned: ScannedMatchPreview[] = [];
     let checked = 0;
-    let nextCursor = cursor;
-    let foundMatchOnPlayer = false;
+    let nextCursor = matchIndex;
 
     for (let i = matchIndex; i < history.length; i++) {
       if (Date.now() - started > SCAN_TIME_BUDGET_MS) break;
       if (checked >= SCAN_DETAILS_PER_CHUNK) break;
 
-      const item = history[i];
-      const matchId = item?.metadata?.matchid;
-      nextCursor = encodeScanCursor(playerIndex, i + 1);
-
-      const startedAtMs =
-        typeof item?.metadata?.game_start === "number" && Number.isFinite(item.metadata.game_start)
-          ? item.metadata.game_start * 1000
-          : null;
-      const previewBase = {
-        matchId: matchId ?? "",
-        mapName: item?.metadata?.map ?? null,
-        startedAt:
-          startedAtMs != null ? new Date(startedAtMs).toISOString() : null,
-      };
-
+      const matchId = history[i]?.metadata?.matchid;
+      nextCursor = i + 1;
       if (!matchId) {
         checked += 1;
         continue;
@@ -1254,16 +1303,11 @@ export async function scanTournamentGamesChunk(opts: {
         detail = await fetchMatchDetails(matchId);
       } catch (err) {
         console.error("[tournament-games] detail failed", matchId, err);
-        scanned.push({ ...previewBase, matched: false });
         checked += 1;
         continue;
       }
       checked += 1;
-
-      if (!detail?.data) {
-        scanned.push({ ...previewBase, matched: false });
-        continue;
-      }
+      if (!detail?.data) continue;
 
       const lobby = detail.data.players?.all_players ?? [];
       const lobbyPuuids = new Set(lobby.map((p) => p.puuid).filter(Boolean));
@@ -1273,11 +1317,8 @@ export async function scanTournamentGamesChunk(opts: {
         lobbyPuuids,
         minPlayersPerTeam: ctx.minPlayers,
       });
-
-      scanned.push({ ...previewBase, matched: overlap.match });
       if (!overlap.match) continue;
 
-      foundMatchOnPlayer = true;
       try {
         const upserted = await upsertCandidateGame({
           tournamentId: ctx.tournamentId,
@@ -1291,7 +1332,7 @@ export async function scanTournamentGamesChunk(opts: {
           rosterBByPuuid: ctx.rosterBByPuuid,
           teamAPresent: overlap.teamAPresent,
           teamBPresent: overlap.teamBPresent,
-          region: ctx.region,
+          region,
         });
         foundIds.push(upserted.id);
       } catch (err) {
@@ -1312,36 +1353,21 @@ export async function scanTournamentGamesChunk(opts: {
       }
     }
 
-    const finishedCurrentPlayer = nextCursor >= encodeScanCursor(playerIndex + 1, 0);
-    if (finishedCurrentPlayer) {
-      if (foundMatchOnPlayer) {
-        nextCursor = encodeScanCursor(playerIndex + 1, 0);
-      } else if (playerIndex + 1 < scanners.length) {
-        nextCursor = encodeScanCursor(playerIndex + 1, 0);
-      }
-    }
-
-    const done =
-      finishedCurrentPlayer &&
-      (foundMatchOnPlayer || playerIndex + 1 >= scanners.length);
-    const progressMatchIndex = nextCursor % SCANNER_CURSOR_STRIDE;
-
+    const done = nextCursor >= history.length;
     return {
       ok: true,
       result: {
         done,
         cursor: nextCursor,
-        total: scanners.length * historySize,
+        total: history.length,
         checked,
         found,
-        scanned,
         progress: done
-          ? foundMatchOnPlayer
-            ? `Found ${found.length} match(es) on ${scannerLabel}; stopping after first hitting player.`
-            : `Finished scanning ${scanners.length} roster player(s).`
-          : `Player ${playerIndex + 1}/${scanners.length} (${scannerLabel}): checked ${progressMatchIndex}/${history.length} custom matches…`,
+          ? `Finished scanning ${history.length} custom match(es) for ${scannerLabel}.`
+          : `Scanning as ${scannerLabel}: checked ${nextCursor}/${history.length} custom matches…`,
         teamAResolved: ctx.rosterA.players.length,
         teamBResolved: ctx.rosterB.players.length,
+        scannerLabel,
       },
     };
   } catch (err) {
