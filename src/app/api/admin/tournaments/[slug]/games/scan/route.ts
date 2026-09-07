@@ -48,6 +48,10 @@ export async function POST(req: Request, { params }: Props) {
         typeof body.historySize === "number"
           ? body.historySize
           : Number(body.historySize) || undefined,
+      scannerPlayerId:
+        typeof body.scannerPlayerId === "string" && body.scannerPlayerId
+          ? body.scannerPlayerId
+          : undefined,
     });
 
     if (!result.ok) {

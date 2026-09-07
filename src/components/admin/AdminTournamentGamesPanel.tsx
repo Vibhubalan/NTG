@@ -3,10 +3,17 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { parseApiJson } from "@/lib/parse-api-json";
 
+type TeamPlayer = {
+  id: string;
+  displayName: string;
+  riotGameName: string | null;
+  riotTagLine: string | null;
+};
+
 type TeamOption = {
   id: string;
   name: string;
-  players: { id: string }[];
+  players: TeamPlayer[];
 };
 
 type GamePlayer = {
@@ -43,13 +50,6 @@ type GameRow = {
   players: GamePlayer[];
 };
 
-type ScannedMatch = {
-  matchId: string;
-  mapName: string | null;
-  startedAt: string | null;
-  matched: boolean;
-};
-
 type Props = {
   slug: string;
   teams: TeamOption[];
@@ -62,6 +62,13 @@ function formatWhen(iso: string | null): string {
     timeStyle: "short",
     timeZone: "Asia/Kolkata",
   });
+}
+
+function playerLabel(player: TeamPlayer): string {
+  if (player.riotGameName && player.riotTagLine) {
+    return `${player.riotGameName}#${player.riotTagLine}`;
+  }
+  return player.displayName;
 }
 
 function parseMatchIdList(raw: string): string[] {
@@ -78,12 +85,12 @@ function parseMatchIdList(raw: string): string[] {
 export default function AdminTournamentGamesPanel({ slug, teams }: Props) {
   const [teamAId, setTeamAId] = useState("");
   const [teamBId, setTeamBId] = useState("");
+  const [scannerPlayerId, setScannerPlayerId] = useState("");
   const [minPlayersInput, setMinPlayersInput] = useState("5");
   const [historySizeInput, setHistorySizeInput] = useState("20");
   const [pasteIds, setPasteIds] = useState("");
   const [games, setGames] = useState<GameRow[]>([]);
   const [selected, setSelected] = useState<Set<string>>(new Set());
-  const [scannedMatches, setScannedMatches] = useState<ScannedMatch[]>([]);
   const [scanning, setScanning] = useState(false);
   const [importing, setImporting] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -113,6 +120,35 @@ export default function AdminTournamentGamesPanel({ slug, teams }: Props) {
     void loadGames();
   }, [loadGames]);
 
+  const scannerOptions = useMemo(() => {
+    const options: Array<{ id: string; label: string }> = [];
+    for (const teamId of [teamAId, teamBId]) {
+      if (!teamId) continue;
+      const team = teams.find((t) => t.id === teamId);
+      if (!team) continue;
+      for (const player of team.players) {
+        options.push({
+          id: player.id,
+          label: `${team.name} · ${playerLabel(player)}`,
+        });
+      }
+    }
+    return options;
+  }, [teamAId, teamBId, teams]);
+
+  useEffect(() => {
+    if (!teamAId) {
+      setScannerPlayerId("");
+      return;
+    }
+    const teamA = teams.find((t) => t.id === teamAId);
+    const defaultId = teamA?.players[0]?.id ?? "";
+    setScannerPlayerId((prev) => {
+      if (prev && scannerOptions.some((o) => o.id === prev)) return prev;
+      return defaultId;
+    });
+  }, [teamAId, teamBId, teams, scannerOptions]);
+
   const candidates = useMemo(
     () => games.filter((g) => g.status === "CANDIDATE"),
     [games],
@@ -120,10 +156,6 @@ export default function AdminTournamentGamesPanel({ slug, teams }: Props) {
   const published = useMemo(
     () => games.filter((g) => g.status === "PUBLISHED" || g.status === "HIDDEN"),
     [games],
-  );
-  const matchedScanned = useMemo(
-    () => scannedMatches.filter((m) => m.matched),
-    [scannedMatches],
   );
 
   async function runScan() {
@@ -134,7 +166,6 @@ export default function AdminTournamentGamesPanel({ slug, teams }: Props) {
     setScanning(true);
     setError(null);
     setLog([]);
-    setScannedMatches([]);
     pushLog("Starting Henrik custom-match scan…");
 
     const parsedMinPlayers = Number(minPlayersInput);
@@ -161,6 +192,7 @@ export default function AdminTournamentGamesPanel({ slug, teams }: Props) {
             cursor,
             minPlayersPerTeam: minPlayers,
             historySize,
+            scannerPlayerId: scannerPlayerId || undefined,
           }),
         });
         const parsed = await parseApiJson(res);
@@ -180,22 +212,13 @@ export default function AdminTournamentGamesPanel({ slug, teams }: Props) {
           pushLog(
             `Resolved roster: Team A ${data.teamAResolved}, Team B ${data.teamBResolved}`,
           );
+          if (typeof data.scannerLabel === "string") {
+            pushLog(`Scanning as ${data.scannerLabel}`);
+          }
         }
         if (typeof data.progress === "string") pushLog(data.progress);
-        if (Array.isArray(data.scanned) && data.scanned.length) {
-          setScannedMatches((prev) => {
-            const seen = new Set(prev.map((m) => m.matchId));
-            const next = [...prev];
-            for (const row of data.scanned as ScannedMatch[]) {
-              if (!row.matchId || seen.has(row.matchId)) continue;
-              seen.add(row.matchId);
-              next.push(row);
-            }
-            return next;
-          });
-        }
         if (Array.isArray(data.found) && data.found.length) {
-          pushLog(`Imported ${data.found.length} candidate match(es) in this chunk.`);
+          pushLog(`Found ${data.found.length} candidate match(es) in this chunk.`);
         }
         cursor = typeof data.cursor === "number" ? data.cursor : cursor;
         done = !!data.done;
@@ -348,9 +371,8 @@ export default function AdminTournamentGamesPanel({ slug, teams }: Props) {
         <div>
           <h3 className="text-sm font-semibold text-white">Import custom games</h3>
           <p className="mt-1 text-xs text-white/45">
-            Pick two cup teams, then scan Henrik custom history one roster player at a time.
-            Stops after the first player whose history contains a matching 5v5 lobby. All checked
-            customs are listed below.
+            Pick two cup teams and scan one player&apos;s Henrik custom history. Matching 5v5
+            lobbies are saved as candidates below for you to publish on the public Matches tab.
           </p>
         </div>
 
@@ -359,7 +381,7 @@ export default function AdminTournamentGamesPanel({ slug, teams }: Props) {
             Need at least two teams with rosters before scanning.
           </p>
         ) : (
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
             <label className="space-y-1 text-xs text-white/50">
               Team A
               <select
@@ -388,6 +410,22 @@ export default function AdminTournamentGamesPanel({ slug, teams }: Props) {
                 {teams.map((t) => (
                   <option key={t.id} value={t.id}>
                     {t.name} ({t.players.length})
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="space-y-1 text-xs text-white/50">
+              Scan as player
+              <select
+                className="w-full rounded-xl border border-white/10 bg-[#0a1020]/60 px-3 py-2.5 text-sm text-white"
+                value={scannerPlayerId}
+                onChange={(e) => setScannerPlayerId(e.target.value)}
+                disabled={actionDisabled || !teamAId || !teamBId}
+              >
+                <option value="">Team A #1 (default)</option>
+                {scannerOptions.map((option) => (
+                  <option key={option.id} value={option.id}>
+                    {option.label}
                   </option>
                 ))}
               </select>
@@ -478,40 +516,6 @@ export default function AdminTournamentGamesPanel({ slug, teams }: Props) {
           </pre>
         ) : null}
       </div>
-
-      {scannedMatches.length > 0 ? (
-        <div className="rounded-2xl border border-white/[0.06] bg-[#0a1020]/40 p-5 space-y-3">
-          <h3 className="text-sm font-semibold text-white">
-            Scanned customs ({scannedMatches.length}
-            {matchedScanned.length ? ` · ${matchedScanned.length} matched` : ""})
-          </h3>
-          <ul className="max-h-72 space-y-2 overflow-auto">
-            {scannedMatches.map((m) => (
-              <li
-                key={m.matchId}
-                className="flex flex-wrap items-center gap-3 rounded-xl border border-white/[0.06] bg-white/[0.02] px-3 py-2.5"
-              >
-                <span
-                  className={`rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider ${
-                    m.matched
-                      ? "bg-emerald-500/15 text-emerald-200"
-                      : "bg-white/10 text-white/45"
-                  }`}
-                >
-                  {m.matched ? "Match" : "Skip"}
-                </span>
-                <div className="min-w-0 flex-1">
-                  <p className="text-sm text-white">{m.mapName ?? "Unknown map"}</p>
-                  <p className="text-[11px] text-white/40">
-                    {formatWhen(m.startedAt)} ·{" "}
-                    <span className="font-mono">{m.matchId.slice(0, 8)}…</span>
-                  </p>
-                </div>
-              </li>
-            ))}
-          </ul>
-        </div>
-      ) : null}
 
       <div className="rounded-2xl border border-white/[0.06] bg-[#0a1020]/40 p-5 space-y-3">
         <h3 className="text-sm font-semibold text-white">
