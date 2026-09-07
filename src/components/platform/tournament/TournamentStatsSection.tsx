@@ -69,21 +69,21 @@ function playerKd(p: AggregatedPlayer): string {
 function rowStyles(idx: number, mvps: number) {
   const isTop3 = idx < 3;
   const rowBgClass = isTop3
-    ? "border-b border-white/[0.04] bg-gradient-to-r from-emerald-500/[0.08] via-transparent to-transparent transition-colors hover:bg-white/[0.04]"
-    : "border-b border-white/[0.04] transition-colors hover:bg-white/[0.04]";
+    ? "border-b border-white/[0.035] transition-colors duration-150"
+    : "border-b border-white/[0.035] transition-colors duration-150";
   const mvpBadgeClass =
     mvps > 0
-      ? "inline-flex items-center gap-1 rounded-md border border-amber-400/40 bg-gradient-to-r from-amber-500/20 to-yellow-500/10 px-1.5 py-0.5 text-[10px] font-black tracking-wide text-amber-300 uppercase shadow-[0_0_10px_rgba(245,158,11,0.15)]"
+      ? "inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[9px] font-black tracking-wider text-amber-200 uppercase"
       : "";
-  const nameColorClass = "text-white font-bold";
+  const nameColorClass = idx === 0 ? "text-white font-bold" : "text-white/90 font-semibold";
   const rankClass =
     idx === 0
-      ? "text-yellow-400"
+      ? "text-amber-300"
       : idx === 1
-        ? "text-gray-300"
+        ? "text-slate-300"
         : idx === 2
-          ? "text-amber-500"
-          : "text-white/40";
+          ? "text-amber-600"
+          : "text-white/30";
 
   return { rowBgClass, mvpBadgeClass, nameColorClass, rankClass };
 }
@@ -247,12 +247,12 @@ export default function TournamentStatsSection({
         <div
           role="tablist"
           aria-label="Stats view"
-          className="inline-flex rounded-xl border border-white/12 bg-[#080d16] p-1 shadow-inner"
+          className="inline-flex gap-0.5 rounded-md border border-white/[0.08] bg-white/[0.02] p-0.5"
         >
           {(
             [
               { id: "players" as const, label: "Players" },
-              { id: "meta" as const, label: "Maps & Agents" },
+              { id: "meta" as const, label: "Maps & agents" },
             ] as const
           ).map((tab) => (
             <button
@@ -261,17 +261,17 @@ export default function TournamentStatsSection({
               role="tab"
               aria-selected={subTab === tab.id}
               onClick={() => setSubTab(tab.id)}
-              className={`min-w-[5.5rem] rounded-lg px-4 py-2.5 text-[11px] font-black tracking-[0.14em] uppercase transition-all sm:min-w-[7.5rem] ${
+              className={`rounded px-3.5 py-2 text-xs font-medium transition-colors ${
                 subTab === tab.id
-                  ? "bg-emerald-400 text-[#070a12] shadow-[0_0_16px_rgba(52,211,153,0.35)]"
-                  : "bg-transparent text-white/50 hover:bg-white/[0.06] hover:text-white/80"
+                  ? "bg-white/[0.08] text-white"
+                  : "text-white/45 hover:text-white/70"
               }`}
             >
               {tab.label}
             </button>
           ))}
         </div>
-        <span className="text-xs text-white/35">
+        <span className="text-[11px] text-white/30">
           {games.length} match{games.length !== 1 ? "es" : ""}
         </span>
       </div>
@@ -530,7 +530,17 @@ export default function TournamentStatsSection({
           </div>
 
           {/* ── Desktop table ── */}
-          <div className="relative hidden overflow-x-auto rounded-2xl border border-white/10 bg-[#080d16] shadow-2xl md:block">
+          <div
+            className="relative hidden overflow-x-auto rounded-2xl shadow-2xl md:block"
+            style={{
+              background: "linear-gradient(160deg, rgba(8,12,22,0.98) 0%, rgba(5,8,18,1) 100%)",
+              border: "1px solid rgba(255,255,255,0.07)",
+              backdropFilter: "blur(20px)",
+              boxShadow: "0 0 0 1px rgba(34,197,94,0.04) inset, 0 24px 48px rgba(0,0,0,0.45)",
+            }}
+          >
+            {/* Top shimmer line */}
+            <div className="h-px w-full bg-gradient-to-r from-transparent via-emerald-500/20 to-transparent" />
             {isAdmin && slug ? (
               <a
                 href={`/api/admin/tournaments/${encodeURIComponent(slug)}/stats/export`}
@@ -544,75 +554,78 @@ export default function TournamentStatsSection({
             ) : null}
             <table className="w-full min-w-[900px] text-sm sm:text-base">
               <thead>
-                <tr className="border-b border-white/10 bg-black/50 text-xs font-black tracking-wider text-white/60 uppercase">
-                  <th className="w-12 px-4 py-4 text-left">#</th>
+                <tr
+                  className="text-[9.5px] font-black tracking-[0.2em] text-white/25 uppercase"
+                  style={{ borderBottom: "1px solid rgba(255,255,255,0.06)", background: "rgba(255,255,255,0.02)" }}
+                >
+                  <th className="w-12 px-5 py-4 text-left">#</th>
                   <th className="px-4 py-4 text-left">Player</th>
                   <th
-                    className="cursor-pointer px-3 py-4 text-center select-none transition-colors hover:text-white"
+                    className="cursor-pointer px-3 py-4 text-center select-none transition-colors hover:text-white/60"
                     title="Toggle high→low / low→high"
                     onClick={() => toggleSort("gamesPlayed")}
                   >
                     GP{sortIcon("gamesPlayed")}
                   </th>
                   <th
-                    className="cursor-pointer px-3 py-4 text-center select-none transition-colors hover:text-white"
+                    className="cursor-pointer px-3 py-4 text-center select-none transition-colors hover:text-white/60"
                     title="Rating: ACS adjusted for how many games were played"
                     onClick={() => toggleSort("rating")}
                   >
                     Rating{sortIcon("rating")}
                   </th>
                   <th
-                    className="cursor-pointer px-3 py-4 text-center select-none transition-colors hover:text-white"
+                    className="cursor-pointer px-3 py-4 text-center select-none transition-colors hover:text-white/60"
                     title="Toggle high→low / low→high"
                     onClick={() => toggleSort("avgAcs")}
                   >
                     ACS{sortIcon("avgAcs")}
                   </th>
                   <th
-                    className="cursor-pointer px-3 py-4 text-center select-none transition-colors hover:text-white"
+                    className="cursor-pointer px-3 py-4 text-center select-none transition-colors hover:text-white/60"
                     title="Click to sort by Kills"
                     onClick={() => toggleSort("totalKills")}
                   >
                     K / D / A{sortIcon("totalKills")}
                   </th>
                   <th
-                    className="cursor-pointer px-3 py-4 text-center select-none transition-colors hover:text-white"
+                    className="cursor-pointer px-3 py-4 text-center select-none transition-colors hover:text-white/60"
                     onClick={() => toggleSort("kd")}
                   >
                     K/D{sortIcon("kd")}
                   </th>
                   <th
-                    className="cursor-pointer px-3 py-4 text-center select-none transition-colors hover:text-white"
+                    className="cursor-pointer px-3 py-4 text-center select-none transition-colors hover:text-white/60"
                     title="First kills"
                     onClick={() => toggleSort("totalFirstKills")}
                   >
                     FK{sortIcon("totalFirstKills")}
                   </th>
                   <th
-                    className="cursor-pointer px-3 py-4 text-center select-none transition-colors hover:text-white"
+                    className="cursor-pointer px-3 py-4 text-center select-none transition-colors hover:text-white/60"
                     title="First deaths"
                     onClick={() => toggleSort("totalFirstDeaths")}
                   >
                     FD{sortIcon("totalFirstDeaths")}
                   </th>
                   <th
-                    className="cursor-pointer px-3 py-4 text-center select-none transition-colors hover:text-white"
+                    className="cursor-pointer px-3 py-4 text-center select-none transition-colors hover:text-white/60"
                     onClick={() => toggleSort("avgHsPercent")}
                   >
                     HS%{sortIcon("avgHsPercent")}
                   </th>
                   <th
-                    className="cursor-pointer px-3 py-4 text-center select-none transition-colors hover:text-white"
+                    className="cursor-pointer px-3 py-4 text-center select-none transition-colors hover:text-white/60"
                     title="Click to cycle Agent Role filter"
                     onClick={cycleRoleFilter}
                   >
                     <div className="inline-flex items-center justify-center gap-2">
                       <span>Agents</span>
                       <span
-                        className={`inline-flex items-center gap-1 rounded-lg px-2 py-0.5 text-[10px] font-black uppercase transition-all ${
+                        className={`inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[9px] font-black uppercase transition-all ${
                           selectedRole === "ALL"
-                            ? "bg-white/10 text-white/50"
-                            : "bg-[#22c55e] text-[#070a12] shadow-sm"
+                            ? "bg-white/[0.08] text-white/40"
+                            : "bg-emerald-400 text-[#070a12] shadow-sm"
                         }`}
                       >
                         {selectedRole !== "ALL" ? (
@@ -634,86 +647,113 @@ export default function TournamentStatsSection({
                       rowStyles(idx, p.mvpCount);
 
                     return (
-                      <tr key={p.key} className={rowBgClass}>
-                        <td className="px-4 py-4 text-center">
-                          <span className={`font-mono text-base font-extrabold ${rankClass}`}>
+                      <tr
+                        key={p.key}
+                        className={rowBgClass}
+                        style={{
+                          background: idx === 0
+                            ? "linear-gradient(90deg, rgba(34,197,94,0.07) 0%, transparent 55%)"
+                            : undefined,
+                        }}
+                        onMouseEnter={(e) => {
+                          (e.currentTarget as HTMLElement).style.background = "rgba(255,255,255,0.028)";
+                        }}
+                        onMouseLeave={(e) => {
+                          (e.currentTarget as HTMLElement).style.background = idx === 0
+                            ? "linear-gradient(90deg, rgba(34,197,94,0.07) 0%, transparent 55%)"
+                            : "";
+                        }}
+                      >
+                        <td className="px-5 py-4 text-center">
+                          <span
+                            className={`font-mono text-base font-black tabular-nums ${rankClass}`}
+                            style={idx === 0 ? { textShadow: "0 0 12px rgba(251,191,36,0.4)" } : undefined}
+                          >
                             {idx + 1}
                           </span>
                         </td>
-                        <td className="px-4 py-4">
+                        <td className="px-4 py-3.5">
                           <div className="flex min-w-0 items-center gap-3">
                             <div className="shrink-0">
                               {agentIcon ? (
                                 <Image
                                   src={agentIcon}
                                   alt={p.mostPlayedAgent ?? "Agent"}
-                                  width={44}
-                                  height={44}
-                                  className="h-11 w-11 object-contain mix-blend-screen drop-shadow-md filter"
+                                  width={40}
+                                  height={40}
+                                  className="h-10 w-10 object-contain mix-blend-screen drop-shadow-md filter"
                                 />
                               ) : (
-                                <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-white/10 text-xs font-bold text-white/50">
+                                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-white/[0.06] text-xs font-bold text-white/40">
                                   {name.slice(0, 2)}
                                 </div>
                               )}
                             </div>
                             <div className="min-w-0 flex-1">
                               <div className="flex items-baseline gap-1.5 min-w-0">
-                                <span className={`truncate text-base ${nameColorClass}`}>
+                                <span className={`truncate text-[13px] leading-tight ${nameColorClass}`}>
                                   {name}
                                 </span>
                                 {tag ? (
-                                  <span className="shrink-0 font-mono text-xs text-white/40">
+                                  <span className="shrink-0 font-mono text-[10px] text-white/30">
                                     #{tag}
                                   </span>
                                 ) : null}
                               </div>
                               {p.mvpCount > 0 ? (
                                 <div className="mt-1 flex flex-wrap items-center gap-1.5">
-                                  <span className={`shrink-0 ${mvpBadgeClass}`}>
-                                    👑 {p.mvpCount}x MVP
+                                  <span
+                                    className={`shrink-0 ${mvpBadgeClass}`}
+                                    style={{ background: "linear-gradient(135deg, rgba(245,158,11,0.18) 0%, rgba(234,179,8,0.08) 100%)", border: "1px solid rgba(245,158,11,0.3)", boxShadow: "0 0 8px rgba(245,158,11,0.12)" }}
+                                  >
+                                    <svg viewBox="0 0 12 12" fill="currentColor" className="h-2.5 w-2.5 text-amber-300" aria-hidden>
+                                      <path d="M6 1L7.5 4.5H11L8.5 6.5L9.5 10L6 8L2.5 10L3.5 6.5L1 4.5H4.5L6 1Z" />
+                                    </svg>
+                                    {p.mvpCount}x MVP
                                   </span>
                                 </div>
                               ) : null}
                             </div>
                           </div>
                         </td>
-                        <td className="px-3 py-4 text-center font-mono text-sm font-medium text-white/80">
+                        <td className="px-3 py-3.5 text-center font-mono text-[13px] font-semibold tabular-nums text-white/55">
                           {p.gamesPlayed}
                         </td>
-                        <td className="px-3 py-4 text-center font-mono text-base font-black text-emerald-300">
-                          {p.rating.toFixed(1)}
+                        <td className="px-3 py-3.5 text-center">
+                          <span className="font-mono text-[15px] font-black tabular-nums text-emerald-300">
+                            {p.rating.toFixed(1)}
+                          </span>
                         </td>
-                        <td className="px-3 py-4 text-center font-mono text-base font-black text-white">
+                        <td className="px-3 py-3.5 text-center font-mono text-[14px] font-bold tabular-nums text-white/85">
                           {p.avgAcs}
                         </td>
-                        <td className="px-3 py-4 text-center font-mono text-sm font-bold whitespace-nowrap">
-                          <span className="font-black text-emerald-300">{p.totalKills}</span>
-                          <span className="text-white/30"> / </span>
-                          <span className="text-rose-300">{p.totalDeaths}</span>
-                          <span className="text-white/30"> / </span>
-                          <span className="text-white/60">{p.totalAssists}</span>
+                        <td className="px-3 py-3.5 text-center font-mono text-[12px] font-semibold whitespace-nowrap">
+                          <span className="text-emerald-400">{p.totalKills}</span>
+                          <span className="text-white/20"> / </span>
+                          <span className="text-rose-400">{p.totalDeaths}</span>
+                          <span className="text-white/20"> / </span>
+                          <span className="text-white/50">{p.totalAssists}</span>
                         </td>
-                        <td className="px-3 py-4 text-center font-mono text-sm font-bold">
+                        <td className="px-3 py-3.5 text-center">
                           <span
-                            className={
+                            className={`font-mono text-[13px] font-bold tabular-nums ${
                               Number(kd) >= 1.0 ? "text-emerald-300" : "text-rose-300"
-                            }
+                            }`}
                           >
                             {kd}
                           </span>
                         </td>
-                        <td className="px-3 py-4 text-center font-mono text-sm font-bold text-cyan-300">
+                        <td className="px-3 py-3.5 text-center font-mono text-[13px] font-semibold tabular-nums text-cyan-300">
                           {p.totalFirstKills}
                         </td>
-                        <td className="px-3 py-4 text-center font-mono text-sm font-bold text-orange-300/90">
+                        <td className="px-3 py-3.5 text-center font-mono text-[13px] font-semibold tabular-nums text-orange-300/80">
                           {p.totalFirstDeaths}
                         </td>
-                        <td className="px-3 py-4 text-center font-mono text-sm font-medium text-white/90">
+                        <td className="px-3 py-3.5 text-center font-mono text-[13px] font-medium tabular-nums text-white/75">
                           {p.avgHsPercent}%
                         </td>
-                        <td className="px-3 py-4">
-                          <div className="mx-auto grid w-max grid-cols-4 gap-1.5">
+                        <td className="px-3 py-3.5">
+                          <div className="mx-auto flex w-max flex-wrap gap-1">
                             {Object.entries(p.agentCounts)
                               .sort((a, b) => b[1] - a[1])
                               .map(([agent]) => {
@@ -724,14 +764,14 @@ export default function TournamentStatsSection({
                                     src={icon}
                                     alt={agent}
                                     title={agent}
-                                    width={32}
-                                    height={32}
-                                    className="h-8 w-8 object-contain mix-blend-screen drop-shadow-md filter"
+                                    width={30}
+                                    height={30}
+                                    className="h-[30px] w-[30px] object-contain mix-blend-screen drop-shadow-md filter"
                                   />
                                 ) : (
                                   <span
                                     key={agent}
-                                    className="flex h-8 w-8 items-center justify-center rounded-full bg-white/10 text-[9px] font-bold text-white/50"
+                                    className="flex h-[30px] w-[30px] items-center justify-center rounded-full bg-white/[0.06] text-[8px] font-bold text-white/40"
                                     title={agent}
                                   >
                                     {agent.slice(0, 2)}
@@ -747,7 +787,7 @@ export default function TournamentStatsSection({
                   <tr>
                     <td
                       colSpan={11}
-                      className="px-5 py-10 text-center text-white/40 italic"
+                      className="px-5 py-12 text-center text-white/30 italic text-sm"
                     >
                       {searchQuery
                         ? `No players found matching "${searchQuery}".`
