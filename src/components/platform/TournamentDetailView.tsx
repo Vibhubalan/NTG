@@ -57,6 +57,8 @@ type Props = {
   publishedGames?: PublicGame[];
   /** Official primary/poach memberships for Stats filtering. */
   statsEligibility?: TournamentStatsEligibility;
+  /** Cup teams the viewer plays for — enables "Start Veto" on their own fixtures. */
+  myTeamNames?: string[];
 };
 
 export default function TournamentDetailView({
@@ -71,6 +73,7 @@ export default function TournamentDetailView({
   showMatchesTab: showMatchesTabProp,
   publishedGames,
   statsEligibility: initialStatsEligibility,
+  myTeamNames,
 }: Props) {
   const [activeTab, setActiveTab] = useState<"overview" | "brackets" | "matches" | "stats">("overview");
   // null = the visitor hasn't picked a stage, so follow the latest one. Brackets
@@ -665,6 +668,11 @@ export default function TournamentDetailView({
                     tournamentName={displayName}
                     stageName={bracketLabel}
                     fallbackTeams={tournamentTeamsList}
+                    veto={
+                      isAdmin || (myTeamNames && myTeamNames.length > 0)
+                        ? { slug: tournament.slug, myTeamNames: myTeamNames ?? [], isAdmin }
+                        : undefined
+                    }
                     format={
                       displayBracket.tournamentType
                         ?.toLowerCase()

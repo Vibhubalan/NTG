@@ -104,6 +104,7 @@ export type UpdateTournamentInput = Partial<
   teamsPerGroup?: number | null;
   advancePerGroup?: number | null;
   rankPoints?: { rank: string; floor: number }[] | null;
+  vetoMapPool?: string[] | null;
 };
 
 function parsePrizeSplit(value: unknown): PrizeSplitRow[] | null {
@@ -284,6 +285,7 @@ export type AdminCupFieldsSnapshot = {
   teamsPerGroup: number | null;
   advancePerGroup: number | null;
   rankPoints: { rank: string; floor: number }[] | null;
+  vetoMapPool: string[] | null;
 };
 
 function parseRankPoints(value: unknown): { rank: string; floor: number }[] | null {
@@ -343,6 +345,9 @@ export function toAdminCupFieldsSnapshot(
     teamsPerGroup: t.teamsPerGroup,
     advancePerGroup: t.advancePerGroup,
     rankPoints: parseRankPoints(t.rankPoints),
+    vetoMapPool: Array.isArray(t.vetoMapPool)
+      ? (t.vetoMapPool as unknown[]).filter((m): m is string => typeof m === "string")
+      : null,
   };
 }
 
@@ -455,6 +460,10 @@ export async function updateTournamentFull(
       input.rankPoints && input.rankPoints.length
         ? (input.rankPoints as unknown as Prisma.InputJsonValue)
         : Prisma.JsonNull;
+  }
+  if (input.vetoMapPool !== undefined) {
+    const pool = (input.vetoMapPool ?? []).map((m) => m.trim()).filter(Boolean);
+    data.vetoMapPool = pool.length ? (pool as unknown as Prisma.InputJsonValue) : Prisma.JsonNull;
   }
   if (input.hideAfter !== undefined) {
     data.hideAfter =
