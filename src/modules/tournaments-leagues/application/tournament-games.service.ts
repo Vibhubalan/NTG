@@ -1055,7 +1055,6 @@ export async function listPlayerStandardCustomGames(opts: {
 
     let teamAPuuids: Set<string> | null = null;
     let teamBPuuids: Set<string> | null = null;
-    let region = player.region;
 
     if (opts.teamAId && opts.teamBId && opts.teamAId !== opts.teamBId) {
       const [teamA, teamB] = await Promise.all([
@@ -1073,7 +1072,6 @@ export async function listPlayerStandardCustomGames(opts: {
         ]);
         teamAPuuids = new Set(rosterA.players.map((p) => p.puuid));
         teamBPuuids = new Set(rosterB.players.map((p) => p.puuid));
-        region = rosterA.region || rosterB.region || region;
       }
     }
 
