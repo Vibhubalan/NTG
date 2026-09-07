@@ -6,17 +6,23 @@ import { henrikFetch, henrikHeaders } from "@/lib/henrik-client";
 import { normalizeHenrikRegion } from "@/lib/henrik-region";
 import { slugWhere } from "@/lib/slug-utils";
 import {
+  buildCorroboratedMatchIndex,
+  clusterMatchSeries,
   computeAcs,
   computeAdr,
   computeHsPercent,
   countFirstKillDeaths,
   extractKillEventsFromMatchPayload,
+  filterMatchesByDateRange,
   isCommonCustomMatch,
   normalizeGameSide,
   pickRosterIdentityForTeam,
+  rankCorroboratedMatches,
   resolveGamePlayerTeamId,
   resolveTeamSideMajority,
+  type HistoryRowInput,
   type MatchLobbyPlayer,
+  type MatchSeriesGroup,
   type RosterPlayerIdentity,
 } from "@/lib/tournament-games";
 import type {
@@ -36,10 +42,16 @@ import {
 } from "@prisma/client";
 
 const SCAN_TIME_BUDGET_MS = 38_000;
-/** Details checked per scan chunk (Henrik ~2.3s gap each). */
-const DETAILS_PER_CHUNK = 3;
+/** Detail fetches per scan chunk (Henrik ~2.3s gap each). */
+const SCAN_DETAILS_PER_CHUNK = 3;
+/** Detail fetches per import chunk. */
+const IMPORT_DETAILS_PER_CHUNK = 10;
 const DEFAULT_HISTORY_SIZE = 20;
 const DEFAULT_MIN_PLAYERS = 5;
+const DEFAULT_HISTORY_MODES = ["custom"] as const;
+
+/** Henrik history mode param (scan uses custom only). */
+export type HenrikHistoryMode = "custom" | "unrated";
 
 export type TournamentGamePlayerView = {
   id: string;
@@ -142,12 +154,15 @@ async function fetchHistoryUrl(url: string): Promise<HenrikMatchHistoryItem[]> {
   return Array.isArray(json.data) ? json.data : [];
 }
 
-async function fetchCustomMatchHistory(opts: {
+type HenrikHistoryModeParam = HenrikHistoryMode;
+
+async function fetchMatchHistory(opts: {
   region: string;
   puuid?: string | null;
   gameName?: string | null;
   tagLine?: string | null;
   size: number;
+  mode: HenrikHistoryModeParam;
 }): Promise<HenrikMatchHistoryItem[]> {
   const region = normalizeHenrikRegion(opts.region);
   const size = Math.min(Math.max(opts.size, 1), 30);
@@ -156,12 +171,12 @@ async function fetchCustomMatchHistory(opts: {
   const urls: string[] = [];
   if (opts.gameName && opts.tagLine) {
     urls.push(
-      `https://api.henrikdev.xyz/valorant/v3/matches/${region}/${encodePath(opts.gameName)}/${encodePath(opts.tagLine)}?mode=custom&size=${size}`,
+      `https://api.henrikdev.xyz/valorant/v3/matches/${region}/${encodePath(opts.gameName)}/${encodePath(opts.tagLine)}?mode=${opts.mode}&size=${size}`,
     );
   }
   if (opts.puuid) {
     urls.push(
-      `https://api.henrikdev.xyz/valorant/v3/by-puuid/matches/${region}/${encodePath(opts.puuid)}?mode=custom&size=${size}`,
+      `https://api.henrikdev.xyz/valorant/v3/by-puuid/matches/${region}/${encodePath(opts.puuid)}?mode=${opts.mode}&size=${size}`,
     );
   }
   if (!urls.length) return [];
@@ -175,6 +190,66 @@ async function fetchCustomMatchHistory(opts: {
     }
   }
   throw lastError ?? new Error("Failed to fetch match history.");
+}
+
+async function fetchCustomMatchHistory(opts: {
+  region: string;
+  puuid?: string | null;
+  gameName?: string | null;
+  tagLine?: string | null;
+  size: number;
+}): Promise<HenrikMatchHistoryItem[]> {
+  return fetchMatchHistory({ ...opts, mode: "custom" });
+}
+
+async function fetchUnratedMatchHistory(opts: {
+  region: string;
+  puuid?: string | null;
+  gameName?: string | null;
+  tagLine?: string | null;
+  size: number;
+}): Promise<HenrikMatchHistoryItem[]> {
+  return fetchMatchHistory({ ...opts, mode: "unrated" });
+}
+
+async function fetchPlayerHistories(opts: {
+  region: string;
+  player: RosterPlayerIdentity;
+  size: number;
+  modes: HenrikHistoryMode[];
+}): Promise<HenrikMatchHistoryItem[]> {
+  const seen = new Set<string>();
+  const merged: HenrikMatchHistoryItem[] = [];
+
+  for (const mode of opts.modes) {
+    let batch: HenrikMatchHistoryItem[] = [];
+    if (mode === "custom") {
+      batch = await fetchCustomMatchHistory({
+        region: opts.region,
+        puuid: opts.player.puuid,
+        gameName: opts.player.riotGameName,
+        tagLine: opts.player.riotTagLine,
+        size: opts.size,
+      });
+    } else {
+      batch = await fetchUnratedMatchHistory({
+        region: opts.region,
+        puuid: opts.player.puuid,
+        gameName: opts.player.riotGameName,
+        tagLine: opts.player.riotTagLine,
+        size: opts.size,
+      });
+    }
+
+    for (const item of batch) {
+      const matchId = item.metadata?.matchid;
+      if (!matchId || seen.has(matchId)) continue;
+      seen.add(matchId);
+      merged.push(item);
+    }
+  }
+
+  return merged;
 }
 
 async function fetchMatchDetails(matchId: string): Promise<HenrikMatchDetail | null> {
@@ -272,6 +347,203 @@ async function resolveTeamRoster(
   }
 
   return { teamName: team.name, players, region };
+}
+
+async function resolveTeamPlayerRowIdentity(
+  row: {
+    userId: string | null;
+    riotGameName: string | null;
+    riotTagLine: string | null;
+    user: {
+      riotPuuid: string | null;
+      riotGameName: string | null;
+      riotTagLine: string | null;
+      riotRegion: string | null;
+    } | null;
+    registration: { snapshotRiotId: string | null } | null;
+  },
+  teamId: string,
+  region: string,
+): Promise<{ player: RosterPlayerIdentity; region: string } | null> {
+  const fromUser = row.user
+    ? splitRiotFields(row.user.riotGameName, row.user.riotTagLine, null)
+    : null;
+  const fromRow = splitRiotFields(row.riotGameName, row.riotTagLine, null);
+  const fromReg = splitRiotFields(null, null, row.registration?.snapshotRiotId ?? null);
+  const identity = fromUser ?? fromRow ?? fromReg;
+  let puuid = row.user?.riotPuuid ?? null;
+  let resolvedRegion = region;
+
+  if (!puuid && identity) {
+    try {
+      const account = await resolveRiotAccount(identity.gameName, identity.tagLine);
+      if (account?.puuid) {
+        puuid = account.puuid;
+        if (account.region) resolvedRegion = normalizeHenrikRegion(account.region);
+        if (row.userId) {
+          await prisma.user.update({
+            where: { id: row.userId },
+            data: {
+              riotPuuid: account.puuid,
+              riotGameName: account.gameName,
+              riotTagLine: account.tagLine,
+              riotRegion: account.region ?? undefined,
+            },
+          });
+        }
+      }
+    } catch {
+      return null;
+    }
+  } else if (row.user?.riotRegion) {
+    resolvedRegion = normalizeHenrikRegion(row.user.riotRegion);
+  }
+
+  if (!puuid || !identity) return null;
+
+  return {
+    player: {
+      puuid,
+      userId: row.userId,
+      teamId,
+      riotGameName: identity.gameName,
+      riotTagLine: identity.tagLine,
+    },
+    region: resolvedRegion,
+  };
+}
+
+async function resolveScannerPlayer(opts: {
+  teamAId: string;
+  teamBId: string;
+  rosterA: Awaited<ReturnType<typeof resolveTeamRoster>>;
+  rosterB: Awaited<ReturnType<typeof resolveTeamRoster>>;
+  region: string;
+  scannerPlayerId?: string | null;
+}): Promise<{ ok: true; scanner: RosterPlayerIdentity; region: string } | { ok: false; error: string }> {
+  if (opts.scannerPlayerId) {
+    const row = await prisma.tournamentTeamPlayer.findFirst({
+      where: {
+        id: opts.scannerPlayerId,
+        teamId: { in: [opts.teamAId, opts.teamBId] },
+      },
+      include: { user: true, registration: true },
+    });
+    if (!row) {
+      return { ok: false, error: "Scanner player not found on either team." };
+    }
+    const resolved = await resolveTeamPlayerRowIdentity(row, row.teamId, opts.region);
+    if (!resolved) {
+      return { ok: false, error: "Scanner player has no resolvable Riot identity." };
+    }
+    return { ok: true, scanner: resolved.player, region: resolved.region };
+  }
+
+  const defaultPlayer = opts.rosterA.players[0];
+  if (!defaultPlayer) {
+    return { ok: false, error: "Team A has no resolvable players. Pick a scanner player." };
+  }
+  return { ok: true, scanner: defaultPlayer, region: opts.region };
+}
+
+function dedupeRosterScanners(
+  rosterA: RosterPlayerIdentity[],
+  rosterB: RosterPlayerIdentity[],
+): RosterPlayerIdentity[] {
+  const byPuuid = new Map<string, RosterPlayerIdentity>();
+  for (const player of [...rosterA, ...rosterB]) {
+    if (!byPuuid.has(player.puuid)) byPuuid.set(player.puuid, player);
+  }
+  return [...byPuuid.values()];
+}
+
+function historyItemsToRows(items: HenrikMatchHistoryItem[], scannerPuuid: string): HistoryRowInput[] {
+  const rows: HistoryRowInput[] = [];
+  for (const item of items) {
+    const matchId = item.metadata?.matchid;
+    if (!matchId) continue;
+    const startedAtMs =
+      typeof item.metadata?.game_start === "number" && Number.isFinite(item.metadata.game_start)
+        ? item.metadata.game_start * 1000
+        : null;
+    rows.push({
+      matchId,
+      mapName: item.metadata?.map ?? null,
+      startedAtMs,
+      scannerPuuid,
+    });
+  }
+  return rows;
+}
+
+async function resolveTeamPairContext(opts: {
+  slug: string;
+  teamAId: string;
+  teamBId: string;
+  minPlayersPerTeam?: number;
+}): Promise<
+  | {
+      ok: true;
+      tournamentId: string;
+      rosterA: Awaited<ReturnType<typeof resolveTeamRoster>>;
+      rosterB: Awaited<ReturnType<typeof resolveTeamRoster>>;
+      teamAPuuids: Set<string>;
+      teamBPuuids: Set<string>;
+      rosterAByPuuid: Map<string, RosterPlayerIdentity>;
+      rosterBByPuuid: Map<string, RosterPlayerIdentity>;
+      region: string;
+      minPlayers: number;
+    }
+  | { ok: false; error: string }
+> {
+  const tournament = await prisma.tournament.findFirst({ where: slugWhere(opts.slug) });
+  if (!tournament) return { ok: false, error: "Tournament not found." };
+  if (opts.teamAId === opts.teamBId) {
+    return { ok: false, error: "Select two different teams." };
+  }
+
+  const [teamA, teamB] = await Promise.all([
+    prisma.tournamentTeam.findFirst({
+      where: { id: opts.teamAId, tournamentId: tournament.id },
+    }),
+    prisma.tournamentTeam.findFirst({
+      where: { id: opts.teamBId, tournamentId: tournament.id },
+    }),
+  ]);
+  if (!teamA || !teamB) return { ok: false, error: "Teams must belong to this tournament." };
+
+  const minPlayers = opts.minPlayersPerTeam ?? DEFAULT_MIN_PLAYERS;
+  const [rosterA, rosterB] = await Promise.all([
+    resolveTeamRoster(opts.teamAId),
+    resolveTeamRoster(opts.teamBId),
+  ]);
+
+  if (rosterA.players.length < minPlayers || rosterB.players.length < minPlayers) {
+    return {
+      ok: false,
+      error: `Need at least ${minPlayers} resolvable Riot identities per team (A=${rosterA.players.length}, B=${rosterB.players.length}).`,
+    };
+  }
+
+  const teamAPuuids = new Set(rosterA.players.map((p) => p.puuid));
+  const teamBPuuids = new Set(rosterB.players.map((p) => p.puuid));
+  const rosterAByPuuid = new Map<string, RosterPlayerIdentity>();
+  const rosterBByPuuid = new Map<string, RosterPlayerIdentity>();
+  for (const p of rosterA.players) rosterAByPuuid.set(p.puuid, p);
+  for (const p of rosterB.players) rosterBByPuuid.set(p.puuid, p);
+
+  return {
+    ok: true,
+    tournamentId: tournament.id,
+    rosterA,
+    rosterB,
+    teamAPuuids,
+    teamBPuuids,
+    rosterAByPuuid,
+    rosterBByPuuid,
+    region: rosterA.region || rosterB.region || "ap",
+    minPlayers,
+  };
 }
 
 function mapPlayerRows(
@@ -711,7 +983,237 @@ export type ScanChunkResult = {
   progress: string;
   teamAResolved: number;
   teamBResolved: number;
+  scannerLabel: string;
 };
+
+export type GameSearchCandidate = {
+  matchId: string;
+  mapName: string | null;
+  startedAt: string | null;
+  teamAHits: number;
+  teamBHits: number;
+  alreadyImported: boolean;
+};
+
+export type GameSearchResult = {
+  done: boolean;
+  progress: string;
+  teamAResolved: number;
+  teamBResolved: number;
+  playersScanned: number;
+  historyRows: number;
+  crossTeamCount: number;
+  candidates: GameSearchCandidate[];
+  series: MatchSeriesGroup[];
+};
+
+export async function searchTournamentGameCandidates(opts: {
+  slug: string;
+  teamAId: string;
+  teamBId: string;
+  historySize?: number;
+  dateFrom?: string | null;
+  dateTo?: string | null;
+  modes?: HenrikHistoryMode[];
+}): Promise<{ ok: true; result: GameSearchResult } | { ok: false; error: string }> {
+  try {
+    const ctx = await resolveTeamPairContext({
+      slug: opts.slug,
+      teamAId: opts.teamAId,
+      teamBId: opts.teamBId,
+    });
+    if (!ctx.ok) return ctx;
+
+    const historySize = opts.historySize ?? DEFAULT_HISTORY_SIZE;
+    const scanners = dedupeRosterScanners(ctx.rosterA.players, ctx.rosterB.players);
+
+    const existingIds = new Set(
+      (
+        await prisma.tournamentGame.findMany({
+          where: { tournamentId: ctx.tournamentId },
+          select: { henrikMatchId: true },
+        })
+      ).map((g) => g.henrikMatchId),
+    );
+
+    const allRows: HistoryRowInput[] = [];
+    let playersScanned = 0;
+
+    for (const player of scanners) {
+      try {
+        const history = await fetchCustomMatchHistory({
+          region: ctx.region,
+          puuid: player.puuid,
+          gameName: player.riotGameName,
+          tagLine: player.riotTagLine,
+          size: historySize,
+        });
+        allRows.push(...historyItemsToRows(history, player.puuid));
+        playersScanned += 1;
+
+        const index = buildCorroboratedMatchIndex(allRows, ctx.teamAPuuids, ctx.teamBPuuids);
+        if (rankCorroboratedMatches(index).length > 0) break;
+      } catch (err) {
+        console.error("[tournament-games] history failed", player.puuid, err);
+      }
+    }
+
+    const index = buildCorroboratedMatchIndex(allRows, ctx.teamAPuuids, ctx.teamBPuuids);
+    let ranked = rankCorroboratedMatches(index);
+    ranked = filterMatchesByDateRange(ranked, opts.dateFrom, opts.dateTo);
+
+    const candidates: GameSearchCandidate[] = ranked.map((row) => ({
+      ...row,
+      alreadyImported: existingIds.has(row.matchId),
+    }));
+
+    const series = clusterMatchSeries(ranked).map((group) => ({
+      ...group,
+      previews: group.previews.map((p) => ({
+        ...p,
+        alreadyImported: existingIds.has(p.matchId),
+      })),
+    }));
+
+    return {
+      ok: true,
+      result: {
+        done: true,
+        progress: `Fetched ${playersScanned}/${scanners.length} players · ${allRows.length} history rows · ${candidates.length} cross-team match(es).`,
+        teamAResolved: ctx.rosterA.players.length,
+        teamBResolved: ctx.rosterB.players.length,
+        playersScanned,
+        historyRows: allRows.length,
+        crossTeamCount: candidates.length,
+        candidates,
+        series,
+      },
+    };
+  } catch (err) {
+    console.error("[tournament-games] search failed", err);
+    return {
+      ok: false,
+      error: err instanceof Error ? err.message : "Search failed unexpectedly.",
+    };
+  }
+}
+
+export async function importTournamentGameMatches(opts: {
+  slug: string;
+  teamAId: string;
+  teamBId: string;
+  matchIds: string[];
+  minPlayersPerTeam?: number;
+}): Promise<
+  | {
+      ok: true;
+      imported: TournamentGameView[];
+      skipped: Array<{ matchId: string; reason: string }>;
+    }
+  | { ok: false; error: string }
+> {
+  try {
+    if (!opts.matchIds.length) return { ok: false, error: "No matches selected." };
+
+    const ctx = await resolveTeamPairContext({
+      slug: opts.slug,
+      teamAId: opts.teamAId,
+      teamBId: opts.teamBId,
+      minPlayersPerTeam: opts.minPlayersPerTeam,
+    });
+    if (!ctx.ok) return ctx;
+
+    const importedIds: string[] = [];
+    const skipped: Array<{ matchId: string; reason: string }> = [];
+    const started = Date.now();
+    let checked = 0;
+
+    for (const matchId of opts.matchIds) {
+      if (Date.now() - started > SCAN_TIME_BUDGET_MS) {
+        skipped.push({ matchId, reason: "Time budget exceeded; retry remaining matches." });
+        continue;
+      }
+      if (checked >= IMPORT_DETAILS_PER_CHUNK) {
+        skipped.push({ matchId, reason: "Import chunk limit reached; retry in another batch." });
+        continue;
+      }
+
+      let detail: HenrikMatchDetail | null;
+      try {
+        detail = await fetchMatchDetails(matchId);
+      } catch (err) {
+        skipped.push({
+          matchId,
+          reason: err instanceof Error ? err.message : "Failed to fetch match details.",
+        });
+        continue;
+      }
+      checked += 1;
+
+      if (!detail?.data) {
+        skipped.push({ matchId, reason: "Match not found." });
+        continue;
+      }
+
+      const lobby = detail.data.players?.all_players ?? [];
+      const lobbyPuuids = new Set(lobby.map((p) => p.puuid).filter(Boolean));
+      const overlap = isCommonCustomMatch({
+        teamAPuuids: ctx.teamAPuuids,
+        teamBPuuids: ctx.teamBPuuids,
+        lobbyPuuids,
+        minPlayersPerTeam: ctx.minPlayers,
+      });
+
+      if (!overlap.match) {
+        skipped.push({
+          matchId,
+          reason: `Lobby overlap too low (A=${overlap.teamAPresent}, B=${overlap.teamBPresent}, need ${ctx.minPlayers} each).`,
+        });
+        continue;
+      }
+
+      try {
+        const upserted = await upsertCandidateGame({
+          tournamentId: ctx.tournamentId,
+          henrikMatchId: matchId,
+          detail,
+          teamAId: opts.teamAId,
+          teamBId: opts.teamBId,
+          teamAPuuids: ctx.teamAPuuids,
+          teamBPuuids: ctx.teamBPuuids,
+          rosterAByPuuid: ctx.rosterAByPuuid,
+          rosterBByPuuid: ctx.rosterBByPuuid,
+          teamAPresent: overlap.teamAPresent,
+          teamBPresent: overlap.teamBPresent,
+          region: ctx.region,
+        });
+        importedIds.push(upserted.id);
+      } catch (err) {
+        skipped.push({
+          matchId,
+          reason: err instanceof Error ? err.message : "Failed to store match.",
+        });
+      }
+    }
+
+    let imported: TournamentGameView[] = [];
+    if (importedIds.length > 0) {
+      const foundGames = await prisma.tournamentGame.findMany({
+        where: { id: { in: importedIds } },
+        include: gameInclude(ctx.tournamentId),
+      });
+      imported = foundGames.map(toGameView);
+    }
+
+    return { ok: true, imported, skipped };
+  } catch (err) {
+    console.error("[tournament-games] import failed", err);
+    return {
+      ok: false,
+      error: err instanceof Error ? err.message : "Import failed unexpectedly.",
+    };
+  }
+}
 
 export async function scanTournamentGamesChunk(opts: {
   slug: string;
@@ -720,51 +1222,33 @@ export async function scanTournamentGamesChunk(opts: {
   cursor?: number;
   minPlayersPerTeam?: number;
   historySize?: number;
+  scannerPlayerId?: string | null;
 }): Promise<{ ok: true; result: ScanChunkResult } | { ok: false; error: string }> {
   try {
-    const tournament = await prisma.tournament.findFirst({ where: slugWhere(opts.slug) });
-    if (!tournament) return { ok: false, error: "Tournament not found." };
+    const ctx = await resolveTeamPairContext({
+      slug: opts.slug,
+      teamAId: opts.teamAId,
+      teamBId: opts.teamBId,
+      minPlayersPerTeam: opts.minPlayersPerTeam,
+    });
+    if (!ctx.ok) return ctx;
 
-    if (opts.teamAId === opts.teamBId) {
-      return { ok: false, error: "Select two different teams." };
-    }
-
-    const [teamA, teamB] = await Promise.all([
-      prisma.tournamentTeam.findFirst({
-        where: { id: opts.teamAId, tournamentId: tournament.id },
-      }),
-      prisma.tournamentTeam.findFirst({
-        where: { id: opts.teamBId, tournamentId: tournament.id },
-      }),
-    ]);
-    if (!teamA || !teamB) return { ok: false, error: "Teams must belong to this tournament." };
+    const scannerPick = await resolveScannerPlayer({
+      teamAId: opts.teamAId,
+      teamBId: opts.teamBId,
+      rosterA: ctx.rosterA,
+      rosterB: ctx.rosterB,
+      region: ctx.region,
+      scannerPlayerId: opts.scannerPlayerId,
+    });
+    if (!scannerPick.ok) return scannerPick;
 
     const started = Date.now();
-    const minPlayers = opts.minPlayersPerTeam ?? DEFAULT_MIN_PLAYERS;
     const historySize = opts.historySize ?? DEFAULT_HISTORY_SIZE;
-    const cursor = Math.max(0, opts.cursor ?? 0);
-
-    const [rosterA, rosterB] = await Promise.all([
-      resolveTeamRoster(opts.teamAId),
-      resolveTeamRoster(opts.teamBId),
-    ]);
-
-    if (rosterA.players.length < minPlayers || rosterB.players.length < minPlayers) {
-      return {
-        ok: false,
-        error: `Need at least ${minPlayers} resolvable Riot identities per team (A=${rosterA.players.length}, B=${rosterB.players.length}).`,
-      };
-    }
-
-    const teamAPuuids = new Set(rosterA.players.map((p) => p.puuid));
-    const teamBPuuids = new Set(rosterB.players.map((p) => p.puuid));
-    const rosterAByPuuid = new Map<string, RosterPlayerIdentity>();
-    const rosterBByPuuid = new Map<string, RosterPlayerIdentity>();
-    for (const p of rosterA.players) rosterAByPuuid.set(p.puuid, p);
-    for (const p of rosterB.players) rosterBByPuuid.set(p.puuid, p);
-
-    const scanner = rosterA.players[0]!;
-    const region = rosterA.region || rosterB.region || "ap";
+    const matchIndex = Math.max(0, opts.cursor ?? 0);
+    const scanner = scannerPick.scanner;
+    const region = scannerPick.region;
+    const scannerLabel = `${scanner.riotGameName}#${scanner.riotTagLine}`;
 
     let history: HenrikMatchHistoryItem[] = [];
     try {
@@ -782,30 +1266,30 @@ export async function scanTournamentGamesChunk(opts: {
       };
     }
 
-    const total = history.length;
-    if (cursor >= total) {
+    if (matchIndex >= history.length) {
       return {
         ok: true,
         result: {
           done: true,
-          cursor: total,
-          total,
+          cursor: matchIndex,
+          total: history.length,
           checked: 0,
           found: [],
-          progress: `Scanned all ${total} custom matches.`,
-          teamAResolved: rosterA.players.length,
-          teamBResolved: rosterB.players.length,
+          progress: `Finished scanning ${history.length} custom match(es) for ${scannerLabel}.`,
+          teamAResolved: ctx.rosterA.players.length,
+          teamBResolved: ctx.rosterB.players.length,
+          scannerLabel,
         },
       };
     }
 
     const foundIds: string[] = [];
     let checked = 0;
-    let nextCursor = cursor;
+    let nextCursor = matchIndex;
 
-    for (let i = cursor; i < total; i++) {
+    for (let i = matchIndex; i < history.length; i++) {
       if (Date.now() - started > SCAN_TIME_BUDGET_MS) break;
-      if (checked >= DETAILS_PER_CHUNK) break;
+      if (checked >= SCAN_DETAILS_PER_CHUNK) break;
 
       const matchId = history[i]?.metadata?.matchid;
       nextCursor = i + 1;
@@ -828,24 +1312,24 @@ export async function scanTournamentGamesChunk(opts: {
       const lobby = detail.data.players?.all_players ?? [];
       const lobbyPuuids = new Set(lobby.map((p) => p.puuid).filter(Boolean));
       const overlap = isCommonCustomMatch({
-        teamAPuuids,
-        teamBPuuids,
+        teamAPuuids: ctx.teamAPuuids,
+        teamBPuuids: ctx.teamBPuuids,
         lobbyPuuids,
-        minPlayersPerTeam: minPlayers,
+        minPlayersPerTeam: ctx.minPlayers,
       });
       if (!overlap.match) continue;
 
       try {
         const upserted = await upsertCandidateGame({
-          tournamentId: tournament.id,
+          tournamentId: ctx.tournamentId,
           henrikMatchId: matchId,
           detail,
           teamAId: opts.teamAId,
           teamBId: opts.teamBId,
-          teamAPuuids,
-          teamBPuuids,
-          rosterAByPuuid,
-          rosterBByPuuid,
+          teamAPuuids: ctx.teamAPuuids,
+          teamBPuuids: ctx.teamBPuuids,
+          rosterAByPuuid: ctx.rosterAByPuuid,
+          rosterBByPuuid: ctx.rosterBByPuuid,
           teamAPresent: overlap.teamAPresent,
           teamBPresent: overlap.teamBPresent,
           region,
@@ -861,7 +1345,7 @@ export async function scanTournamentGamesChunk(opts: {
       try {
         const foundGames = await prisma.tournamentGame.findMany({
           where: { id: { in: foundIds } },
-          include: gameInclude(tournament.id),
+          include: gameInclude(ctx.tournamentId),
         });
         found = foundGames.map(toGameView);
       } catch (err) {
@@ -869,20 +1353,21 @@ export async function scanTournamentGamesChunk(opts: {
       }
     }
 
-    const done = nextCursor >= total;
+    const done = nextCursor >= history.length;
     return {
       ok: true,
       result: {
         done,
         cursor: nextCursor,
-        total,
+        total: history.length,
         checked,
         found,
         progress: done
-          ? `Finished scanning ${total} custom matches.`
-          : `Checked ${nextCursor}/${total} custom matches…`,
-        teamAResolved: rosterA.players.length,
-        teamBResolved: rosterB.players.length,
+          ? `Finished scanning ${history.length} custom match(es) for ${scannerLabel}.`
+          : `Scanning as ${scannerLabel}: checked ${nextCursor}/${history.length} custom matches…`,
+        teamAResolved: ctx.rosterA.players.length,
+        teamBResolved: ctx.rosterB.players.length,
+        scannerLabel,
       },
     };
   } catch (err) {

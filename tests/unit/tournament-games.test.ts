@@ -1,14 +1,18 @@
 import { describe, expect, it } from "vitest";
 import {
+  buildCorroboratedMatchIndex,
+  clusterMatchSeries,
   computeAcs,
   computeAdr,
   computeHsPercent,
   countFirstKillDeaths,
   countTeamPresence,
   extractKillEventsFromMatchPayload,
+  filterMatchesByDateRange,
   isCommonCustomMatch,
   normalizeGameSide,
   partitionPlayersByCupTeam,
+  rankCorroboratedMatches,
   resolveGamePlayerTeamId,
   resolveTeamSideMajority,
 } from "@/lib/tournament-games";
@@ -166,5 +170,53 @@ describe("tournament-games helpers", () => {
         rosterTeamId: teamBId,
       }),
     ).toBe(teamAId);
+  });
+
+  it("builds corroborated index and ranks cross-team matches", () => {
+    const teamA = new Set(["a1", "a2"]);
+    const teamB = new Set(["b1", "b2"]);
+    const rows = [
+      { matchId: "m1", mapName: "Lotus", startedAtMs: 1000, scannerPuuid: "a1" },
+      { matchId: "m1", mapName: "Lotus", startedAtMs: 1000, scannerPuuid: "b1" },
+      { matchId: "m1", mapName: "Lotus", startedAtMs: 1000, scannerPuuid: "a2" },
+      { matchId: "m2", mapName: "Bind", startedAtMs: 2000, scannerPuuid: "a1" },
+      { matchId: "m3", mapName: "Ascent", startedAtMs: 3000, scannerPuuid: "b1" },
+      { matchId: "m3", mapName: "Ascent", startedAtMs: 3000, scannerPuuid: "b2" },
+    ];
+
+    const index = buildCorroboratedMatchIndex(rows, teamA, teamB);
+    const ranked = rankCorroboratedMatches(index);
+
+    expect(ranked).toHaveLength(1);
+    expect(ranked[0].matchId).toBe("m1");
+    expect(ranked[0].teamAHits).toBe(2);
+    expect(ranked[0].teamBHits).toBe(1);
+  });
+
+  it("filters corroborated matches by date range", () => {
+    const previews = [
+      { matchId: "m1", mapName: "Lotus", startedAt: "2026-09-05T12:00:00.000Z", teamAHits: 2, teamBHits: 2 },
+      { matchId: "m2", mapName: "Bind", startedAt: "2026-09-06T12:00:00.000Z", teamAHits: 1, teamBHits: 1 },
+      { matchId: "m3", mapName: "Ascent", startedAt: "2026-09-07T12:00:00.000Z", teamAHits: 3, teamBHits: 3 },
+    ];
+
+    const filtered = filterMatchesByDateRange(previews, "2026-09-06", "2026-09-06");
+    expect(filtered.map((p) => p.matchId)).toEqual(["m2"]);
+  });
+
+  it("clusters matches into BO5-style series within a time window", () => {
+    const base = Date.parse("2026-09-06T17:00:00.000Z");
+    const hour = 60 * 60 * 1000;
+    const previews = [
+      { matchId: "m1", mapName: "Lotus", startedAt: new Date(base).toISOString(), teamAHits: 2, teamBHits: 2 },
+      { matchId: "m2", mapName: "Bind", startedAt: new Date(base + hour).toISOString(), teamAHits: 2, teamBHits: 2 },
+      { matchId: "m3", mapName: "Ascent", startedAt: new Date(base + 5 * hour).toISOString(), teamAHits: 2, teamBHits: 2 },
+    ];
+
+    const groups = clusterMatchSeries(previews, 4 * hour);
+    expect(groups).toHaveLength(2);
+    expect(groups[0].matchIds).toEqual(["m1", "m2"]);
+    expect(groups[0].maps).toEqual(["Lotus", "Bind"]);
+    expect(groups[1].matchIds).toEqual(["m3"]);
   });
 });

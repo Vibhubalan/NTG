@@ -1,7 +1,7 @@
 import { guardResponse, isAuthedAdmin, requireAdmin } from "@/lib/auth-guard";
 import { logAdminAction } from "@/lib/admin-audit";
 import { serverEnv } from "@core/config/env.server";
-import { scanTournamentGamesChunk } from "@tournaments-leagues/index";
+import { searchTournamentGameCandidates } from "@tournaments-leagues/index";
 import { NextResponse } from "next/server";
 
 export const dynamic = "force-dynamic";
@@ -35,41 +35,30 @@ export async function POST(req: Request, { params }: Props) {
       return NextResponse.json({ error: "teamAId and teamBId are required." }, { status: 400 });
     }
 
-    const result = await scanTournamentGamesChunk({
+    const result = await searchTournamentGameCandidates({
       slug,
       teamAId,
       teamBId,
-      cursor: typeof body.cursor === "number" ? body.cursor : Number(body.cursor) || 0,
-      minPlayersPerTeam:
-        typeof body.minPlayersPerTeam === "number"
-          ? body.minPlayersPerTeam
-          : Number(body.minPlayersPerTeam) || undefined,
       historySize:
         typeof body.historySize === "number"
           ? body.historySize
           : Number(body.historySize) || undefined,
-      scannerPlayerId:
-        typeof body.scannerPlayerId === "string" && body.scannerPlayerId
-          ? body.scannerPlayerId
-          : undefined,
     });
 
     if (!result.ok) {
       return NextResponse.json({ error: result.error }, { status: 400 });
     }
 
-    await logAdminAction(auth.userId, "tournament.games.scan", slug, {
+    await logAdminAction(auth.userId, "tournament.games.search", slug, {
       teamAId,
       teamBId,
-      cursor: result.result.cursor,
-      done: result.result.done,
-      found: result.result.found.length,
+      crossTeamCount: result.result.crossTeamCount,
     });
 
     return NextResponse.json(result.result);
   } catch (err) {
-    console.error("[admin/tournaments/games/scan]", err);
-    const message = err instanceof Error ? err.message : "Scan failed.";
+    console.error("[admin/tournaments/games/search]", err);
+    const message = err instanceof Error ? err.message : "Search failed.";
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }

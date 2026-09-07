@@ -1,7 +1,7 @@
 import { guardResponse, isAuthedAdmin, requireAdmin } from "@/lib/auth-guard";
 import { logAdminAction } from "@/lib/admin-audit";
 import { serverEnv } from "@core/config/env.server";
-import { scanTournamentGamesChunk } from "@tournaments-leagues/index";
+import { importTournamentGameMatches } from "@tournaments-leagues/index";
 import { NextResponse } from "next/server";
 
 export const dynamic = "force-dynamic";
@@ -31,45 +31,44 @@ export async function POST(req: Request, { params }: Props) {
 
     const teamAId = typeof body.teamAId === "string" ? body.teamAId : "";
     const teamBId = typeof body.teamBId === "string" ? body.teamBId : "";
+    const matchIds = Array.isArray(body.matchIds)
+      ? body.matchIds.filter((id): id is string => typeof id === "string" && id.length > 0)
+      : [];
+
     if (!teamAId || !teamBId) {
       return NextResponse.json({ error: "teamAId and teamBId are required." }, { status: 400 });
     }
+    if (!matchIds.length) {
+      return NextResponse.json({ error: "matchIds is required." }, { status: 400 });
+    }
 
-    const result = await scanTournamentGamesChunk({
+    const result = await importTournamentGameMatches({
       slug,
       teamAId,
       teamBId,
-      cursor: typeof body.cursor === "number" ? body.cursor : Number(body.cursor) || 0,
+      matchIds,
       minPlayersPerTeam:
         typeof body.minPlayersPerTeam === "number"
           ? body.minPlayersPerTeam
           : Number(body.minPlayersPerTeam) || undefined,
-      historySize:
-        typeof body.historySize === "number"
-          ? body.historySize
-          : Number(body.historySize) || undefined,
-      scannerPlayerId:
-        typeof body.scannerPlayerId === "string" && body.scannerPlayerId
-          ? body.scannerPlayerId
-          : undefined,
     });
 
     if (!result.ok) {
       return NextResponse.json({ error: result.error }, { status: 400 });
     }
 
-    await logAdminAction(auth.userId, "tournament.games.scan", slug, {
+    await logAdminAction(auth.userId, "tournament.games.import", slug, {
       teamAId,
       teamBId,
-      cursor: result.result.cursor,
-      done: result.result.done,
-      found: result.result.found.length,
+      matchIds,
+      imported: result.imported.length,
+      skipped: result.skipped.length,
     });
 
-    return NextResponse.json(result.result);
+    return NextResponse.json(result);
   } catch (err) {
-    console.error("[admin/tournaments/games/scan]", err);
-    const message = err instanceof Error ? err.message : "Scan failed.";
+    console.error("[admin/tournaments/games/import]", err);
+    const message = err instanceof Error ? err.message : "Import failed.";
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }

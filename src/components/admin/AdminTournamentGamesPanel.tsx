@@ -3,10 +3,17 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { parseApiJson } from "@/lib/parse-api-json";
 
+type TeamPlayer = {
+  id: string;
+  displayName: string;
+  riotGameName: string | null;
+  riotTagLine: string | null;
+};
+
 type TeamOption = {
   id: string;
   name: string;
-  players: { id: string }[];
+  players: TeamPlayer[];
 };
 
 type GamePlayer = {
@@ -57,14 +64,35 @@ function formatWhen(iso: string | null): string {
   });
 }
 
+function playerLabel(player: TeamPlayer): string {
+  if (player.riotGameName && player.riotTagLine) {
+    return `${player.riotGameName}#${player.riotTagLine}`;
+  }
+  return player.displayName;
+}
+
+function parseMatchIdList(raw: string): string[] {
+  return [
+    ...new Set(
+      raw
+        .split(/[\s,]+/)
+        .map((s) => s.trim())
+        .filter(Boolean),
+    ),
+  ];
+}
+
 export default function AdminTournamentGamesPanel({ slug, teams }: Props) {
   const [teamAId, setTeamAId] = useState("");
   const [teamBId, setTeamBId] = useState("");
+  const [scannerPlayerId, setScannerPlayerId] = useState("");
   const [minPlayersInput, setMinPlayersInput] = useState("5");
   const [historySizeInput, setHistorySizeInput] = useState("20");
+  const [pasteIds, setPasteIds] = useState("");
   const [games, setGames] = useState<GameRow[]>([]);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [scanning, setScanning] = useState(false);
+  const [importing, setImporting] = useState(false);
   const [busy, setBusy] = useState(false);
   const [log, setLog] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -92,6 +120,35 @@ export default function AdminTournamentGamesPanel({ slug, teams }: Props) {
     void loadGames();
   }, [loadGames]);
 
+  const scannerOptions = useMemo(() => {
+    const options: Array<{ id: string; label: string }> = [];
+    for (const teamId of [teamAId, teamBId]) {
+      if (!teamId) continue;
+      const team = teams.find((t) => t.id === teamId);
+      if (!team) continue;
+      for (const player of team.players) {
+        options.push({
+          id: player.id,
+          label: `${team.name} · ${playerLabel(player)}`,
+        });
+      }
+    }
+    return options;
+  }, [teamAId, teamBId, teams]);
+
+  useEffect(() => {
+    if (!teamAId) {
+      setScannerPlayerId("");
+      return;
+    }
+    const teamA = teams.find((t) => t.id === teamAId);
+    const defaultId = teamA?.players[0]?.id ?? "";
+    setScannerPlayerId((prev) => {
+      if (prev && scannerOptions.some((o) => o.id === prev)) return prev;
+      return defaultId;
+    });
+  }, [teamAId, teamBId, teams, scannerOptions]);
+
   const candidates = useMemo(
     () => games.filter((g) => g.status === "CANDIDATE"),
     [games],
@@ -113,12 +170,14 @@ export default function AdminTournamentGamesPanel({ slug, teams }: Props) {
 
     const parsedMinPlayers = Number(minPlayersInput);
     const parsedHistorySize = Number(historySizeInput);
-    const minPlayers = Number.isFinite(parsedMinPlayers) && parsedMinPlayers > 0
-      ? Math.floor(parsedMinPlayers)
-      : 5;
-    const historySize = Number.isFinite(parsedHistorySize) && parsedHistorySize > 0
-      ? Math.floor(parsedHistorySize)
-      : 20;
+    const minPlayers =
+      Number.isFinite(parsedMinPlayers) && parsedMinPlayers > 0
+        ? Math.floor(parsedMinPlayers)
+        : 5;
+    const historySize =
+      Number.isFinite(parsedHistorySize) && parsedHistorySize > 0
+        ? Math.floor(parsedHistorySize)
+        : 20;
 
     let cursor = 0;
     let done = false;
@@ -133,6 +192,7 @@ export default function AdminTournamentGamesPanel({ slug, teams }: Props) {
             cursor,
             minPlayersPerTeam: minPlayers,
             historySize,
+            scannerPlayerId: scannerPlayerId || undefined,
           }),
         });
         const parsed = await parseApiJson(res);
@@ -152,6 +212,9 @@ export default function AdminTournamentGamesPanel({ slug, teams }: Props) {
           pushLog(
             `Resolved roster: Team A ${data.teamAResolved}, Team B ${data.teamBResolved}`,
           );
+          if (typeof data.scannerLabel === "string") {
+            pushLog(`Scanning as ${data.scannerLabel}`);
+          }
         }
         if (typeof data.progress === "string") pushLog(data.progress);
         if (Array.isArray(data.found) && data.found.length) {
@@ -168,6 +231,49 @@ export default function AdminTournamentGamesPanel({ slug, teams }: Props) {
       pushLog(msg);
     } finally {
       setScanning(false);
+    }
+  }
+
+  async function importPastedIds() {
+    if (!teamAId || !teamBId || teamAId === teamBId) {
+      setError("Pick two different teams.");
+      return;
+    }
+    const matchIds = parseMatchIdList(pasteIds);
+    if (!matchIds.length) {
+      setError("Paste one or more Henrik match IDs.");
+      return;
+    }
+
+    const parsedMinPlayers = Number(minPlayersInput);
+    const minPlayers =
+      Number.isFinite(parsedMinPlayers) && parsedMinPlayers > 0
+        ? Math.floor(parsedMinPlayers)
+        : 5;
+
+    setImporting(true);
+    setError(null);
+    pushLog(`Importing ${matchIds.length} pasted match ID(s)…`);
+    try {
+      const res = await fetch(`/api/admin/tournaments/${slug}/games/import`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ teamAId, teamBId, matchIds, minPlayersPerTeam: minPlayers }),
+      });
+      const parsed = await parseApiJson(res);
+      if (!parsed.ok) {
+        setError(parsed.message);
+        return;
+      }
+      if (!res.ok) {
+        setError(typeof parsed.data.error === "string" ? parsed.data.error : "Import failed.");
+        return;
+      }
+      const imported = Array.isArray(parsed.data.imported) ? parsed.data.imported.length : 0;
+      pushLog(`Imported ${imported} match(es).`);
+      await loadGames();
+    } finally {
+      setImporting(false);
     }
   }
 
@@ -257,14 +363,16 @@ export default function AdminTournamentGamesPanel({ slug, teams }: Props) {
     });
   }
 
+  const actionDisabled = scanning || importing || busy;
+
   return (
     <div className="space-y-6">
       <div className="rounded-2xl border border-white/[0.06] bg-[#0a1020]/40 p-5 space-y-4">
         <div>
           <h3 className="text-sm font-semibold text-white">Import custom games</h3>
           <p className="mt-1 text-xs text-white/45">
-            Pick two cup teams, scan Henrik for shared custom lobbies, then publish selected matches
-            to the public Matches tab.
+            Pick two cup teams and scan one player&apos;s Henrik custom history. Matching 5v5
+            lobbies are saved as candidates below for you to publish on the public Matches tab.
           </p>
         </div>
 
@@ -273,14 +381,14 @@ export default function AdminTournamentGamesPanel({ slug, teams }: Props) {
             Need at least two teams with rosters before scanning.
           </p>
         ) : (
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
             <label className="space-y-1 text-xs text-white/50">
               Team A
               <select
                 className="w-full rounded-xl border border-white/10 bg-[#0a1020]/60 px-3 py-2.5 text-sm text-white"
                 value={teamAId}
                 onChange={(e) => setTeamAId(e.target.value)}
-                disabled={scanning}
+                disabled={actionDisabled}
               >
                 <option value="">Select…</option>
                 {teams.map((t) => (
@@ -296,12 +404,28 @@ export default function AdminTournamentGamesPanel({ slug, teams }: Props) {
                 className="w-full rounded-xl border border-white/10 bg-[#0a1020]/60 px-3 py-2.5 text-sm text-white"
                 value={teamBId}
                 onChange={(e) => setTeamBId(e.target.value)}
-                disabled={scanning}
+                disabled={actionDisabled}
               >
                 <option value="">Select…</option>
                 {teams.map((t) => (
                   <option key={t.id} value={t.id}>
                     {t.name} ({t.players.length})
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="space-y-1 text-xs text-white/50">
+              Scan as player
+              <select
+                className="w-full rounded-xl border border-white/10 bg-[#0a1020]/60 px-3 py-2.5 text-sm text-white"
+                value={scannerPlayerId}
+                onChange={(e) => setScannerPlayerId(e.target.value)}
+                disabled={actionDisabled || !teamAId || !teamBId}
+              >
+                <option value="">Team A #1 (default)</option>
+                {scannerOptions.map((option) => (
+                  <option key={option.id} value={option.id}>
+                    {option.label}
                   </option>
                 ))}
               </select>
@@ -315,7 +439,7 @@ export default function AdminTournamentGamesPanel({ slug, teams }: Props) {
                 className="w-full rounded-xl border border-white/10 bg-[#0a1020]/60 px-3 py-2.5 text-sm text-white"
                 value={minPlayersInput}
                 onChange={(e) => setMinPlayersInput(e.target.value)}
-                disabled={scanning}
+                disabled={actionDisabled}
               />
             </label>
             <label className="space-y-1 text-xs text-white/50">
@@ -327,7 +451,7 @@ export default function AdminTournamentGamesPanel({ slug, teams }: Props) {
                 className="w-full rounded-xl border border-white/10 bg-[#0a1020]/60 px-3 py-2.5 text-sm text-white"
                 value={historySizeInput}
                 onChange={(e) => setHistorySizeInput(e.target.value)}
-                disabled={scanning}
+                disabled={actionDisabled}
               />
             </label>
           </div>
@@ -337,7 +461,7 @@ export default function AdminTournamentGamesPanel({ slug, teams }: Props) {
           <button
             type="button"
             onClick={() => void runScan()}
-            disabled={scanning || busy || teams.length < 2}
+            disabled={actionDisabled || teams.length < 2}
             className="rounded-full bg-amber-500 px-5 py-2 text-[11px] font-semibold uppercase tracking-[0.14em] text-[#0a1020] disabled:opacity-40"
           >
             {scanning ? "Scanning…" : "Scan matches"}
@@ -345,7 +469,7 @@ export default function AdminTournamentGamesPanel({ slug, teams }: Props) {
           <button
             type="button"
             onClick={() => void publishSelected()}
-            disabled={scanning || busy || selected.size === 0}
+            disabled={actionDisabled || selected.size === 0}
             className="rounded-full border border-emerald-500/40 bg-emerald-500/10 px-5 py-2 text-[11px] font-semibold uppercase tracking-[0.14em] text-emerald-200 disabled:opacity-40"
           >
             Publish selected ({selected.size})
@@ -353,12 +477,32 @@ export default function AdminTournamentGamesPanel({ slug, teams }: Props) {
           <button
             type="button"
             onClick={() => void loadGames()}
-            disabled={scanning || busy}
+            disabled={actionDisabled}
             className="rounded-full border border-white/15 px-5 py-2 text-[11px] font-semibold uppercase tracking-[0.14em] text-white/70 disabled:opacity-40"
           >
             Refresh
           </button>
         </div>
+
+        <label className="block space-y-1 text-xs text-white/50">
+          Paste Henrik match IDs (optional)
+          <textarea
+            rows={2}
+            className="w-full rounded-xl border border-white/10 bg-[#0a1020]/60 px-3 py-2.5 text-sm text-white font-mono"
+            value={pasteIds}
+            onChange={(e) => setPasteIds(e.target.value)}
+            disabled={actionDisabled}
+            placeholder="24415582-399b-4d3b-ac98-8cd8fbb33e55"
+          />
+        </label>
+        <button
+          type="button"
+          onClick={() => void importPastedIds()}
+          disabled={actionDisabled || !pasteIds.trim()}
+          className="rounded-full border border-white/15 px-5 py-2 text-[11px] font-semibold uppercase tracking-[0.14em] text-white/70 disabled:opacity-40"
+        >
+          {importing ? "Importing…" : "Import pasted IDs"}
+        </button>
 
         {error ? (
           <p className="rounded-xl border border-rose-500/30 bg-rose-500/10 px-3 py-2 text-sm text-rose-200">
@@ -398,7 +542,8 @@ export default function AdminTournamentGamesPanel({ slug, teams }: Props) {
                     {g.teamBName}
                   </p>
                   <p className="text-[11px] text-white/40">
-                    {formatWhen(g.startedAt)} · A {g.teamAPresent} present · B {g.teamBPresent} present
+                    {formatWhen(g.startedAt)} · A {g.teamAPresent} present · B {g.teamBPresent}{" "}
+                    present
                     {g.mvpRiotId ? ` · MVP ${g.mvpRiotId} (${g.mvpAcs} ACS)` : ""}
                   </p>
                 </div>
