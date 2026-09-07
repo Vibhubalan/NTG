@@ -338,3 +338,168 @@ export function partitionPlayersByCupTeam<
     teamB: players.filter((p) => p.side === "Blue"),
   };
 }
+
+export type HistoryRowInput = {
+  matchId: string;
+  mapName: string | null;
+  startedAtMs: number | null;
+  scannerPuuid: string;
+};
+
+export type CorroboratedMatchPreview = {
+  matchId: string;
+  mapName: string | null;
+  startedAt: string | null;
+  teamAHits: number;
+  teamBHits: number;
+};
+
+type CorroboratedIndexEntry = {
+  mapName: string | null;
+  startedAtMs: number | null;
+  teamAHits: number;
+  teamBHits: number;
+};
+
+export function buildCorroboratedMatchIndex(
+  rows: HistoryRowInput[],
+  teamAPuuids: ReadonlySet<string>,
+  teamBPuuids: ReadonlySet<string>,
+): Map<string, CorroboratedIndexEntry> {
+  const index = new Map<string, CorroboratedIndexEntry>();
+
+  for (const row of rows) {
+    if (!row.matchId) continue;
+    let entry = index.get(row.matchId);
+    if (!entry) {
+      entry = {
+        mapName: row.mapName,
+        startedAtMs: row.startedAtMs,
+        teamAHits: 0,
+        teamBHits: 0,
+      };
+      index.set(row.matchId, entry);
+    } else {
+      if (!entry.mapName && row.mapName) entry.mapName = row.mapName;
+      if (
+        row.startedAtMs != null &&
+        (entry.startedAtMs == null || row.startedAtMs > entry.startedAtMs)
+      ) {
+        entry.startedAtMs = row.startedAtMs;
+      }
+    }
+
+    const onA = teamAPuuids.has(row.scannerPuuid);
+    const onB = teamBPuuids.has(row.scannerPuuid);
+    if (onA) entry.teamAHits += 1;
+    if (onB) entry.teamBHits += 1;
+  }
+
+  return index;
+}
+
+export function rankCorroboratedMatches(
+  index: Map<string, CorroboratedIndexEntry>,
+): CorroboratedMatchPreview[] {
+  const previews: CorroboratedMatchPreview[] = [];
+
+  for (const [matchId, entry] of index) {
+    if (entry.teamAHits < 1 || entry.teamBHits < 1) continue;
+    previews.push({
+      matchId,
+      mapName: entry.mapName,
+      startedAt:
+        entry.startedAtMs != null && Number.isFinite(entry.startedAtMs)
+          ? new Date(entry.startedAtMs).toISOString()
+          : null,
+      teamAHits: entry.teamAHits,
+      teamBHits: entry.teamBHits,
+    });
+  }
+
+  previews.sort((a, b) => {
+    const scoreA = a.teamAHits + a.teamBHits;
+    const scoreB = b.teamAHits + b.teamBHits;
+    if (scoreB !== scoreA) return scoreB - scoreA;
+    const timeA = a.startedAt ? Date.parse(a.startedAt) : 0;
+    const timeB = b.startedAt ? Date.parse(b.startedAt) : 0;
+    return timeB - timeA;
+  });
+
+  return previews;
+}
+
+export function filterMatchesByDateRange(
+  previews: CorroboratedMatchPreview[],
+  dateFrom?: string | null,
+  dateTo?: string | null,
+): CorroboratedMatchPreview[] {
+  const fromMs = dateFrom ? Date.parse(`${dateFrom}T00:00:00.000Z`) : NaN;
+  const toMs = dateTo ? Date.parse(`${dateTo}T23:59:59.999Z`) : NaN;
+  const hasFrom = Number.isFinite(fromMs);
+  const hasTo = Number.isFinite(toMs);
+  if (!hasFrom && !hasTo) return previews;
+
+  return previews.filter((p) => {
+    if (!p.startedAt) return !hasFrom && !hasTo;
+    const ms = Date.parse(p.startedAt);
+    if (!Number.isFinite(ms)) return false;
+    if (hasFrom && ms < fromMs) return false;
+    if (hasTo && ms > toMs) return false;
+    return true;
+  });
+}
+
+export type MatchSeriesGroup = {
+  id: string;
+  startedAt: string | null;
+  maps: string[];
+  matchIds: string[];
+  previews: CorroboratedMatchPreview[];
+};
+
+/** Group matches played within a time window (default 4h) for BO5-style series. */
+export function clusterMatchSeries(
+  previews: CorroboratedMatchPreview[],
+  windowMs = 4 * 60 * 60 * 1000,
+): MatchSeriesGroup[] {
+  const sorted = [...previews].sort((a, b) => {
+    const timeA = a.startedAt ? Date.parse(a.startedAt) : 0;
+    const timeB = b.startedAt ? Date.parse(b.startedAt) : 0;
+    return timeA - timeB;
+  });
+
+  const groups: MatchSeriesGroup[] = [];
+  let current: MatchSeriesGroup | null = null;
+  let anchorMs: number | null = null;
+
+  for (const preview of sorted) {
+    const ms = preview.startedAt ? Date.parse(preview.startedAt) : null;
+    const breakSeries =
+      current == null ||
+      ms == null ||
+      anchorMs == null ||
+      ms - anchorMs > windowMs;
+
+    if (breakSeries) {
+      current = {
+        id: preview.matchId,
+        startedAt: preview.startedAt,
+        maps: preview.mapName ? [preview.mapName] : [],
+        matchIds: [preview.matchId],
+        previews: [preview],
+      };
+      groups.push(current);
+      anchorMs = ms;
+      continue;
+    }
+
+    current!.previews.push(preview);
+    current!.matchIds.push(preview.matchId);
+    if (preview.mapName && !current!.maps.includes(preview.mapName)) {
+      current!.maps.push(preview.mapName);
+    }
+  }
+
+  return groups;
+}
