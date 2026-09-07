@@ -35,10 +35,6 @@ export async function POST(req: Request, { params }: Props) {
       return NextResponse.json({ error: "teamAId and teamBId are required." }, { status: 400 });
     }
 
-    const modes = Array.isArray(body.modes)
-      ? body.modes.filter((m): m is "custom" | "unrated" => m === "custom" || m === "unrated")
-      : undefined;
-
     const result = await searchTournamentGameCandidates({
       slug,
       teamAId,
@@ -47,9 +43,6 @@ export async function POST(req: Request, { params }: Props) {
         typeof body.historySize === "number"
           ? body.historySize
           : Number(body.historySize) || undefined,
-      dateFrom: typeof body.dateFrom === "string" ? body.dateFrom : undefined,
-      dateTo: typeof body.dateTo === "string" ? body.dateTo : undefined,
-      modes,
     });
 
     if (!result.ok) {
