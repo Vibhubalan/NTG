@@ -142,12 +142,15 @@ async function fetchHistoryUrl(url: string): Promise<HenrikMatchHistoryItem[]> {
   return Array.isArray(json.data) ? json.data : [];
 }
 
-async function fetchCustomMatchHistory(opts: {
+type HenrikHistoryMode = "custom" | "unrated";
+
+async function fetchMatchHistory(opts: {
   region: string;
   puuid?: string | null;
   gameName?: string | null;
   tagLine?: string | null;
   size: number;
+  mode: HenrikHistoryMode;
 }): Promise<HenrikMatchHistoryItem[]> {
   const region = normalizeHenrikRegion(opts.region);
   const size = Math.min(Math.max(opts.size, 1), 30);
@@ -156,12 +159,12 @@ async function fetchCustomMatchHistory(opts: {
   const urls: string[] = [];
   if (opts.gameName && opts.tagLine) {
     urls.push(
-      `https://api.henrikdev.xyz/valorant/v3/matches/${region}/${encodePath(opts.gameName)}/${encodePath(opts.tagLine)}?mode=custom&size=${size}`,
+      `https://api.henrikdev.xyz/valorant/v3/matches/${region}/${encodePath(opts.gameName)}/${encodePath(opts.tagLine)}?mode=${opts.mode}&size=${size}`,
     );
   }
   if (opts.puuid) {
     urls.push(
-      `https://api.henrikdev.xyz/valorant/v3/by-puuid/matches/${region}/${encodePath(opts.puuid)}?mode=custom&size=${size}`,
+      `https://api.henrikdev.xyz/valorant/v3/by-puuid/matches/${region}/${encodePath(opts.puuid)}?mode=${opts.mode}&size=${size}`,
     );
   }
   if (!urls.length) return [];
@@ -175,6 +178,26 @@ async function fetchCustomMatchHistory(opts: {
     }
   }
   throw lastError ?? new Error("Failed to fetch match history.");
+}
+
+async function fetchCustomMatchHistory(opts: {
+  region: string;
+  puuid?: string | null;
+  gameName?: string | null;
+  tagLine?: string | null;
+  size: number;
+}): Promise<HenrikMatchHistoryItem[]> {
+  return fetchMatchHistory({ ...opts, mode: "custom" });
+}
+
+async function fetchStandardCustomMatchHistory(opts: {
+  region: string;
+  puuid?: string | null;
+  gameName?: string | null;
+  tagLine?: string | null;
+  size: number;
+}): Promise<HenrikMatchHistoryItem[]> {
+  return fetchMatchHistory({ ...opts, mode: "unrated" });
 }
 
 async function fetchMatchDetails(matchId: string): Promise<HenrikMatchDetail | null> {
@@ -272,6 +295,75 @@ async function resolveTeamRoster(
   }
 
   return { teamName: team.name, players, region };
+}
+
+async function resolveTeamPlayerIdentity(teamPlayerId: string): Promise<
+  | (RosterPlayerIdentity & {
+      region: string;
+      displayName: string;
+      teamId: string;
+      teamName: string;
+      tournamentId: string;
+    })
+  | null
+> {
+  const row = await prisma.tournamentTeamPlayer.findUnique({
+    where: { id: teamPlayerId },
+    include: {
+      user: true,
+      registration: true,
+      team: true,
+    },
+  });
+  if (!row) return null;
+
+  const fromUser = row.user
+    ? splitRiotFields(row.user.riotGameName, row.user.riotTagLine, null)
+    : null;
+  const fromRow = splitRiotFields(row.riotGameName, row.riotTagLine, null);
+  const fromReg = splitRiotFields(null, null, row.registration?.snapshotRiotId ?? null);
+  const identity = fromUser ?? fromRow ?? fromReg;
+  let puuid = row.user?.riotPuuid ?? null;
+  let region = normalizeHenrikRegion(row.user?.riotRegion ?? "ap");
+
+  if (!puuid && identity) {
+    try {
+      const account = await resolveRiotAccount(identity.gameName, identity.tagLine);
+      if (account?.puuid) {
+        puuid = account.puuid;
+        if (account.region) region = normalizeHenrikRegion(account.region);
+        if (row.userId) {
+          await prisma.user.update({
+            where: { id: row.userId },
+            data: {
+              riotPuuid: account.puuid,
+              riotGameName: account.gameName,
+              riotTagLine: account.tagLine,
+              riotRegion: account.region ?? undefined,
+            },
+          });
+        }
+      }
+    } catch {
+      return null;
+    }
+  } else if (row.user?.riotRegion) {
+    region = normalizeHenrikRegion(row.user.riotRegion);
+  }
+
+  if (!puuid || !identity) return null;
+
+  return {
+    puuid,
+    userId: row.userId,
+    teamId: row.teamId,
+    riotGameName: identity.gameName,
+    riotTagLine: identity.tagLine,
+    region,
+    displayName: row.displayName?.trim() || `${identity.gameName}#${identity.tagLine}`,
+    teamName: row.team.name,
+    tournamentId: row.team.tournamentId,
+  };
 }
 
 function mapPlayerRows(
@@ -890,6 +982,299 @@ export async function scanTournamentGamesChunk(opts: {
     return {
       ok: false,
       error: err instanceof Error ? err.message : "Scan failed unexpectedly.",
+    };
+  }
+}
+
+export type PlayerStandardCustomPreview = {
+  matchId: string;
+  mapName: string | null;
+  startedAt: string | null;
+  gameLengthSec: number | null;
+  scoreLabel: string | null;
+  alreadyImported: boolean;
+  qualifies: boolean | null;
+  teamAPresent: number | null;
+  teamBPresent: number | null;
+};
+
+export async function listPlayerStandardCustomGames(opts: {
+  slug: string;
+  teamPlayerId: string;
+  teamAId?: string;
+  teamBId?: string;
+  limit?: number;
+  minPlayersPerTeam?: number;
+}): Promise<
+  | {
+      ok: true;
+      playerName: string;
+      teamName: string;
+      riotId: string;
+      games: PlayerStandardCustomPreview[];
+    }
+  | { ok: false; error: string }
+> {
+  try {
+    const tournament = await prisma.tournament.findFirst({ where: slugWhere(opts.slug) });
+    if (!tournament) return { ok: false, error: "Tournament not found." };
+
+    const player = await resolveTeamPlayerIdentity(opts.teamPlayerId);
+    if (!player) return { ok: false, error: "Could not resolve Riot identity for this player." };
+    if (player.tournamentId !== tournament.id) {
+      return { ok: false, error: "Player does not belong to this tournament." };
+    }
+
+    const limit = Math.min(Math.max(opts.limit ?? 10, 1), 10);
+    const minPlayers = opts.minPlayersPerTeam ?? DEFAULT_MIN_PLAYERS;
+
+    let history: HenrikMatchHistoryItem[] = [];
+    try {
+      history = await fetchStandardCustomMatchHistory({
+        region: player.region,
+        puuid: player.puuid,
+        gameName: player.riotGameName,
+        tagLine: player.riotTagLine,
+        size: limit,
+      });
+    } catch (err) {
+      return {
+        ok: false,
+        error: err instanceof Error ? err.message : "Failed to fetch standard custom history.",
+      };
+    }
+
+    const existingIds = new Set(
+      (
+        await prisma.tournamentGame.findMany({
+          where: { tournamentId: tournament.id },
+          select: { henrikMatchId: true },
+        })
+      ).map((g) => g.henrikMatchId),
+    );
+
+    let teamAPuuids: Set<string> | null = null;
+    let teamBPuuids: Set<string> | null = null;
+
+    if (opts.teamAId && opts.teamBId && opts.teamAId !== opts.teamBId) {
+      const [teamA, teamB] = await Promise.all([
+        prisma.tournamentTeam.findFirst({
+          where: { id: opts.teamAId, tournamentId: tournament.id },
+        }),
+        prisma.tournamentTeam.findFirst({
+          where: { id: opts.teamBId, tournamentId: tournament.id },
+        }),
+      ]);
+      if (teamA && teamB) {
+        const [rosterA, rosterB] = await Promise.all([
+          resolveTeamRoster(opts.teamAId),
+          resolveTeamRoster(opts.teamBId),
+        ]);
+        teamAPuuids = new Set(rosterA.players.map((p) => p.puuid));
+        teamBPuuids = new Set(rosterB.players.map((p) => p.puuid));
+      }
+    }
+
+    const started = Date.now();
+    const games: PlayerStandardCustomPreview[] = [];
+
+    for (const item of history.slice(0, limit)) {
+      if (Date.now() - started > SCAN_TIME_BUDGET_MS) break;
+
+      const matchId = item.metadata?.matchid;
+      if (!matchId) continue;
+
+      const meta = item.metadata;
+      const startedAt =
+        typeof meta?.game_start === "number" && Number.isFinite(meta.game_start)
+          ? new Date(meta.game_start * 1000).toISOString()
+          : null;
+
+      let scoreLabel: string | null = null;
+      let qualifies: boolean | null = null;
+      let teamAPresent: number | null = null;
+      let teamBPresent: number | null = null;
+
+      if (teamAPuuids && teamBPuuids) {
+        try {
+          const detail = await fetchMatchDetails(matchId);
+          if (detail?.data) {
+            const lobby = detail.data.players?.all_players ?? [];
+            const lobbyPuuids = new Set(lobby.map((p) => p.puuid).filter(Boolean));
+            const overlap = isCommonCustomMatch({
+              teamAPuuids,
+              teamBPuuids,
+              lobbyPuuids,
+              minPlayersPerTeam: minPlayers,
+            });
+            qualifies = overlap.match;
+            teamAPresent = overlap.teamAPresent;
+            teamBPresent = overlap.teamBPresent;
+
+            const teams = detail.data.teams;
+            const red = teams?.red?.rounds_won ?? 0;
+            const blue = teams?.blue?.rounds_won ?? 0;
+            scoreLabel = `${red}-${blue}`;
+          }
+        } catch (err) {
+          console.error("[tournament-games] player preview detail failed", matchId, err);
+        }
+      }
+
+      games.push({
+        matchId,
+        mapName: meta?.map ?? null,
+        startedAt,
+        gameLengthSec: meta?.game_length ?? null,
+        scoreLabel,
+        alreadyImported: existingIds.has(matchId),
+        qualifies,
+        teamAPresent,
+        teamBPresent,
+      });
+    }
+
+    return {
+      ok: true,
+      playerName: player.displayName,
+      teamName: player.teamName,
+      riotId: `${player.riotGameName}#${player.riotTagLine}`,
+      games,
+    };
+  } catch (err) {
+    console.error("[tournament-games] list player standard customs failed", err);
+    return {
+      ok: false,
+      error: err instanceof Error ? err.message : "Failed to load player history.",
+    };
+  }
+}
+
+export async function importStandardCustomMatches(opts: {
+  slug: string;
+  teamAId: string;
+  teamBId: string;
+  matchIds: string[];
+  minPlayersPerTeam?: number;
+}): Promise<
+  | {
+      ok: true;
+      imported: TournamentGameView[];
+      skipped: Array<{ matchId: string; reason: string }>;
+    }
+  | { ok: false; error: string }
+> {
+  try {
+    const tournament = await prisma.tournament.findFirst({ where: slugWhere(opts.slug) });
+    if (!tournament) return { ok: false, error: "Tournament not found." };
+    if (!opts.matchIds.length) return { ok: false, error: "No matches selected." };
+    if (opts.teamAId === opts.teamBId) {
+      return { ok: false, error: "Select two different teams." };
+    }
+
+    const [teamA, teamB] = await Promise.all([
+      prisma.tournamentTeam.findFirst({
+        where: { id: opts.teamAId, tournamentId: tournament.id },
+      }),
+      prisma.tournamentTeam.findFirst({
+        where: { id: opts.teamBId, tournamentId: tournament.id },
+      }),
+    ]);
+    if (!teamA || !teamB) return { ok: false, error: "Teams must belong to this tournament." };
+
+    const minPlayers = opts.minPlayersPerTeam ?? DEFAULT_MIN_PLAYERS;
+    const [rosterA, rosterB] = await Promise.all([
+      resolveTeamRoster(opts.teamAId),
+      resolveTeamRoster(opts.teamBId),
+    ]);
+
+    if (rosterA.players.length < minPlayers || rosterB.players.length < minPlayers) {
+      return {
+        ok: false,
+        error: `Need at least ${minPlayers} resolvable Riot identities per team (A=${rosterA.players.length}, B=${rosterB.players.length}).`,
+      };
+    }
+
+    const teamAPuuids = new Set(rosterA.players.map((p) => p.puuid));
+    const teamBPuuids = new Set(rosterB.players.map((p) => p.puuid));
+    const rosterAByPuuid = new Map(rosterA.players.map((p) => [p.puuid, p]));
+    const rosterBByPuuid = new Map(rosterB.players.map((p) => [p.puuid, p]));
+    const region = rosterA.region || rosterB.region || "ap";
+
+    const importedIds: string[] = [];
+    const skipped: Array<{ matchId: string; reason: string }> = [];
+
+    for (const matchId of opts.matchIds) {
+      let detail: HenrikMatchDetail | null;
+      try {
+        detail = await fetchMatchDetails(matchId);
+      } catch (err) {
+        skipped.push({
+          matchId,
+          reason: err instanceof Error ? err.message : "Failed to fetch match details.",
+        });
+        continue;
+      }
+      if (!detail?.data) {
+        skipped.push({ matchId, reason: "Match not found." });
+        continue;
+      }
+
+      const lobby = detail.data.players?.all_players ?? [];
+      const lobbyPuuids = new Set(lobby.map((p) => p.puuid).filter(Boolean));
+      const overlap = isCommonCustomMatch({
+        teamAPuuids,
+        teamBPuuids,
+        lobbyPuuids,
+        minPlayersPerTeam: minPlayers,
+      });
+      if (!overlap.match) {
+        skipped.push({
+          matchId,
+          reason: `Lobby overlap too low (A=${overlap.teamAPresent}, B=${overlap.teamBPresent}, need ${minPlayers} each).`,
+        });
+        continue;
+      }
+
+      try {
+        const upserted = await upsertCandidateGame({
+          tournamentId: tournament.id,
+          henrikMatchId: matchId,
+          detail,
+          teamAId: opts.teamAId,
+          teamBId: opts.teamBId,
+          teamAPuuids,
+          teamBPuuids,
+          rosterAByPuuid,
+          rosterBByPuuid,
+          teamAPresent: overlap.teamAPresent,
+          teamBPresent: overlap.teamBPresent,
+          region,
+        });
+        importedIds.push(upserted.id);
+      } catch (err) {
+        skipped.push({
+          matchId,
+          reason: err instanceof Error ? err.message : "Failed to store match.",
+        });
+      }
+    }
+
+    let imported: TournamentGameView[] = [];
+    if (importedIds.length > 0) {
+      const foundGames = await prisma.tournamentGame.findMany({
+        where: { id: { in: importedIds } },
+        include: gameInclude(tournament.id),
+      });
+      imported = foundGames.map(toGameView);
+    }
+
+    return { ok: true, imported, skipped };
+  } catch (err) {
+    console.error("[tournament-games] import standard customs failed", err);
+    return {
+      ok: false,
+      error: err instanceof Error ? err.message : "Import failed unexpectedly.",
     };
   }
 }

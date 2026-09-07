@@ -6,7 +6,24 @@ import { parseApiJson } from "@/lib/parse-api-json";
 type TeamOption = {
   id: string;
   name: string;
-  players: { id: string }[];
+  players: {
+    id: string;
+    displayName: string;
+    riotGameName: string | null;
+    riotTagLine: string | null;
+  }[];
+};
+
+type PlayerStandardCustomPreview = {
+  matchId: string;
+  mapName: string | null;
+  startedAt: string | null;
+  gameLengthSec: number | null;
+  scoreLabel: string | null;
+  alreadyImported: boolean;
+  qualifies: boolean | null;
+  teamAPresent: number | null;
+  teamBPresent: number | null;
 };
 
 type GamePlayer = {
@@ -68,6 +85,32 @@ export default function AdminTournamentGamesPanel({ slug, teams }: Props) {
   const [busy, setBusy] = useState(false);
   const [log, setLog] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
+
+  const [playerId, setPlayerId] = useState("");
+  const [playerGames, setPlayerGames] = useState<PlayerStandardCustomPreview[]>([]);
+  const [playerMeta, setPlayerMeta] = useState<{ name: string; team: string; riotId: string } | null>(
+    null,
+  );
+  const [selectedPlayerMatches, setSelectedPlayerMatches] = useState<Set<string>>(new Set());
+  const [loadingPlayerHistory, setLoadingPlayerHistory] = useState(false);
+  const [importingPlayerMatches, setImportingPlayerMatches] = useState(false);
+
+  const cupPlayers = useMemo(
+    () =>
+      teams.flatMap((team) =>
+        team.players.map((player) => ({
+          ...player,
+          teamId: team.id,
+          teamName: team.name,
+          label: `${player.displayName || "Player"} (${team.name})${
+            player.riotGameName && player.riotTagLine
+              ? ` · ${player.riotGameName}#${player.riotTagLine}`
+              : ""
+          }`,
+        })),
+      ),
+    [teams],
+  );
 
   const pushLog = useCallback((line: string) => {
     setLog((prev) => [...prev.slice(-40), line]);
@@ -257,6 +300,123 @@ export default function AdminTournamentGamesPanel({ slug, teams }: Props) {
     });
   }
 
+  function togglePlayerMatch(matchId: string) {
+    setSelectedPlayerMatches((prev) => {
+      const next = new Set(prev);
+      if (next.has(matchId)) next.delete(matchId);
+      else next.add(matchId);
+      return next;
+    });
+  }
+
+  async function loadPlayerHistory() {
+    if (!playerId) {
+      setError("Select a player first.");
+      return;
+    }
+    setLoadingPlayerHistory(true);
+    setError(null);
+    setPlayerGames([]);
+    setPlayerMeta(null);
+    setSelectedPlayerMatches(new Set());
+    try {
+      const parsedMinPlayers = Number(minPlayersInput);
+      const minPlayers = Number.isFinite(parsedMinPlayers) && parsedMinPlayers > 0
+        ? Math.floor(parsedMinPlayers)
+        : 5;
+
+      const res = await fetch(`/api/admin/tournaments/${slug}/games/player-history`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          teamPlayerId: playerId,
+          teamAId: teamAId || undefined,
+          teamBId: teamBId || undefined,
+          limit: 10,
+          minPlayersPerTeam: minPlayers,
+        }),
+      });
+      const parsed = await parseApiJson(res);
+      if (!parsed.ok) {
+        setError(parsed.message);
+        return;
+      }
+      if (!res.ok) {
+        setError(typeof parsed.data.error === "string" ? parsed.data.error : "Failed to load history.");
+        return;
+      }
+      setPlayerMeta({
+        name: typeof parsed.data.playerName === "string" ? parsed.data.playerName : "Player",
+        team: typeof parsed.data.teamName === "string" ? parsed.data.teamName : "",
+        riotId: typeof parsed.data.riotId === "string" ? parsed.data.riotId : "",
+      });
+      setPlayerGames(
+        (parsed.data.games as PlayerStandardCustomPreview[] | undefined) ?? [],
+      );
+      pushLog(
+        `Loaded ${((parsed.data.games as unknown[] | undefined) ?? []).length} standard custom game(s) for ${parsed.data.playerName ?? "player"}.`,
+      );
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Failed to load player history.";
+      setError(msg);
+    } finally {
+      setLoadingPlayerHistory(false);
+    }
+  }
+
+  async function importSelectedPlayerMatches() {
+    const matchIds = [...selectedPlayerMatches];
+    if (!matchIds.length) {
+      setError("Select at least one match to import.");
+      return;
+    }
+    if (!teamAId || !teamBId || teamAId === teamBId) {
+      setError("Pick Team A and Team B before importing.");
+      return;
+    }
+    setImportingPlayerMatches(true);
+    setError(null);
+    try {
+      const parsedMinPlayers = Number(minPlayersInput);
+      const minPlayers = Number.isFinite(parsedMinPlayers) && parsedMinPlayers > 0
+        ? Math.floor(parsedMinPlayers)
+        : 5;
+
+      const res = await fetch(`/api/admin/tournaments/${slug}/games/import-matches`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          teamAId,
+          teamBId,
+          matchIds,
+          minPlayersPerTeam: minPlayers,
+        }),
+      });
+      const parsed = await parseApiJson(res);
+      if (!parsed.ok) {
+        setError(parsed.message);
+        return;
+      }
+      if (!res.ok) {
+        setError(typeof parsed.data.error === "string" ? parsed.data.error : "Import failed.");
+        return;
+      }
+      const imported = Array.isArray(parsed.data.imported) ? parsed.data.imported.length : 0;
+      const skipped = Array.isArray(parsed.data.skipped) ? parsed.data.skipped.length : 0;
+      pushLog(`Imported ${imported} match(es) from player history (${skipped} skipped).`);
+      if (Array.isArray(parsed.data.skipped)) {
+        for (const row of parsed.data.skipped as Array<{ matchId?: string; reason?: string }>) {
+          if (row.matchId && row.reason) pushLog(`Skipped ${row.matchId}: ${row.reason}`);
+        }
+      }
+      setSelectedPlayerMatches(new Set());
+      await loadGames();
+      await loadPlayerHistory();
+    } finally {
+      setImportingPlayerMatches(false);
+    }
+  }
+
   return (
     <div className="space-y-6">
       <div className="rounded-2xl border border-white/[0.06] bg-[#0a1020]/40 p-5 space-y-4">
@@ -370,6 +530,138 @@ export default function AdminTournamentGamesPanel({ slug, teams }: Props) {
           <pre className="max-h-40 overflow-auto rounded-xl border border-white/[0.06] bg-black/30 p-3 text-[11px] leading-relaxed text-white/55">
             {log.join("\n")}
           </pre>
+        ) : null}
+      </div>
+
+      <div className="rounded-2xl border border-white/[0.06] bg-[#0a1020]/40 p-5 space-y-4">
+        <div>
+          <h3 className="text-sm font-semibold text-white">Scan by player (standard custom)</h3>
+          <p className="mt-1 text-xs text-white/45">
+            Standard/normal customs use Henrik&apos;s Unrated mode (not competitive custom). Pick a
+            player who was in the lobby, load their last 10 games, then import matches that overlap
+            with Team A and Team B above.
+          </p>
+        </div>
+
+        {cupPlayers.length === 0 ? (
+          <p className="text-sm text-amber-200/80">No roster players available.</p>
+        ) : (
+          <div className="grid gap-3 sm:grid-cols-2">
+            <label className="space-y-1 text-xs text-white/50">
+              Player
+              <select
+                className="w-full rounded-xl border border-white/10 bg-[#0a1020]/60 px-3 py-2.5 text-sm text-white"
+                value={playerId}
+                onChange={(e) => setPlayerId(e.target.value)}
+                disabled={loadingPlayerHistory || importingPlayerMatches}
+              >
+                <option value="">Select…</option>
+                {cupPlayers.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <div className="flex items-end gap-2">
+              <button
+                type="button"
+                onClick={() => void loadPlayerHistory()}
+                disabled={
+                  loadingPlayerHistory ||
+                  importingPlayerMatches ||
+                  busy ||
+                  scanning ||
+                  !playerId
+                }
+                className="rounded-full bg-sky-500 px-5 py-2.5 text-[11px] font-semibold uppercase tracking-[0.14em] text-[#0a1020] disabled:opacity-40"
+              >
+                {loadingPlayerHistory ? "Loading…" : "Load last 10 games"}
+              </button>
+              <button
+                type="button"
+                onClick={() => void importSelectedPlayerMatches()}
+                disabled={
+                  loadingPlayerHistory ||
+                  importingPlayerMatches ||
+                  busy ||
+                  scanning ||
+                  selectedPlayerMatches.size === 0 ||
+                  !teamAId ||
+                  !teamBId
+                }
+                className="rounded-full border border-sky-500/40 bg-sky-500/10 px-5 py-2.5 text-[11px] font-semibold uppercase tracking-[0.14em] text-sky-200 disabled:opacity-40"
+              >
+                {importingPlayerMatches
+                  ? "Importing…"
+                  : `Import selected (${selectedPlayerMatches.size})`}
+              </button>
+            </div>
+          </div>
+        )}
+
+        {playerMeta ? (
+          <p className="text-xs text-white/50">
+            Showing standard customs for{" "}
+            <span className="text-white/80">{playerMeta.name}</span>
+            {playerMeta.team ? ` (${playerMeta.team})` : ""}
+            {playerMeta.riotId ? ` · ${playerMeta.riotId}` : ""}
+            {teamAId && teamBId && teamAId !== teamBId
+              ? " · overlap checked against selected teams"
+              : " · select Team A & B to see overlap badges"}
+          </p>
+        ) : null}
+
+        {playerGames.length > 0 ? (
+          <ul className="space-y-2">
+            {playerGames.map((g) => {
+              const disabled =
+                g.alreadyImported ||
+                g.qualifies === false ||
+                importingPlayerMatches ||
+                loadingPlayerHistory;
+              return (
+                <li
+                  key={g.matchId}
+                  className="flex flex-wrap items-center gap-3 rounded-xl border border-white/[0.06] bg-white/[0.02] px-3 py-2.5"
+                >
+                  <input
+                    type="checkbox"
+                    checked={selectedPlayerMatches.has(g.matchId)}
+                    onChange={() => togglePlayerMatch(g.matchId)}
+                    disabled={disabled}
+                    className="accent-sky-500"
+                  />
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm text-white">
+                      {g.mapName ?? "Unknown map"}
+                      {g.scoreLabel ? ` · ${g.scoreLabel}` : ""}
+                    </p>
+                    <p className="text-[11px] text-white/40">
+                      {formatWhen(g.startedAt)}
+                      {g.teamAPresent != null && g.teamBPresent != null
+                        ? ` · A ${g.teamAPresent} · B ${g.teamBPresent}`
+                        : ""}
+                      {g.alreadyImported ? " · already imported" : ""}
+                    </p>
+                  </div>
+                  {g.qualifies === true ? (
+                    <span className="rounded-full bg-emerald-500/15 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-emerald-200">
+                      qualifies
+                    </span>
+                  ) : g.qualifies === false ? (
+                    <span className="rounded-full bg-rose-500/15 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-rose-200">
+                      low overlap
+                    </span>
+                  ) : null}
+                </li>
+              );
+            })}
+          </ul>
+        ) : playerId && !loadingPlayerHistory ? (
+          <p className="text-sm text-white/40">
+            No standard custom history found for this player, or load games to preview.
+          </p>
         ) : null}
       </div>
 
