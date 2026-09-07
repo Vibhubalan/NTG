@@ -43,21 +43,11 @@ type GameRow = {
   players: GamePlayer[];
 };
 
-type SearchCandidate = {
+type ScannedMatch = {
   matchId: string;
   mapName: string | null;
   startedAt: string | null;
-  teamAHits: number;
-  teamBHits: number;
-  alreadyImported: boolean;
-};
-
-type SeriesGroup = {
-  id: string;
-  startedAt: string | null;
-  maps: string[];
-  matchIds: string[];
-  previews: SearchCandidate[];
+  matched: boolean;
 };
 
 type Props = {
@@ -90,15 +80,11 @@ export default function AdminTournamentGamesPanel({ slug, teams }: Props) {
   const [teamBId, setTeamBId] = useState("");
   const [minPlayersInput, setMinPlayersInput] = useState("5");
   const [historySizeInput, setHistorySizeInput] = useState("20");
-  const [dateFrom, setDateFrom] = useState("");
-  const [dateTo, setDateTo] = useState("");
   const [pasteIds, setPasteIds] = useState("");
   const [games, setGames] = useState<GameRow[]>([]);
   const [selected, setSelected] = useState<Set<string>>(new Set());
-  const [searchCandidates, setSearchCandidates] = useState<SearchCandidate[]>([]);
-  const [searchSeries, setSearchSeries] = useState<SeriesGroup[]>([]);
-  const [selectedMatchIds, setSelectedMatchIds] = useState<Set<string>>(new Set());
-  const [searching, setSearching] = useState(false);
+  const [scannedMatches, setScannedMatches] = useState<ScannedMatch[]>([]);
+  const [scanning, setScanning] = useState(false);
   const [importing, setImporting] = useState(false);
   const [busy, setBusy] = useState(false);
   const [log, setLog] = useState<string[]>([]);
@@ -135,111 +121,46 @@ export default function AdminTournamentGamesPanel({ slug, teams }: Props) {
     () => games.filter((g) => g.status === "PUBLISHED" || g.status === "HIDDEN"),
     [games],
   );
+  const matchedScanned = useMemo(
+    () => scannedMatches.filter((m) => m.matched),
+    [scannedMatches],
+  );
 
-  const parsedMinPlayers = Number(minPlayersInput);
-  const parsedHistorySize = Number(historySizeInput);
-  const minPlayers =
-    Number.isFinite(parsedMinPlayers) && parsedMinPlayers > 0
-      ? Math.floor(parsedMinPlayers)
-      : 5;
-  const historySize =
-    Number.isFinite(parsedHistorySize) && parsedHistorySize > 0
-      ? Math.floor(parsedHistorySize)
-      : 20;
-
-  function validateTeams(): boolean {
+  async function runScan() {
     if (!teamAId || !teamBId || teamAId === teamBId) {
       setError("Pick two different teams.");
-      return false;
-    }
-    return true;
-  }
-
-  async function runSearch() {
-    if (!validateTeams()) return;
-    setSearching(true);
-    setError(null);
-    setLog([]);
-    setSearchCandidates([]);
-    setSearchSeries([]);
-    setSelectedMatchIds(new Set());
-    pushLog("Searching Henrik history across both rosters…");
-
-    try {
-      const res = await fetch(`/api/admin/tournaments/${slug}/games/search`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          teamAId,
-          teamBId,
-          historySize,
-          dateFrom: dateFrom || undefined,
-          dateTo: dateTo || undefined,
-        }),
-      });
-      const parsed = await parseApiJson(res);
-      if (!parsed.ok) {
-        setError(parsed.message);
-        pushLog(parsed.message);
-        return;
-      }
-      const data = parsed.data;
-      if (!res.ok) {
-        const msg = typeof data.error === "string" ? data.error : "Search failed.";
-        setError(msg);
-        pushLog(msg);
-        return;
-      }
-
-      const rows = (data.candidates as SearchCandidate[] | undefined) ?? [];
-      const series = (data.series as SeriesGroup[] | undefined) ?? [];
-      setSearchCandidates(rows);
-      setSearchSeries(series);
-
-      const importable = rows.filter((r) => !r.alreadyImported).map((r) => r.matchId);
-      setSelectedMatchIds(new Set(importable));
-
-      if (typeof data.progress === "string") pushLog(data.progress);
-      if (typeof data.teamAResolved === "number") {
-        pushLog(`Roster: Team A ${data.teamAResolved}, Team B ${data.teamBResolved}`);
-      }
-      pushLog(`Found ${rows.length} cross-team match(es) in ${series.length} series group(s).`);
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : "Search failed.";
-      setError(msg);
-      pushLog(msg);
-    } finally {
-      setSearching(false);
-    }
-  }
-
-  async function importMatchIds(matchIds: string[], label: string) {
-    if (!validateTeams()) return;
-    if (!matchIds.length) {
-      setError("No matches to import.");
       return;
     }
-
-    setImporting(true);
+    setScanning(true);
     setError(null);
-    pushLog(`${label}: importing ${matchIds.length} match(es)…`);
+    setLog([]);
+    setScannedMatches([]);
+    pushLog("Starting Henrik custom-match scan…");
 
-    let importedTotal = 0;
-    let skippedTotal = 0;
-    const importedHenrikIds = new Set<string>();
-    const batchSize = 10;
+    const parsedMinPlayers = Number(minPlayersInput);
+    const parsedHistorySize = Number(historySizeInput);
+    const minPlayers =
+      Number.isFinite(parsedMinPlayers) && parsedMinPlayers > 0
+        ? Math.floor(parsedMinPlayers)
+        : 5;
+    const historySize =
+      Number.isFinite(parsedHistorySize) && parsedHistorySize > 0
+        ? Math.floor(parsedHistorySize)
+        : 20;
 
+    let cursor = 0;
+    let done = false;
     try {
-      for (let i = 0; i < matchIds.length; i += batchSize) {
-        const batch = matchIds.slice(i, i + batchSize);
-        const res = await fetch(`/api/admin/tournaments/${slug}/games/import`, {
+      while (!done) {
+        const res = await fetch(`/api/admin/tournaments/${slug}/games/scan`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             teamAId,
             teamBId,
-            matchIds: batch,
+            cursor,
             minPlayersPerTeam: minPlayers,
+            historySize,
           }),
         });
         const parsed = await parseApiJson(res);
@@ -250,79 +171,87 @@ export default function AdminTournamentGamesPanel({ slug, teams }: Props) {
         }
         const data = parsed.data;
         if (!res.ok) {
-          const msg = typeof data.error === "string" ? data.error : "Import failed.";
+          const msg = typeof data.error === "string" ? data.error : "Scan failed.";
           setError(msg);
           pushLog(msg);
           break;
         }
-
-        const imported = Array.isArray(data.imported) ? data.imported.length : 0;
-        const skipped = Array.isArray(data.skipped) ? data.skipped.length : 0;
-        importedTotal += imported;
-        skippedTotal += skipped;
-
-        if (Array.isArray(data.imported)) {
-          for (const row of data.imported as Array<{ henrikMatchId?: string }>) {
-            if (row.henrikMatchId) importedHenrikIds.add(row.henrikMatchId);
-          }
+        if (typeof data.teamAResolved === "number" && cursor === 0) {
+          pushLog(
+            `Resolved roster: Team A ${data.teamAResolved}, Team B ${data.teamBResolved}`,
+          );
         }
-
-        if (Array.isArray(data.skipped)) {
-          for (const row of data.skipped as Array<{ matchId: string; reason: string }>) {
-            pushLog(`Skipped ${row.matchId.slice(0, 8)}…: ${row.reason}`);
-          }
+        if (typeof data.progress === "string") pushLog(data.progress);
+        if (Array.isArray(data.scanned) && data.scanned.length) {
+          setScannedMatches((prev) => {
+            const seen = new Set(prev.map((m) => m.matchId));
+            const next = [...prev];
+            for (const row of data.scanned as ScannedMatch[]) {
+              if (!row.matchId || seen.has(row.matchId)) continue;
+              seen.add(row.matchId);
+              next.push(row);
+            }
+            return next;
+          });
         }
+        if (Array.isArray(data.found) && data.found.length) {
+          pushLog(`Imported ${data.found.length} candidate match(es) in this chunk.`);
+        }
+        cursor = typeof data.cursor === "number" ? data.cursor : cursor;
+        done = !!data.done;
       }
-
-      pushLog(`Import done: ${importedTotal} saved, ${skippedTotal} skipped.`);
       await loadGames();
-      if (importedHenrikIds.size > 0) {
-        setSearchCandidates((prev) =>
-          prev.map((c) => ({
-            ...c,
-            alreadyImported: c.alreadyImported || importedHenrikIds.has(c.matchId),
-          })),
-        );
-        setSelectedMatchIds((prev) => {
-          const next = new Set(prev);
-          for (const id of importedHenrikIds) next.delete(id);
-          return next;
-        });
-      }
+      pushLog("Scan complete.");
     } catch (err) {
-      const msg = err instanceof Error ? err.message : "Import failed.";
+      const msg = err instanceof Error ? err.message : "Scan failed.";
       setError(msg);
       pushLog(msg);
     } finally {
-      setImporting(false);
+      setScanning(false);
     }
-  }
-
-  async function importSelected() {
-    const ids = [...selectedMatchIds].filter((id) => {
-      const row = searchCandidates.find((c) => c.matchId === id);
-      return row && !row.alreadyImported;
-    });
-    await importMatchIds(ids, "Import selected");
-  }
-
-  async function importAllSearchResults() {
-    const ids = searchCandidates.filter((c) => !c.alreadyImported).map((c) => c.matchId);
-    await importMatchIds(ids, "Import all search results");
   }
 
   async function importPastedIds() {
-    const ids = parseMatchIdList(pasteIds);
-    if (!ids.length) {
+    if (!teamAId || !teamBId || teamAId === teamBId) {
+      setError("Pick two different teams.");
+      return;
+    }
+    const matchIds = parseMatchIdList(pasteIds);
+    if (!matchIds.length) {
       setError("Paste one or more Henrik match IDs.");
       return;
     }
-    await importMatchIds(ids, "Import pasted IDs");
-  }
 
-  async function importSeries(series: SeriesGroup) {
-    const ids = series.previews.filter((p) => !p.alreadyImported).map((p) => p.matchId);
-    await importMatchIds(ids, `Import series (${series.maps.join(", ") || "unknown maps"})`);
+    const parsedMinPlayers = Number(minPlayersInput);
+    const minPlayers =
+      Number.isFinite(parsedMinPlayers) && parsedMinPlayers > 0
+        ? Math.floor(parsedMinPlayers)
+        : 5;
+
+    setImporting(true);
+    setError(null);
+    pushLog(`Importing ${matchIds.length} pasted match ID(s)…`);
+    try {
+      const res = await fetch(`/api/admin/tournaments/${slug}/games/import`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ teamAId, teamBId, matchIds, minPlayersPerTeam: minPlayers }),
+      });
+      const parsed = await parseApiJson(res);
+      if (!parsed.ok) {
+        setError(parsed.message);
+        return;
+      }
+      if (!res.ok) {
+        setError(typeof parsed.data.error === "string" ? parsed.data.error : "Import failed.");
+        return;
+      }
+      const imported = Array.isArray(parsed.data.imported) ? parsed.data.imported.length : 0;
+      pushLog(`Imported ${imported} match(es).`);
+      await loadGames();
+    } finally {
+      setImporting(false);
+    }
   }
 
   async function publishSelected() {
@@ -411,16 +340,7 @@ export default function AdminTournamentGamesPanel({ slug, teams }: Props) {
     });
   }
 
-  function toggleMatchId(matchId: string) {
-    setSelectedMatchIds((prev) => {
-      const next = new Set(prev);
-      if (next.has(matchId)) next.delete(matchId);
-      else next.add(matchId);
-      return next;
-    });
-  }
-
-  const actionDisabled = searching || importing || busy;
+  const actionDisabled = scanning || importing || busy;
 
   return (
     <div className="space-y-6">
@@ -428,18 +348,18 @@ export default function AdminTournamentGamesPanel({ slug, teams }: Props) {
         <div>
           <h3 className="text-sm font-semibold text-white">Import custom games</h3>
           <p className="mt-1 text-xs text-white/45">
-            Search Henrik custom + unrated history for all roster players on both teams. Matches
-            corroborated across teams appear in the preview — import selected ones or an entire
-            BO5 series before publishing on the public Matches tab.
+            Pick two cup teams, then scan Henrik custom history one roster player at a time.
+            Stops after the first player whose history contains a matching 5v5 lobby. All checked
+            customs are listed below.
           </p>
         </div>
 
         {teams.length < 2 ? (
           <p className="text-sm text-amber-200/80">
-            Need at least two teams with rosters before searching.
+            Need at least two teams with rosters before scanning.
           </p>
         ) : (
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
             <label className="space-y-1 text-xs text-white/50">
               Team A
               <select
@@ -496,56 +416,17 @@ export default function AdminTournamentGamesPanel({ slug, teams }: Props) {
                 disabled={actionDisabled}
               />
             </label>
-            <label className="space-y-1 text-xs text-white/50">
-              Date from
-              <input
-                type="date"
-                className="w-full rounded-xl border border-white/10 bg-[#0a1020]/60 px-3 py-2.5 text-sm text-white"
-                value={dateFrom}
-                onChange={(e) => setDateFrom(e.target.value)}
-                disabled={actionDisabled}
-              />
-            </label>
-            <label className="space-y-1 text-xs text-white/50">
-              Date to
-              <input
-                type="date"
-                className="w-full rounded-xl border border-white/10 bg-[#0a1020]/60 px-3 py-2.5 text-sm text-white"
-                value={dateTo}
-                onChange={(e) => setDateTo(e.target.value)}
-                disabled={actionDisabled}
-              />
-            </label>
           </div>
         )}
 
         <div className="flex flex-wrap gap-2">
           <button
             type="button"
-            onClick={() => void runSearch()}
+            onClick={() => void runScan()}
             disabled={actionDisabled || teams.length < 2}
             className="rounded-full bg-amber-500 px-5 py-2 text-[11px] font-semibold uppercase tracking-[0.14em] text-[#0a1020] disabled:opacity-40"
           >
-            {searching ? "Searching…" : "Search matches"}
-          </button>
-          <button
-            type="button"
-            onClick={() => void importSelected()}
-            disabled={actionDisabled || selectedMatchIds.size === 0 || !searchCandidates.length}
-            className="rounded-full border border-sky-500/40 bg-sky-500/10 px-5 py-2 text-[11px] font-semibold uppercase tracking-[0.14em] text-sky-200 disabled:opacity-40"
-          >
-            {importing ? "Importing…" : `Import selected (${selectedMatchIds.size})`}
-          </button>
-          <button
-            type="button"
-            onClick={() => void importAllSearchResults()}
-            disabled={
-              actionDisabled ||
-              !searchCandidates.some((c) => !c.alreadyImported)
-            }
-            className="rounded-full border border-sky-500/40 bg-sky-500/10 px-5 py-2 text-[11px] font-semibold uppercase tracking-[0.14em] text-sky-200 disabled:opacity-40"
-          >
-            Import all results
+            {scanning ? "Scanning…" : "Scan matches"}
           </button>
           <button
             type="button"
@@ -566,7 +447,7 @@ export default function AdminTournamentGamesPanel({ slug, teams }: Props) {
         </div>
 
         <label className="block space-y-1 text-xs text-white/50">
-          Paste Henrik match IDs (space or comma separated)
+          Paste Henrik match IDs (optional)
           <textarea
             rows={2}
             className="w-full rounded-xl border border-white/10 bg-[#0a1020]/60 px-3 py-2.5 text-sm text-white font-mono"
@@ -582,7 +463,7 @@ export default function AdminTournamentGamesPanel({ slug, teams }: Props) {
           disabled={actionDisabled || !pasteIds.trim()}
           className="rounded-full border border-white/15 px-5 py-2 text-[11px] font-semibold uppercase tracking-[0.14em] text-white/70 disabled:opacity-40"
         >
-          Import pasted IDs
+          {importing ? "Importing…" : "Import pasted IDs"}
         </button>
 
         {error ? (
@@ -598,64 +479,32 @@ export default function AdminTournamentGamesPanel({ slug, teams }: Props) {
         ) : null}
       </div>
 
-      {searchCandidates.length > 0 ? (
-        <div className="rounded-2xl border border-white/[0.06] bg-[#0a1020]/40 p-5 space-y-4">
+      {scannedMatches.length > 0 ? (
+        <div className="rounded-2xl border border-white/[0.06] bg-[#0a1020]/40 p-5 space-y-3">
           <h3 className="text-sm font-semibold text-white">
-            Search results ({searchCandidates.length})
+            Scanned customs ({scannedMatches.length}
+            {matchedScanned.length ? ` · ${matchedScanned.length} matched` : ""})
           </h3>
-
-          {searchSeries.length > 1 || searchSeries.some((s) => s.matchIds.length > 1) ? (
-            <div className="space-y-2">
-              <p className="text-xs text-white/45">BO5-style series (4h window)</p>
-              {searchSeries.map((series) => (
-                <div
-                  key={series.id}
-                  className="flex flex-wrap items-center gap-3 rounded-xl border border-white/[0.06] bg-white/[0.02] px-3 py-2.5"
-                >
-                  <div className="min-w-0 flex-1">
-                    <p className="text-sm text-white">
-                      {series.maps.join(" · ") || "Unknown maps"} · {series.matchIds.length} map(s)
-                    </p>
-                    <p className="text-[11px] text-white/40">{formatWhen(series.startedAt)}</p>
-                  </div>
-                  <button
-                    type="button"
-                    className="text-[11px] uppercase tracking-wider text-sky-300/80"
-                    onClick={() => void importSeries(series)}
-                    disabled={actionDisabled}
-                  >
-                    Import series
-                  </button>
-                </div>
-              ))}
-            </div>
-          ) : null}
-
-          <ul className="space-y-2">
-            {searchCandidates.map((c) => (
+          <ul className="max-h-72 space-y-2 overflow-auto">
+            {scannedMatches.map((m) => (
               <li
-                key={c.matchId}
+                key={m.matchId}
                 className="flex flex-wrap items-center gap-3 rounded-xl border border-white/[0.06] bg-white/[0.02] px-3 py-2.5"
               >
-                <input
-                  type="checkbox"
-                  checked={selectedMatchIds.has(c.matchId)}
-                  onChange={() => toggleMatchId(c.matchId)}
-                  disabled={c.alreadyImported || actionDisabled}
-                  className="accent-amber-500"
-                />
+                <span
+                  className={`rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider ${
+                    m.matched
+                      ? "bg-emerald-500/15 text-emerald-200"
+                      : "bg-white/10 text-white/45"
+                  }`}
+                >
+                  {m.matched ? "Match" : "Skip"}
+                </span>
                 <div className="min-w-0 flex-1">
-                  <p className="text-sm text-white">
-                    {c.mapName ?? "Unknown map"}
-                    {c.alreadyImported ? (
-                      <span className="ml-2 text-[10px] uppercase tracking-wider text-emerald-300/80">
-                        imported
-                      </span>
-                    ) : null}
-                  </p>
+                  <p className="text-sm text-white">{m.mapName ?? "Unknown map"}</p>
                   <p className="text-[11px] text-white/40">
-                    {formatWhen(c.startedAt)} · A {c.teamAHits} hits · B {c.teamBHits} hits ·{" "}
-                    <span className="font-mono">{c.matchId.slice(0, 8)}…</span>
+                    {formatWhen(m.startedAt)} ·{" "}
+                    <span className="font-mono">{m.matchId.slice(0, 8)}…</span>
                   </p>
                 </div>
               </li>
@@ -669,9 +518,7 @@ export default function AdminTournamentGamesPanel({ slug, teams }: Props) {
           Candidates ({candidates.length})
         </h3>
         {candidates.length === 0 ? (
-          <p className="text-sm text-white/40">
-            No candidates yet. Search and import matches after teams play customs.
-          </p>
+          <p className="text-sm text-white/40">No candidates yet. Run a scan after teams play customs.</p>
         ) : (
           <ul className="space-y-2">
             {candidates.map((g) => (
