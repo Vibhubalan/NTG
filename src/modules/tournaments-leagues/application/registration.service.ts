@@ -4,16 +4,19 @@ import { tournamentDetailTag } from "./tournament.service";
 import type { RegistrationResult } from "@core/contracts";
 import {
   GameSlug,
+  Prisma,
   type RegistrationParticipantRole,
   type ValorantRole,
 } from "@prisma/client";
 import {
   findUserByUsername,
+  findUserByUsernameOrRiotId,
   usernameKeyFromDisplayName,
   validateCs2RanksForRegistration,
   normalizeCs2PeakPremierRank,
   normalizeCs2FaceitRank,
 } from "@auth-membership/application/registration-helpers";
+import { riotIdSegmentLengths } from "@/lib/riot-id";
 import { ensureCs2RankDefaults } from "@auth-membership/application/game-profile.service";
 import { displayCurrentValorantRank } from "@auth-membership/domain/game-profile";
 import { isTournamentRegistrationLive } from "../domain/registration-window";
@@ -94,6 +97,26 @@ async function fetchValorantPeakSnapshot(userId: string): Promise<ValorantRankSn
     tier: lifetime?.peakRankTier ?? null,
     tierId: lifetime?.peakRankTierId ?? null,
     act: lifetime?.peakAct ?? null,
+  };
+}
+
+function valorantSnapshotsFromLeaderboard(entry: {
+  rankTier: string | null;
+  rankTierId: number | null;
+  peakRankTier: string | null;
+  peakRankTierId: number | null;
+  peakAct: string | null;
+} | null | undefined): ValorantRegistrationSnapshots {
+  return {
+    current: {
+      tier: entry?.rankTier ?? null,
+      tierId: entry?.rankTierId ?? null,
+    },
+    peak: {
+      tier: entry?.peakRankTier ?? null,
+      tierId: entry?.peakRankTierId ?? null,
+      act: entry?.peakAct ?? null,
+    },
   };
 }
 
@@ -301,6 +324,35 @@ type RegistrationSnapshotData = {
   snapshotPeakAct: string | null;
   snapshotValorantRoles: ValorantRole[] | null;
 };
+
+function snapshotDataFromUserAndBoard(
+  user: Parameters<typeof userSnapshotFields>[0] & {
+    playerProfile: {
+      displayName: string;
+      cs2PeakPremierRank: string | null;
+      cs2FaceitRank: string | null;
+      valorantRoles: ValorantRole[];
+    } | null;
+    leaderboard?: Array<{
+      rankTier: string | null;
+      rankTierId: number | null;
+      peakRankTier: string | null;
+      peakRankTierId: number | null;
+      peakAct: string | null;
+    }>;
+  },
+): RegistrationSnapshotData {
+  const snapshots = valorantSnapshotsFromLeaderboard(user.leaderboard?.[0] ?? null);
+  return {
+    ...userSnapshotFields(user),
+    snapshotRankTier: snapshots.current.tier,
+    snapshotRankTierId: snapshots.current.tierId,
+    snapshotPeakRankTier: snapshots.peak.tier,
+    snapshotPeakRankTierId: snapshots.peak.tierId,
+    snapshotPeakAct: snapshots.peak.act,
+    snapshotValorantRoles: user.playerProfile?.valorantRoles ?? [],
+  };
+}
 
 async function resolveCoCaptainForCaptainRegistration(
   game: GameSlug,
@@ -1229,6 +1281,358 @@ export async function registerSoloCup(
     const code = (e as { code?: string })?.code;
     if (code === "P2002") {
       return { ok: false, error: "You are already registered for this tournament." };
+    }
+    throw e;
+  }
+}
+
+export type DynamicTeamRegisterInput = {
+  teamName: string;
+  memberUserIds: string[];
+};
+
+export type DynamicTeamCandidate = {
+  userId: string;
+  displayName: string;
+  riotId: string | null;
+  rankTier: string | null;
+};
+
+/**
+ * Typeahead for the DYNAMIC 5v5 captain flow. Only surfaces Valorant members
+ * who are eligible to register (linked Riot ID, at least one Valorant role,
+ * completed signup) and are not already on this cup's registration list.
+ * not already on this cup's registration list. `excludeUserIds` lets the
+ * client hide teammates already added to the roster-in-progress.
+ */
+export async function searchDynamicTeamCandidates(
+  slug: string,
+  requesterUserId: string,
+  query: string,
+  excludeUserIds: string[] = [],
+): Promise<DynamicTeamCandidate[]> {
+  const trimmed = query.trim();
+  if (trimmed.length < 2) return [];
+
+  const prefix = `${usernameKeyFromDisplayName(trimmed)}%`;
+  const riotParsed = riotIdSegmentLengths(trimmed);
+  const excluded = [...new Set([requesterUserId, ...excludeUserIds].filter(Boolean))];
+
+  const excludeSql =
+    excluded.length > 0
+      ? Prisma.sql`AND u.id NOT IN (${Prisma.join(excluded)})`
+      : Prisma.empty;
+
+  const riotExactSql = riotParsed
+    ? Prisma.sql`OR (
+        LOWER(u."riotGameName") = ${riotParsed.gameName.toLowerCase()}
+        AND LOWER(u."riotTagLine") = ${riotParsed.tagLine.toLowerCase()}
+      )`
+    : Prisma.empty;
+
+  const rows = await prisma.$queryRaw<
+    Array<{
+      userId: string;
+      displayName: string;
+      riotId: string | null;
+    }>
+  >`
+    SELECT
+      u.id AS "userId",
+      COALESCE(p."displayName", u.name, 'Player') AS "displayName",
+      CASE
+        WHEN u."riotGameName" IS NOT NULL AND u."riotTagLine" IS NOT NULL
+          THEN u."riotGameName" || '#' || u."riotTagLine"
+        ELSE NULL
+      END AS "riotId"
+    FROM "PlayerProfile" p
+    INNER JOIN "User" u ON u.id = p."userId"
+    WHERE p."usernameKey" LIKE ${prefix}
+      AND u."signupCompleted" = true
+      AND u."riotPuuid" IS NOT NULL
+      AND cardinality(p."valorantRoles") > 0
+      ${excludeSql}
+      AND EXISTS (
+        SELECT 1
+        FROM "Tournament" t
+        WHERE t.slug = ${slug}
+          AND t."registrationFormat"::text = 'DYNAMIC'
+          AND t.game::text = 'VALORANT'
+          AND NOT EXISTS (
+            SELECT 1
+            FROM "TournamentRegistration" r
+            WHERE r."tournamentId" = t.id
+              AND r."userId" = u.id
+          )
+      )
+    LIMIT 8
+  `;
+
+  if (rows.length > 0) {
+    return rows.map((row) => ({
+      userId: row.userId,
+      displayName: row.displayName,
+      riotId: row.riotId,
+      rankTier: null,
+    }));
+  }
+
+  const riotRows = await prisma.$queryRaw<
+    Array<{
+      userId: string;
+      displayName: string;
+      riotId: string | null;
+    }>
+  >`
+    SELECT
+      u.id AS "userId",
+      COALESCE(p."displayName", u.name, 'Player') AS "displayName",
+      CASE
+        WHEN u."riotGameName" IS NOT NULL AND u."riotTagLine" IS NOT NULL
+          THEN u."riotGameName" || '#' || u."riotTagLine"
+        ELSE NULL
+      END AS "riotId"
+    FROM "User" u
+    INNER JOIN "PlayerProfile" p ON p."userId" = u.id
+    WHERE u."signupCompleted" = true
+      AND u."riotPuuid" IS NOT NULL
+      AND cardinality(p."valorantRoles") > 0
+      ${excludeSql}
+      AND (
+        u."riotGameName" ILIKE ${prefix}
+        ${riotExactSql}
+      )
+      AND EXISTS (
+        SELECT 1
+        FROM "Tournament" t
+        WHERE t.slug = ${slug}
+          AND t."registrationFormat"::text = 'DYNAMIC'
+          AND t.game::text = 'VALORANT'
+          AND NOT EXISTS (
+            SELECT 1
+            FROM "TournamentRegistration" r
+            WHERE r."tournamentId" = t.id
+              AND r."userId" = u.id
+          )
+      )
+    LIMIT 8
+  `;
+
+  return riotRows.map((row) => ({
+    userId: row.userId,
+    displayName: row.displayName,
+    riotId: row.riotId,
+    rankTier: null,
+  }));
+}
+
+async function resolveDynamicTeamMembers(
+  captainUserId: string,
+  memberUserIds: string[],
+  tournamentId: string,
+): Promise<{ ok: true; members: ResolvedStandardMember[] } | { ok: false; error: string }> {
+  const ids = [...new Set(memberUserIds.map((id) => id.trim()).filter(Boolean))];
+  if (ids.length !== 4) {
+    return { ok: false, error: "Add exactly 4 teammates to register a 5v5 team." };
+  }
+  if (ids.includes(captainUserId)) {
+    return { ok: false, error: "You cannot list yourself as a teammate." };
+  }
+
+  const [users, already] = await Promise.all([
+    prisma.user.findMany({
+      where: { id: { in: ids } },
+      include: {
+        playerProfile: true,
+        leaderboard: { where: { game: "VALORANT", scope: "TOWN" }, take: 1 },
+      },
+    }),
+    prisma.tournamentRegistration.findMany({
+      where: { tournamentId, userId: { in: ids } },
+      select: { userId: true },
+    }),
+  ]);
+
+  if (users.length !== 4) {
+    return { ok: false, error: "One or more teammates were not found. Search and add them again." };
+  }
+
+  const alreadyIds = new Set(already.map((r) => r.userId));
+  const byId = new Map(users.map((u) => [u.id, u]));
+  const members: ResolvedStandardMember[] = [];
+
+  for (const id of ids) {
+    const member = byId.get(id);
+    if (!member) {
+      return { ok: false, error: "One or more teammates were not found. Search and add them again." };
+    }
+    if (!member.signupCompleted) {
+      return {
+        ok: false,
+        error: `${member.playerProfile?.displayName ?? "A teammate"} must complete signup before you can register them.`,
+      };
+    }
+    const missing = validateGameProfile(GameSlug.VALORANT, member);
+    if (missing.length > 0) {
+      return {
+        ok: false,
+        error: `${member.playerProfile?.displayName ?? "A teammate"} must complete their profile: ${missing[0]}`,
+      };
+    }
+    if (alreadyIds.has(member.id)) {
+      return {
+        ok: false,
+        error: `${member.playerProfile?.displayName ?? "A teammate"} is already registered for this tournament.`,
+      };
+    }
+    members.push({
+      userId: member.id,
+      displayName: member.playerProfile?.displayName ?? member.name ?? "Player",
+      snapshot: snapshotDataFromUserAndBoard(member),
+    });
+  }
+
+  return { ok: true, members };
+}
+
+export async function registerDynamicTeam(
+  slug: string,
+  userId: string,
+  input: DynamicTeamRegisterInput,
+): Promise<RegistrationResult> {
+  const tournament = await prisma.tournament.findUnique({
+    where: { slug },
+    include: { tournamentTeams: { orderBy: { sortOrder: "desc" }, take: 1 } },
+  });
+
+  if (!tournament) {
+    return { ok: false, error: "Tournament not found." };
+  }
+
+  if (tournament.registrationFormat !== "DYNAMIC") {
+    return { ok: false, error: "This cup does not use dynamic registration." };
+  }
+
+  if (tournament.game !== GameSlug.VALORANT) {
+    return { ok: false, error: "Dynamic registration is only available for Valorant cups." };
+  }
+
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    include: {
+      playerProfile: true,
+      leaderboard: { where: { game: "VALORANT", scope: "TOWN" }, take: 1 },
+    },
+  });
+
+  if (!user) {
+    return { ok: false, error: "Account not found." };
+  }
+
+  if (!user.emailVerified || !user.signupCompleted) {
+    return { ok: false, error: "Complete signup before registering for cups." };
+  }
+
+  if (!isTournamentRegistrationLive(tournament)) {
+    return { ok: false, error: "Registration is not open for this tournament." };
+  }
+
+  const missing = validateGameProfile(tournament.game, user);
+  if (missing.length > 0) {
+    return { ok: false, error: missing[0] };
+  }
+
+  if (!input.teamName?.trim()) {
+    return { ok: false, error: "Team name is required." };
+  }
+
+  const existingCaptainReg = await prisma.tournamentRegistration.findUnique({
+    where: { tournamentId_userId: { tournamentId: tournament.id, userId } },
+  });
+  if (existingCaptainReg) {
+    return { ok: false, error: "You are already registered for this tournament." };
+  }
+
+  const membersResolved = await resolveDynamicTeamMembers(userId, input.memberUserIds, tournament.id);
+  if (!membersResolved.ok) return membersResolved;
+
+  const snapshots = valorantSnapshotsFromLeaderboard(user.leaderboard[0] ?? null);
+
+  const captainBase = {
+    tournamentId: tournament.id,
+    userId,
+    participantRole: "CAPTAIN" as const,
+    ...userSnapshotFields(user),
+    snapshotRankTier: snapshots.current.tier,
+    snapshotRankTierId: snapshots.current.tierId,
+    snapshotPeakRankTier: snapshots.peak.tier,
+    snapshotPeakRankTierId: snapshots.peak.tierId,
+    snapshotPeakAct: snapshots.peak.act,
+    snapshotValorantRoles: (user.playerProfile?.valorantRoles ?? []) as unknown as import("@prisma/client").Prisma.InputJsonValue,
+    status: "APPROVED" as const,
+  };
+
+  const teamName = input.teamName.trim();
+  const sortOrder = (tournament.tournamentTeams[0]?.sortOrder ?? -1) + 1;
+
+  try {
+    const result = await prisma.$transaction(async (tx) => {
+      const team = await tx.tournamentTeam.create({
+        data: {
+          tournamentId: tournament.id,
+          name: teamName,
+          captainUserId: userId,
+          sortOrder,
+        },
+      });
+
+      const captainReg = await tx.tournamentRegistration.create({
+        data: {
+          ...captainBase,
+          teamId: team.id,
+          teamName,
+        },
+      });
+
+      for (const member of membersResolved.members) {
+        await tx.tournamentRegistration.create({
+          data: {
+            tournamentId: tournament.id,
+            userId: member.userId,
+            participantRole: "PLAYER",
+            teamId: team.id,
+            teamName,
+            ...member.snapshot,
+            snapshotValorantRoles: member.snapshot.snapshotValorantRoles
+              ? (member.snapshot.snapshotValorantRoles as unknown as import("@prisma/client").Prisma.InputJsonValue)
+              : undefined,
+            status: "APPROVED",
+          },
+        });
+      }
+
+      await tx.tournamentTeam.update({
+        where: { id: team.id },
+        data: { sourceRegistrationId: captainReg.id },
+      });
+
+      return captainReg;
+    });
+
+    await logUserActivity({
+      userId,
+      email: user.email,
+      name: user.name,
+      action: "TOURNAMENT_REGISTER",
+      target: slug,
+      details: `Registered for cup "${tournament.name}" as Captain of ${teamName} (dynamic 5v5).`,
+    });
+
+    return { ok: true, registrationId: result.id };
+  } catch (e: unknown) {
+    const code = (e as { code?: string })?.code;
+    if (code === "P2002") {
+      return { ok: false, error: "You or a teammate is already registered for this tournament." };
     }
     throw e;
   }

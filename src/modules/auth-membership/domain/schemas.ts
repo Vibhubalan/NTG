@@ -126,6 +126,14 @@ export const soloRegisterSchema = z.object({
   ...registrationTermsField,
 });
 
+export const dynamicTeamRegisterSchema = z.object({
+  teamName: sanitizedString.pipe(z.string().min(2).max(48)),
+  memberUserIds: z
+    .array(z.string().trim().min(1).max(40))
+    .length(4, "Add exactly 4 teammates to register a 5v5 team."),
+  ...registrationTermsField,
+});
+
 export const standardTournamentRegisterSchema = z.object({
   teamName: sanitizedString.pipe(z.string().min(2).max(48)),
   memberUsernames: z.array(usernameSchema).length(4, "Enter exactly 4 teammate usernames."),

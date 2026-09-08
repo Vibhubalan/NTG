@@ -102,6 +102,7 @@ export const AUTH_RATE_LIMITS = {
   riotLink: { prefix: "auth:riot-link", limit: 10, windowMs: 15 * 60 * 1000 },
   steamLink: { prefix: "auth:steam-link", limit: 10, windowMs: 15 * 60 * 1000 },
   tournamentRegister: { prefix: "app:tournament-register", limit: 10, windowMs: 15 * 60 * 1000 },
+  dynamicTeamSearch: { prefix: "app:dynamic-team-search", limit: 60, windowMs: 60 * 1000 },
   listingApply: { prefix: "app:listing-apply", limit: 10, windowMs: 15 * 60 * 1000 },
   teamLogoUpload: { prefix: "app:team-logo-upload", limit: 10, windowMs: 60 * 60 * 1000 },
   profilePatch: { prefix: "app:profile-patch", limit: 30, windowMs: 15 * 60 * 1000 },
@@ -124,6 +125,21 @@ export async function enforceRateLimit(
 ): Promise<NextResponse | null> {
   const ip = getClientIp(req);
   const result = await checkRateLimit(ip, config);
+  if (!result.ok) return rateLimitResponse(result.retryAfterSec);
+  return null;
+}
+
+/**
+ * In-process rate limit (no Redis). Use on typeahead endpoints where an extra
+ * Upstash round-trip would dominate latency.
+ */
+export function enforceMemoryRateLimit(
+  req: Request,
+  config: RateLimitConfig,
+): NextResponse | null {
+  const ip = getClientIp(req);
+  const key = `rl:${config.prefix}:${ip}`;
+  const result = memoryRateLimit(key, config.limit, config.windowMs);
   if (!result.ok) return rateLimitResponse(result.retryAfterSec);
   return null;
 }

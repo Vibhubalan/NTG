@@ -29,6 +29,13 @@ export type RegistrationPreview = {
   missing: string[];
 };
 
+export type DynamicTeamCandidate = {
+  userId: string;
+  displayName: string;
+  riotId: string | null;
+  rankTier: string | null;
+};
+
 type Props = {
   slug: string;
   game: GameSlug;
@@ -172,6 +179,147 @@ function ProfilePreview({
   );
 }
 
+function TeammateChip({
+  candidate,
+  onRemove,
+}: {
+  candidate: DynamicTeamCandidate;
+  onRemove: () => void;
+}) {
+  return (
+    <span className="inline-flex max-w-full items-center gap-2 rounded-full border border-white/10 bg-white/[0.05] px-3 py-1.5 text-xs text-white/80">
+      <span className="truncate font-medium text-white/90">{candidate.displayName}</span>
+      {candidate.riotId ? (
+        <span className="truncate text-white/40">{candidate.riotId}</span>
+      ) : null}
+      <button
+        type="button"
+        onClick={onRemove}
+        aria-label={`Remove ${candidate.displayName}`}
+        className="shrink-0 text-white/40 transition-colors hover:text-red-300"
+      >
+        ×
+      </button>
+    </span>
+  );
+}
+
+/** Google/Instagram-style typeahead: search-as-you-type, pick a result, query clears. */
+function TeammateSearchField({
+  slug,
+  excludeUserIds,
+  onSelect,
+  inputClass,
+}: {
+  slug: string;
+  excludeUserIds: string[];
+  onSelect: (candidate: DynamicTeamCandidate) => void;
+  inputClass: string;
+}) {
+  const [query, setQuery] = useState("");
+  const [results, setResults] = useState<DynamicTeamCandidate[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [open, setOpen] = useState(false);
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const abortRef = useRef<AbortController | null>(null);
+  const excludeKey = excludeUserIds.join(",");
+
+  useEffect(() => {
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    abortRef.current?.abort();
+    const q = query.trim();
+    if (q.length < 2) {
+      setResults([]);
+      setOpen(false);
+      setLoading(false);
+      return;
+    }
+
+    setOpen(true);
+
+    debounceRef.current = setTimeout(async () => {
+      const controller = new AbortController();
+      abortRef.current = controller;
+      setLoading(true);
+      try {
+        const params = new URLSearchParams({ q });
+        if (excludeKey) params.set("exclude", excludeKey);
+        const res = await fetch(
+          `/api/tournaments/${slug}/register/search-players?${params.toString()}`,
+          { signal: controller.signal },
+        );
+        const data = await res.json().catch(() => ({}));
+        if (controller.signal.aborted) return;
+        setResults(Array.isArray(data.candidates) ? data.candidates : []);
+        setOpen(true);
+      } catch (err) {
+        if (err instanceof DOMException && err.name === "AbortError") return;
+        setResults([]);
+      } finally {
+        if (!controller.signal.aborted) setLoading(false);
+      }
+    }, 120);
+
+    return () => {
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+      abortRef.current?.abort();
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [query, slug, excludeKey]);
+
+  return (
+    <div className="relative">
+      <input
+        className={inputClass}
+        placeholder="Search username or Riot ID…"
+        value={query}
+        onChange={(e) => setQuery(e.target.value)}
+        onFocus={() => {
+          if (results.length > 0) setOpen(true);
+        }}
+        onBlur={() => {
+          // Let the click on a result register before closing the dropdown.
+          setTimeout(() => setOpen(false), 120);
+        }}
+      />
+      {open && query.trim().length >= 2 ? (
+        <div className="absolute z-20 mt-1 w-full overflow-hidden rounded-xl border border-white/10 bg-[#0a1020] shadow-xl">
+          {results.length > 0 ? (
+            <ul className="max-h-56 overflow-y-auto">
+              {results.map((candidate) => (
+                <li key={candidate.userId}>
+                  <button
+                    type="button"
+                    onMouseDown={(e) => e.preventDefault()}
+                    onClick={() => {
+                      onSelect(candidate);
+                      setQuery("");
+                      setResults([]);
+                      setOpen(false);
+                    }}
+                    className="flex w-full items-center justify-between gap-3 px-4 py-2.5 text-left text-sm transition-colors hover:bg-white/[0.06]"
+                  >
+                    <span className="truncate text-white/85">{candidate.displayName}</span>
+                    <span className="shrink-0 truncate text-xs text-white/35">
+                      {candidate.riotId ?? ""}
+                    </span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="px-4 py-3 text-xs text-white/40">
+              {loading
+                ? "Searching…"
+                : "No matches. They need an NTG account, linked Riot ID, and at least one Valorant role."}
+            </p>
+          )}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 export default function TournamentRegisterForm({
   slug,
   game,
@@ -199,6 +347,8 @@ export default function TournamentRegisterForm({
   );
   const [memberUsernames, setMemberUsernames] = useState(["", "", "", ""]);
   const [partnerUsername, setPartnerUsername] = useState("");
+  const [dynamicMode, setDynamicMode] = useState<"solo" | "team">("solo");
+  const [dynamicTeammates, setDynamicTeammates] = useState<DynamicTeamCandidate[]>([]);
   const [acceptedTerms, setAcceptedTerms] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -562,6 +712,57 @@ export default function TournamentRegisterForm({
     }
   }
 
+  async function submitDynamicTeamRegistration() {
+    if (submitting.current || loading || !acceptedTerms) return;
+    if (dynamicTeammates.length !== 4) return;
+    submitting.current = true;
+    setLoading(true);
+    setError(null);
+
+    try {
+      const res = await fetch(`/api/tournaments/${slug}/register`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          teamName: teamName.trim(),
+          memberUserIds: dynamicTeammates.map((c) => c.userId),
+          acceptedTerms: true,
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setError(
+          (data as { error?: string }).error ??
+            (res.status >= 500
+              ? "Server error. Restart dev after running prisma generate."
+              : "Registration failed."),
+        );
+        submitting.current = false;
+        setLoading(false);
+        return;
+      }
+      setSuccess(true);
+      if (data.profileCard) setProfileCard(data.profileCard);
+      router.refresh();
+    } catch {
+      setError("Something went wrong. Try again.");
+      submitting.current = false;
+      setLoading(false);
+    }
+  }
+
+  function addDynamicTeammate(candidate: DynamicTeamCandidate) {
+    setDynamicTeammates((prev) =>
+      prev.some((c) => c.userId === candidate.userId) || prev.length >= 4
+        ? prev
+        : [...prev, candidate],
+    );
+  }
+
+  function removeDynamicTeammate(userId: string) {
+    setDynamicTeammates((prev) => prev.filter((c) => c.userId !== userId));
+  }
+
   async function submitRegistration() {
     if (submitting.current || loading || !participantRole || !acceptedTerms) return;
     submitting.current = true;
@@ -650,6 +851,8 @@ export default function TournamentRegisterForm({
   }
 
   if (resolvedFormat === "DYNAMIC") {
+    const dynamicTeamReady = dynamicTeammates.length === 4 && teamName.trim().length >= 2;
+
     return (
       <div className="shine-border rounded-[1.35rem] lg:sticky lg:top-28">
         <div className="shine-border-inner space-y-4 rounded-[1.35rem] bg-[#0a1020]/85 p-6 backdrop-blur-sm">
@@ -657,23 +860,114 @@ export default function TournamentRegisterForm({
             <p className="text-[10px] font-medium uppercase tracking-[0.32em] text-[var(--color-brand)]/85">Register</p>
           </div>
 
+          <div className="grid grid-cols-2 gap-2">
+            <button
+              type="button"
+              onClick={() => {
+                setDynamicMode("solo");
+                setError(null);
+              }}
+              className={roleCardClass(dynamicMode === "solo")}
+            >
+              <p className="font-display text-sm font-bold text-white">Solo</p>
+              <p className="mt-1 text-xs text-white/45">Register on your own.</p>
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setDynamicMode("team");
+                setError(null);
+              }}
+              className={roleCardClass(dynamicMode === "team")}
+            >
+              <p className="font-display text-sm font-bold text-white">Team (5v5)</p>
+              <p className="mt-1 text-xs text-white/45">You + 4 teammates.</p>
+            </button>
+          </div>
+
           <ProfilePreview preview={preview} game={game} />
 
-          <RegistrationTermsAgreement
-            checked={acceptedTerms}
-            onChange={setAcceptedTerms}
-            rulebookUrl={rulebookUrl}
-            disabled={loading}
-          />
-          <button
-            type="button"
-            onClick={submitSoloRegistration}
-            disabled={loading || !acceptedTerms}
-            className="cta flex w-full items-center justify-center gap-2 rounded-full py-3 text-xs font-semibold uppercase tracking-[0.18em] disabled:opacity-50"
-          >
-            {loading ? <Spinner size="xs" /> : null}
-            {loading ? "Registering…" : "Register"}
-          </button>
+          {dynamicMode === "solo" ? (
+            <>
+              <RegistrationTermsAgreement
+                checked={acceptedTerms}
+                onChange={setAcceptedTerms}
+                rulebookUrl={rulebookUrl}
+                disabled={loading}
+              />
+              <button
+                type="button"
+                onClick={submitSoloRegistration}
+                disabled={loading || !acceptedTerms}
+                className="cta flex w-full items-center justify-center gap-2 rounded-full py-3 text-xs font-semibold uppercase tracking-[0.18em] disabled:opacity-50"
+              >
+                {loading ? <Spinner size="xs" /> : null}
+                {loading ? "Registering…" : "Register"}
+              </button>
+            </>
+          ) : (
+            <>
+              <div>
+                <label className="mb-1.5 block text-[10px] font-bold uppercase tracking-wider text-white/40">
+                  Team name
+                </label>
+                <input
+                  className={inputClass}
+                  placeholder="Enter your team name"
+                  value={teamName}
+                  onChange={(e) => setTeamName(e.target.value)}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <p className="text-[10px] font-bold uppercase tracking-wider text-white/40">
+                  Teammates ({dynamicTeammates.length}/4)
+                </p>
+                {dynamicTeammates.length > 0 ? (
+                  <div className="flex flex-wrap gap-2">
+                    {dynamicTeammates.map((candidate) => (
+                      <TeammateChip
+                        key={candidate.userId}
+                        candidate={candidate}
+                        onRemove={() => removeDynamicTeammate(candidate.userId)}
+                      />
+                    ))}
+                  </div>
+                ) : null}
+                {dynamicTeammates.length < 4 ? (
+                  <TeammateSearchField
+                    slug={slug}
+                    excludeUserIds={dynamicTeammates.map((c) => c.userId)}
+                    onSelect={addDynamicTeammate}
+                    inputClass={inputClass}
+                  />
+                ) : (
+                  <p className="text-xs text-white/40">
+                    Roster full (5/5). Remove a teammate to change the lineup.
+                  </p>
+                )}
+                <p className="text-[11px] text-white/35">
+                  Search by NTG username or Riot ID. Teammates must have a linked Riot ID and at least one Valorant role — same as you. Can&apos;t fill all 4? Switch to Solo instead.
+                </p>
+              </div>
+
+              <RegistrationTermsAgreement
+                checked={acceptedTerms}
+                onChange={setAcceptedTerms}
+                rulebookUrl={rulebookUrl}
+                disabled={loading}
+              />
+              <button
+                type="button"
+                onClick={submitDynamicTeamRegistration}
+                disabled={loading || !acceptedTerms || !dynamicTeamReady}
+                className="cta flex w-full items-center justify-center gap-2 rounded-full py-3 text-xs font-semibold uppercase tracking-[0.18em] disabled:opacity-50"
+              >
+                {loading ? <Spinner size="xs" /> : null}
+                {loading ? "Registering…" : `Register team (${dynamicTeammates.length + 1}/5)`}
+              </button>
+            </>
+          )}
 
           {error ? <p className="text-sm text-red-400/90">{error}</p> : null}
         </div>

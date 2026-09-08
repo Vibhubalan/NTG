@@ -131,6 +131,60 @@ const TIER_NUM_MAP: Record<string, number> = {
   radiant: 27,
 };
 
+/** Rank brackets in order, lowest first. `minTierId` is Iron 1 / Bronze 1 / … / Radiant. */
+export const RANK_BRACKET_FILTERS = [
+  { key: "UNRANKED", label: "Unranked", minTierId: 0 },
+  { key: "IRON", label: "Iron", minTierId: 3 },
+  { key: "BRONZE", label: "Bronze", minTierId: 6 },
+  { key: "SILVER", label: "Silver", minTierId: 9 },
+  { key: "GOLD", label: "Gold", minTierId: 12 },
+  { key: "PLATINUM", label: "Platinum", minTierId: 15 },
+  { key: "DIAMOND", label: "Diamond", minTierId: 18 },
+  { key: "ASCENDANT", label: "Ascendant", minTierId: 21 },
+  { key: "IMMORTAL", label: "Immortal", minTierId: 24 },
+  { key: "RADIANT", label: "Radiant", minTierId: 27 },
+] as const;
+
+export type RankBracketFilterKey = (typeof RANK_BRACKET_FILTERS)[number]["key"];
+
+/**
+ * Henrik tier id from a stored id or a rank label like "Gold 2" / "Radiant".
+ * Unranked / missing → 0.
+ */
+export function parseRankToTierId(
+  tierId: number | null | undefined,
+  tierName: string | null | undefined,
+): number {
+  if (typeof tierId === "number" && Number.isFinite(tierId) && tierId > 0) {
+    return tierId;
+  }
+  const raw = tierName?.trim();
+  if (!raw) return 0;
+  const lower = raw.toLowerCase();
+  if (lower.includes("unrank") || lower.includes("unrate")) return 0;
+  if (lower === "radiant") return 27;
+
+  const parts = lower.split(/\s+/);
+  const baseName = parts[0] ?? "";
+  const baseVal = TIER_NUM_MAP[baseName];
+  if (baseVal == null) return 0;
+  if (baseName === "radiant") return 27;
+  const div = parseInt(parts[1] || "1", 10);
+  const offset = Number.isFinite(div) && div >= 1 ? Math.min(div, 3) - 1 : 0;
+  return baseVal + offset;
+}
+
+/** Unranked matches only unranked. Any other bracket is that rank and above. */
+export function rankMeetsMinBracket(
+  tierId: number,
+  minKey: RankBracketFilterKey | "",
+): boolean {
+  if (!minKey) return true;
+  if (minKey === "UNRANKED") return tierId <= 0;
+  const min = RANK_BRACKET_FILTERS.find((b) => b.key === minKey)?.minTierId ?? 0;
+  return tierId >= min;
+}
+
 const ROMAN_MAP: Record<number, string> = {
   1: "I",
   2: "II",

@@ -9,6 +9,7 @@ import {
   registerDuoCup,
   registerSoloCup,
   registerDynamicCup,
+  registerDynamicTeam,
   getValorantRegistrationProfileCard,
 } from "@tournaments-leagues/index";
 import {
@@ -16,6 +17,7 @@ import {
   standardTournamentRegisterSchema,
   duoRegisterSchema,
   soloRegisterSchema,
+  dynamicTeamRegisterSchema,
 } from "@auth-membership/domain/schemas";
 import { NextResponse } from "next/server";
 
@@ -82,6 +84,28 @@ export async function POST(req: Request, { params }: Props) {
   }
 
   if (format === "DYNAMIC") {
+    const bodyRecord = body as Record<string, unknown> | null;
+    const wantsTeam =
+      typeof bodyRecord?.teamName === "string" && bodyRecord.teamName.trim().length > 0;
+
+    if (wantsTeam) {
+      const parsed = dynamicTeamRegisterSchema.safeParse(body);
+      if (!parsed.success) {
+        return NextResponse.json(
+          { error: parsed.error.issues[0]?.message ?? "Invalid registration." },
+          { status: 400 },
+        );
+      }
+      const result = await registerDynamicTeam(slug, auth.userId, {
+        teamName: parsed.data.teamName,
+        memberUserIds: parsed.data.memberUserIds,
+      });
+      if (!result.ok) {
+        return NextResponse.json({ error: result.error }, { status: 400 });
+      }
+      return registrationResponse(slug, auth.userId, result.registrationId, tournament.game);
+    }
+
     const parsed = soloRegisterSchema.safeParse(body);
     if (!parsed.success) {
       return NextResponse.json(

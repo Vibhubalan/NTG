@@ -1,4 +1,5 @@
 import { prisma } from "@core/database/client";
+import { riotIdSegmentLengths } from "@/lib/riot-id";
 import { AUTH_SIGNUP_DETAILS_CONFLICT } from "./auth-messages";
 
 /** Lowercase key used for case-insensitive identity uniqueness. */
@@ -162,4 +163,27 @@ export async function findUserByUsername(username: string) {
     },
     include: { playerProfile: true },
   });
+}
+
+/**
+ * Resolve a teammate lookup that may be an NTG username or a Riot ID (Name#Tag).
+ * Tries Riot ID first (only when the query parses as one), then falls back to username.
+ */
+export async function findUserByUsernameOrRiotId(query: string) {
+  const trimmed = query.trim();
+  if (!trimmed) return null;
+
+  const riotParsed = riotIdSegmentLengths(trimmed);
+  if (riotParsed) {
+    const byRiot = await prisma.user.findFirst({
+      where: {
+        riotGameName: { equals: riotParsed.gameName, mode: "insensitive" },
+        riotTagLine: { equals: riotParsed.tagLine, mode: "insensitive" },
+      },
+      include: { playerProfile: true },
+    });
+    if (byRiot) return byRiot;
+  }
+
+  return findUserByUsername(trimmed);
 }
