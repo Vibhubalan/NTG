@@ -131,7 +131,8 @@ export function formatParticipantRole(role: string): string {
 
 export type TournamentScheduleCardView = {
   registrationDate: string;
-  auctionDate: string;
+  /** Only set for AUCTION cups — hide the Auction row otherwise. */
+  auctionDate: string | null;
   tournamentDate: string;
 };
 
@@ -176,9 +177,11 @@ export function buildTournamentScheduleCardView(input: {
       ? formatScheduleDate(input.registrationOpensAt)
       : TBD,
     auctionDate:
-      input.registrationFormat === "AUCTION" && input.auctionStartsAt
-        ? formatScheduleDate(input.auctionStartsAt)
-        : TBD,
+      input.registrationFormat === "AUCTION"
+        ? input.auctionStartsAt
+          ? formatScheduleDate(input.auctionStartsAt)
+          : TBD
+        : null,
     tournamentDate: input.startsAt
       ? formatCupDateRange(input.startsAt, input.endsAt)
       : TBD,
