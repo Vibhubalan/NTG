@@ -679,6 +679,93 @@ export async function createTournamentTeam(
   return { ok: true, id: team.id };
 }
 
+/**
+ * Dynamic-format helper: creates a named team and assigns a batch of solo
+ * PLAYER registrations to it in one transaction. Mirrors createTournamentTeam
+ * + createTeamPlayer, but bulk and also writes teamName onto each
+ * registration (createTeamPlayer only sets teamId, which is why the
+ * registrations table TEAM column can show "-" for assigned players).
+ */
+export async function createTeamFromRegistrations(
+  slug: string,
+  name: string,
+  registrationIds: string[],
+): Promise<{ ok: true; id: string } | { ok: false; error: string }> {
+  const trimmedName = name.trim();
+  if (!trimmedName) return { ok: false, error: "Team name is required." };
+  if (!registrationIds.length) {
+    return { ok: false, error: "Select at least one registration to form a team." };
+  }
+
+  const tournament = await prisma.tournament.findUnique({
+    where: { slug },
+    include: { tournamentTeams: { orderBy: { sortOrder: "desc" }, take: 1 } },
+  });
+  if (!tournament) return { ok: false, error: "Tournament not found." };
+
+  const regs = await prisma.tournamentRegistration.findMany({
+    where: { id: { in: registrationIds } },
+    include: { user: true },
+  });
+  if (regs.length !== registrationIds.length) {
+    return { ok: false, error: "One or more registrations were not found." };
+  }
+  for (const reg of regs) {
+    if (reg.tournamentId !== tournament.id) {
+      return { ok: false, error: "Registration does not belong to this cup." };
+    }
+    if (reg.participantRole !== "PLAYER") {
+      return { ok: false, error: "Only solo player registrations can be grouped into a team." };
+    }
+    if (reg.teamId) {
+      return { ok: false, error: "One or more selected players are already on a team." };
+    }
+  }
+
+  const teamSortOrder = (tournament.tournamentTeams[0]?.sortOrder ?? -1) + 1;
+
+  const teamId = await prisma.$transaction(async (tx) => {
+    const team = await tx.tournamentTeam.create({
+      data: {
+        tournamentId: tournament.id,
+        name: trimmedName,
+        sortOrder: teamSortOrder,
+      },
+    });
+
+    let sortOrder = 0;
+    for (const reg of regs) {
+      await tx.tournamentTeamPlayer.create({
+        data: {
+          teamId: team.id,
+          userId: reg.userId,
+          registrationId: reg.id,
+          displayName: reg.snapshotDisplayName ?? reg.user?.name ?? "Player",
+          riotGameName: reg.user?.riotGameName ?? null,
+          riotTagLine: reg.user?.riotTagLine ?? null,
+          valorantRoles: reg.snapshotValorantRoles ?? undefined,
+          peakPremierRank: reg.snapshotCs2PeakPremier,
+          membershipKind: "PRIMARY",
+          sortOrder: sortOrder++,
+        },
+      });
+      await tx.tournamentRegistration.update({
+        where: { id: reg.id },
+        data: { teamId: team.id, teamName: trimmedName },
+      });
+    }
+
+    return team.id;
+  });
+
+  await prisma.tournament.update({
+    where: { id: tournament.id },
+    data: { updatedAt: new Date() },
+  });
+
+  return { ok: true, id: teamId };
+}
+
 export async function updateTournamentTeam(
   teamId: string,
   input: { name?: string; seed?: number | null; sortOrder?: number; logoUrl?: string | null },

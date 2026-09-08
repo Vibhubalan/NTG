@@ -931,6 +931,10 @@ export async function registerForTournament(
     return { ok: false, error: "Use the 1v1 solo registration form." };
   }
 
+  if (tournament.registrationFormat === "DYNAMIC") {
+    return { ok: false, error: "Use the dynamic solo registration form." };
+  }
+
   const user = await prisma.user.findUnique({
     where: { id: userId },
     include: { playerProfile: true },
@@ -1218,6 +1222,91 @@ export async function registerSoloCup(
       action: "TOURNAMENT_REGISTER",
       target: slug,
       details: `Registered for cup "${tournament.name}" (1v1 solo).`,
+    });
+
+    return { ok: true, registrationId: reg.id };
+  } catch (e: unknown) {
+    const code = (e as { code?: string })?.code;
+    if (code === "P2002") {
+      return { ok: false, error: "You are already registered for this tournament." };
+    }
+    throw e;
+  }
+}
+
+export async function registerDynamicCup(
+  slug: string,
+  userId: string,
+): Promise<RegistrationResult> {
+  const tournament = await prisma.tournament.findUnique({ where: { slug } });
+
+  if (!tournament) {
+    return { ok: false, error: "Tournament not found." };
+  }
+
+  if (tournament.registrationFormat !== "DYNAMIC") {
+    return { ok: false, error: "This cup does not use dynamic solo registration." };
+  }
+
+  if (tournament.game !== GameSlug.VALORANT) {
+    return { ok: false, error: "Dynamic registration is only available for Valorant cups." };
+  }
+
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    include: { playerProfile: true },
+  });
+
+  if (!user) {
+    return { ok: false, error: "Account not found." };
+  }
+
+  if (!user.emailVerified || !user.signupCompleted) {
+    return { ok: false, error: "Complete signup before registering for cups." };
+  }
+
+  if (!isTournamentRegistrationLive(tournament)) {
+    return { ok: false, error: "Registration is not open for this tournament." };
+  }
+
+  const missing = validateGameProfile(tournament.game, user);
+  if (missing.length > 0) {
+    return { ok: false, error: missing[0] };
+  }
+
+  const snapshot = await buildRegistrationSnapshotForUser(userId, tournament.game);
+  if (!snapshot.ok) return snapshot;
+
+  const existing = await prisma.tournamentRegistration.findUnique({
+    where: {
+      tournamentId_userId: { tournamentId: tournament.id, userId },
+    },
+  });
+  if (existing) {
+    return { ok: false, error: "You are already registered for this tournament." };
+  }
+
+  try {
+    const reg = await prisma.tournamentRegistration.create({
+      data: {
+        tournamentId: tournament.id,
+        userId,
+        participantRole: "PLAYER",
+        status: "APPROVED",
+        ...snapshot.data,
+        snapshotValorantRoles: snapshot.data.snapshotValorantRoles
+          ? (snapshot.data.snapshotValorantRoles as unknown as import("@prisma/client").Prisma.InputJsonValue)
+          : undefined,
+      },
+    });
+
+    await logUserActivity({
+      userId,
+      email: user.email,
+      name: user.name,
+      action: "TOURNAMENT_REGISTER",
+      target: slug,
+      details: `Registered for cup "${tournament.name}" (dynamic solo).`,
     });
 
     return { ok: true, registrationId: reg.id };
@@ -1633,8 +1722,12 @@ export async function switchPlayerToCaptain(
     return { ok: false, error: "This action is not available for FIFA cups." };
   }
 
-  if (tournament.registrationFormat === "DUO" || tournament.registrationFormat === "SOLO") {
-    return { ok: false, error: "This action is not available for 1v1 or 2v2 cups." };
+  if (
+    tournament.registrationFormat === "DUO" ||
+    tournament.registrationFormat === "SOLO" ||
+    tournament.registrationFormat === "DYNAMIC"
+  ) {
+    return { ok: false, error: "This action is not available for 1v1, 2v2, or dynamic cups." };
   }
 
   if (!isTournamentRegistrationLive(tournament)) {

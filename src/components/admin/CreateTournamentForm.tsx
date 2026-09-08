@@ -13,7 +13,7 @@ const GAME_OPTIONS = [
   { value: "OTHER", label: "Other" },
 ];
 
-type RegistrationFormat = "AUCTION" | "STANDARD" | "DUO" | "SOLO";
+type RegistrationFormat = "AUCTION" | "STANDARD" | "DUO" | "SOLO" | "DYNAMIC";
 
 function defaultFormatForGame(game: string): RegistrationFormat {
   if (game === "EA_FC26") return "DUO";
@@ -142,6 +142,7 @@ export default function CreateTournamentForm() {
                 ["STANDARD", "Standard (5v5)"],
                 ["DUO", "2v2 Duo"],
                 ["SOLO", "1v1 Solo"],
+                ["DYNAMIC", "Dynamic (Solo to Teams)"],
               ] as const
             ).map(([value, title]) => (
               <button

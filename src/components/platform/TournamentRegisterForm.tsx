@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import type { GameSlug } from "@prisma/client";
 import RegistrationTermsAgreement from "@/components/platform/RegistrationTermsAgreement";
+import Spinner from "@/components/ui/Spinner";
 import ValorantRegistrationProfileCard from "@/components/platform/tournament/ValorantRegistrationProfileCard";
 import { profileRequirementFix } from "@/lib/profile-requirements";
 import type { ValorantRegistrationProfileCard as ValorantRegistrationProfileCardData } from "@core/contracts/registration-profile";
@@ -98,6 +99,15 @@ function RegisterShell({
         {children}
       </div>
     </div>
+  );
+}
+
+function RankPullHint({ show }: { show: boolean }) {
+  if (!show) return null;
+  return (
+    <p className="text-center text-[11px] leading-snug text-white/40">
+      Fetching your current and peak rank from Riot — this can take a few seconds. Please don&apos;t close this page.
+    </p>
   );
 }
 
@@ -408,11 +418,13 @@ export default function TournamentRegisterForm({
                 type="button"
                 disabled={loading || !acceptedTerms || !teamName.trim() || !switchCaptainFormComplete}
                 onClick={() => void submitSwitchToCaptain()}
-                className="cta flex-1 rounded-full py-3 text-xs font-semibold uppercase tracking-[0.16em] disabled:opacity-50"
+                className="cta flex flex-1 items-center justify-center gap-2 rounded-full py-3 text-xs font-semibold uppercase tracking-[0.16em] disabled:opacity-50"
               >
+                {loading ? <Spinner size="xs" /> : null}
                 {loading ? "Switching…" : "Confirm switch to captain"}
               </button>
             </div>
+            <RankPullHint show={loading && game === "VALORANT"} />
           </div>
         ) : null}
       </RegisterShell>
@@ -635,10 +647,48 @@ export default function TournamentRegisterForm({
             type="button"
             onClick={submitSoloRegistration}
             disabled={loading || !acceptedTerms}
-            className="cta w-full rounded-full py-3 text-xs font-semibold uppercase tracking-[0.18em] disabled:opacity-50"
+            className="cta flex w-full items-center justify-center gap-2 rounded-full py-3 text-xs font-semibold uppercase tracking-[0.18em] disabled:opacity-50"
           >
+            {loading ? <Spinner size="xs" /> : null}
             {loading ? "Registering…" : "Register for 1v1"}
           </button>
+          <RankPullHint show={loading && game === "VALORANT"} />
+
+          {error ? <p className="text-sm text-red-400/90">{error}</p> : null}
+        </div>
+      </div>
+    );
+  }
+
+  if (resolvedFormat === "DYNAMIC") {
+    return (
+      <div className="shine-border rounded-[1.35rem] lg:sticky lg:top-28">
+        <div className="shine-border-inner space-y-4 rounded-[1.35rem] bg-[#0a1020]/85 p-6 backdrop-blur-sm">
+          <div>
+            <p className="text-[10px] font-medium uppercase tracking-[0.32em] text-[var(--color-brand)]/85">Register</p>
+            <p className="mt-2 text-sm text-white/45">
+              Dynamic registration. Register solo now — the admin will group registered players into teams before the cup starts.
+            </p>
+          </div>
+
+          <ProfilePreview preview={preview} game={game} />
+
+          <RegistrationTermsAgreement
+            checked={acceptedTerms}
+            onChange={setAcceptedTerms}
+            rulebookUrl={rulebookUrl}
+            disabled={loading}
+          />
+          <button
+            type="button"
+            onClick={submitSoloRegistration}
+            disabled={loading || !acceptedTerms}
+            className="cta flex w-full items-center justify-center gap-2 rounded-full py-3 text-xs font-semibold uppercase tracking-[0.18em] disabled:opacity-50"
+          >
+            {loading ? <Spinner size="xs" /> : null}
+            {loading ? "Registering…" : "Register solo"}
+          </button>
+          <RankPullHint show={loading && game === "VALORANT"} />
 
           {error ? <p className="text-sm text-red-400/90">{error}</p> : null}
         </div>
@@ -685,10 +735,12 @@ export default function TournamentRegisterForm({
               type="button"
               onClick={submitDuoRegistration}
               disabled={loading || !teamName.trim() || !partnerUsername.trim() || !acceptedTerms}
-              className="cta w-full rounded-full py-3 text-xs font-semibold uppercase tracking-[0.18em] disabled:opacity-50"
+              className="cta flex w-full items-center justify-center gap-2 rounded-full py-3 text-xs font-semibold uppercase tracking-[0.18em] disabled:opacity-50"
             >
+              {loading ? <Spinner size="xs" /> : null}
               {loading ? "Registering…" : "Register 2v2 team"}
             </button>
+            <RankPullHint show={loading && game === "VALORANT"} />
           </div>
 
           {error ? <p className="text-sm text-red-400/90">{error}</p> : null}
@@ -755,10 +807,12 @@ export default function TournamentRegisterForm({
               type="button"
               onClick={submitStandardRegistration}
               disabled={loading || !teamName.trim() || !standardMembersComplete || !acceptedTerms}
-              className="cta w-full rounded-full py-3 text-xs font-semibold uppercase tracking-[0.18em] disabled:opacity-50"
+              className="cta flex w-full items-center justify-center gap-2 rounded-full py-3 text-xs font-semibold uppercase tracking-[0.18em] disabled:opacity-50"
             >
+              {loading ? <Spinner size="xs" /> : null}
               {loading ? "Registering…" : "Register team"}
             </button>
+            <RankPullHint show={loading && game === "VALORANT"} />
           </div>
 
           {error ? <p className="text-sm text-red-400/90">{error}</p> : null}
@@ -982,10 +1036,12 @@ export default function TournamentRegisterForm({
             />
             <div className="flex gap-2">
               <button type="button" onClick={() => setStep(participantRole === "CAPTAIN" ? "captain" : "role")} className="rounded-full border border-white/10 px-4 py-2 text-xs text-white/50 hover:bg-white/[0.04]">Back</button>
-              <button type="button" onClick={submitRegistration} disabled={loading || !acceptedTerms} className="cta flex-1 rounded-full py-2.5 text-xs font-semibold uppercase tracking-[0.16em] disabled:opacity-50">
+              <button type="button" onClick={submitRegistration} disabled={loading || !acceptedTerms} className="cta flex flex-1 items-center justify-center gap-2 rounded-full py-2.5 text-xs font-semibold uppercase tracking-[0.16em] disabled:opacity-50">
+                {loading ? <Spinner size="xs" /> : null}
                 {loading ? "Registering…" : "Confirm registration"}
               </button>
             </div>
+            <RankPullHint show={loading && game === "VALORANT"} />
           </div>
         ) : null}
 
@@ -1017,8 +1073,9 @@ export default function TournamentRegisterForm({
                     type="button"
                     onClick={submitRegistration}
                     disabled={loading || !acceptedTerms}
-                    className="cta flex-1 rounded-full py-2.5 text-xs font-semibold uppercase tracking-[0.16em] disabled:opacity-50"
+                    className="cta flex flex-1 items-center justify-center gap-2 rounded-full py-2.5 text-xs font-semibold uppercase tracking-[0.16em] disabled:opacity-50"
                   >
+                    {loading ? <Spinner size="xs" /> : null}
                     {loading ? "Registering…" : "Confirm registration"}
                   </button>
                 )}
@@ -1029,6 +1086,7 @@ export default function TournamentRegisterForm({
           </div>
         ) : null}
 
+        <RankPullHint show={loading && step === "confirm" && game === "VALORANT"} />
         {error && layout === "featured" ? <p className="mt-2 text-sm text-red-400/90">{error}</p> : null}
       </div>
     </RegisterShell>

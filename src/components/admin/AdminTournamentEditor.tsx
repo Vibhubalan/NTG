@@ -402,6 +402,71 @@ export default function AdminTournamentEditor({
     (form.registrationFormat === "AUCTION" || !form.registrationFormat);
   const isStandardFormat =
     SUPPORTS_FORMAT.includes(form.game) && form.registrationFormat === "STANDARD";
+  const isDynamicFormat = form.registrationFormat === "DYNAMIC";
+
+  const [registrationFilter, setRegistrationFilter] = useState("");
+  const filteredRegistrations = useMemo(() => {
+    const q = registrationFilter.trim().toLowerCase();
+    if (!q) return registrations;
+    return registrations.filter((r) => {
+      const haystack = [
+        r.displayName,
+        r.email,
+        r.phone,
+        r.riotId,
+        r.teamName,
+        r.olympusId,
+        r.partnerUsername,
+        r.partnerName,
+        formatParticipantRole(r.participantRole),
+      ]
+        .filter(Boolean)
+        .join(" ")
+        .toLowerCase();
+      return haystack.includes(q);
+    });
+  }, [registrations, registrationFilter]);
+
+  const [selectedRegistrationIds, setSelectedRegistrationIds] = useState<Set<string>>(new Set());
+  const [dynamicTeamName, setDynamicTeamName] = useState("");
+  const [creatingDynamicTeam, setCreatingDynamicTeam] = useState(false);
+
+  function toggleRegistrationSelected(id: string) {
+    setSelectedRegistrationIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  async function createTeamFromSelectedRegistrations() {
+    if (!dynamicTeamName.trim() || selectedRegistrationIds.size === 0 || creatingDynamicTeam) return;
+    setCreatingDynamicTeam(true);
+    try {
+      const res = await fetch(`/api/admin/tournaments/${form.slug}/teams`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: dynamicTeamName.trim(),
+          registrationIds: Array.from(selectedRegistrationIds),
+        }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setDynamicTeamName("");
+        setSelectedRegistrationIds(new Set());
+        showMessage(`Team "${dynamicTeamName.trim()}" created.`);
+        refreshLists();
+      } else {
+        showMessage(data.error ?? "Failed to create team.", "error");
+      }
+    } catch {
+      showMessage("Failed to create team.", "error");
+    } finally {
+      setCreatingDynamicTeam(false);
+    }
+  }
 
   const prizeSplitDisplay =
     form.prizeSplit != null
@@ -1310,6 +1375,12 @@ export default function AdminTournamentEditor({
                           title: "1v1 Solo",
                           desc: "Solo registration — no team or partner.",
                           activeClass: "border-amber-500/40 bg-amber-500/[0.08] text-amber-200",
+                        },
+                        {
+                          value: "DYNAMIC" as const,
+                          title: "Dynamic (Solo to Teams)",
+                          desc: "Players register solo. Admin groups them into named teams later.",
+                          activeClass: "border-fuchsia-500/40 bg-fuchsia-500/[0.08] text-fuchsia-200",
                         },
                       ] as const
                     ).map((opt) => (
@@ -2308,13 +2379,26 @@ export default function AdminTournamentEditor({
               showsOn="Player sign-ups with profile snapshots at registration time"
             >
               <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
-                <p className="text-sm text-white/45">{registrations.length} registered</p>
+                <p className="text-sm text-white/45">
+                  {registrationFilter.trim()
+                    ? `${filteredRegistrations.length} of ${registrations.length} registered`
+                    : `${registrations.length} registered`}
+                </p>
                 <a
                   href={`/api/admin/tournaments/${form.slug}/registrations/export`}
                   className="rounded-xl border border-white/15 bg-white/[0.03] px-4 py-2 text-xs font-semibold text-white/65 hover:bg-white/[0.06] hover:text-white transition-colors"
                 >
                   Export CSV
                 </a>
+              </div>
+
+              <div className="mb-4">
+                <input
+                  className={inputClass}
+                  value={registrationFilter}
+                  onChange={(e) => setRegistrationFilter(e.target.value)}
+                  placeholder="Search registered players by name, email, phone, Riot ID, or team…"
+                />
               </div>
 
               <div className="mb-6 space-y-3 rounded-xl border border-white/[0.06] bg-white/[0.02] p-4">
@@ -2455,13 +2539,66 @@ export default function AdminTournamentEditor({
                 </button>
               </div>
 
+              {isDynamicFormat && selectedRegistrationIds.size > 0 ? (
+                <div className="mb-4 flex flex-wrap items-center gap-3 rounded-xl border border-fuchsia-500/20 bg-fuchsia-500/[0.06] p-3">
+                  <p className="text-[10px] font-bold uppercase tracking-wider text-fuchsia-200">
+                    {selectedRegistrationIds.size} player{selectedRegistrationIds.size === 1 ? "" : "s"} selected
+                  </p>
+                  <input
+                    className={`${inputClass} max-w-xs`}
+                    value={dynamicTeamName}
+                    onChange={(e) => setDynamicTeamName(e.target.value)}
+                    placeholder="New team name"
+                  />
+                  <button
+                    type="button"
+                    onClick={createTeamFromSelectedRegistrations}
+                    disabled={creatingDynamicTeam || !dynamicTeamName.trim()}
+                    className="rounded-xl bg-fuchsia-600 px-4 py-2 text-xs font-bold text-white hover:bg-fuchsia-500 disabled:opacity-50 transition-colors"
+                  >
+                    {creatingDynamicTeam
+                      ? "Creating…"
+                      : `Create team from ${selectedRegistrationIds.size} selected`}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedRegistrationIds(new Set())}
+                    className="text-[10px] font-semibold text-white/40 hover:text-white/70"
+                  >
+                    Clear selection
+                  </button>
+                </div>
+              ) : null}
+
               {registrations.length === 0 ? (
                 <p className="text-sm text-white/35">No registrations yet.</p>
+              ) : filteredRegistrations.length === 0 ? (
+                <p className="text-sm text-white/35">No registrations match your search.</p>
               ) : (
                 <div className="overflow-x-auto rounded-xl border border-white/[0.06]">
                   <table className="min-w-full text-left text-xs text-white/70">
                     <thead className="border-b border-white/[0.06] bg-white/[0.02] text-[10px] uppercase tracking-wider text-white/40">
                       <tr>
+                        {isDynamicFormat ? (
+                          <th className="px-3 py-2">
+                            <input
+                              type="checkbox"
+                              aria-label="Select all unassigned players"
+                              checked={
+                                filteredRegistrations.filter((r) => !r.teamId).length > 0 &&
+                                filteredRegistrations
+                                  .filter((r) => !r.teamId)
+                                  .every((r) => selectedRegistrationIds.has(r.id))
+                              }
+                              onChange={(e) => {
+                                const unassigned = filteredRegistrations.filter((r) => !r.teamId);
+                                setSelectedRegistrationIds(
+                                  e.target.checked ? new Set(unassigned.map((r) => r.id)) : new Set(),
+                                );
+                              }}
+                            />
+                          </th>
+                        ) : null}
                         <th className="px-3 py-2">Name</th>
                         <th className="px-3 py-2">Email</th>
                         <th className="px-3 py-2">Phone</th>
@@ -2492,8 +2629,19 @@ export default function AdminTournamentEditor({
                       </tr>
                     </thead>
                     <tbody>
-                      {registrations.map((r) => (
+                      {filteredRegistrations.map((r) => (
                         <tr key={r.id} className="border-b border-white/[0.04]">
+                          {isDynamicFormat ? (
+                            <td className="px-3 py-2">
+                              <input
+                                type="checkbox"
+                                aria-label={`Select ${r.displayName ?? "player"}`}
+                                checked={selectedRegistrationIds.has(r.id)}
+                                disabled={Boolean(r.teamId)}
+                                onChange={() => toggleRegistrationSelected(r.id)}
+                              />
+                            </td>
+                          ) : null}
                           <td className="px-3 py-2 font-medium text-white/85">{r.displayName ?? "-"}</td>
                           <td className="px-3 py-2">{r.email ?? "-"}</td>
                           <td className="px-3 py-2 font-mono">{r.phone ?? "-"}</td>

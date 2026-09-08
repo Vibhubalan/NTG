@@ -8,6 +8,7 @@ import {
   registerFifaTeam,
   registerDuoCup,
   registerSoloCup,
+  registerDynamicCup,
   getValorantRegistrationProfileCard,
 } from "@tournaments-leagues/index";
 import {
@@ -74,6 +75,21 @@ export async function POST(req: Request, { params }: Props) {
       );
     }
     const result = await registerSoloCup(slug, auth.userId);
+    if (!result.ok) {
+      return NextResponse.json({ error: result.error }, { status: 400 });
+    }
+    return registrationResponse(slug, auth.userId, result.registrationId, tournament.game);
+  }
+
+  if (format === "DYNAMIC") {
+    const parsed = soloRegisterSchema.safeParse(body);
+    if (!parsed.success) {
+      return NextResponse.json(
+        { error: parsed.error.issues[0]?.message ?? "Invalid registration." },
+        { status: 400 },
+      );
+    }
+    const result = await registerDynamicCup(slug, auth.userId);
     if (!result.ok) {
       return NextResponse.json({ error: result.error }, { status: 400 });
     }
