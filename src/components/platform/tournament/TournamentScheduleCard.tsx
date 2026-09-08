@@ -42,9 +42,15 @@ export default function TournamentScheduleCard({
         <p className="text-[10px] font-medium tracking-[0.2em] text-white/40 uppercase">
           Schedule
         </p>
-        <div className="mt-3 grid min-w-0 gap-3 sm:grid-cols-3 sm:gap-5">
+        <div
+          className={`mt-3 grid min-w-0 gap-3 sm:gap-5 ${
+            schedule.auctionDate ? "sm:grid-cols-3" : "sm:grid-cols-2"
+          }`}
+        >
           <ScheduleCell label="Registration" value={schedule.registrationDate} />
-          <ScheduleCell label="Auction" value={schedule.auctionDate} />
+          {schedule.auctionDate ? (
+            <ScheduleCell label="Auction" value={schedule.auctionDate} />
+          ) : null}
           <ScheduleCell label="Games" value={schedule.tournamentDate} />
         </div>
       </div>
@@ -58,7 +64,9 @@ export default function TournamentScheduleCard({
       </p>
       <div className="mt-3 space-y-2.5">
         <ScheduleRow label="Registration" value={schedule.registrationDate} />
-        <ScheduleRow label="Auction" value={schedule.auctionDate} />
+        {schedule.auctionDate ? (
+          <ScheduleRow label="Auction" value={schedule.auctionDate} />
+        ) : null}
         <ScheduleRow label="Games" value={schedule.tournamentDate} />
       </div>
     </div>
