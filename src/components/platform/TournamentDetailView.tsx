@@ -200,9 +200,11 @@ export default function TournamentDetailView({
   const showTeams =
     tournament.registrationFormat === "SOLO"
       ? tournament.soloPlayers.length > 0 || tournament.registrationOpen
-      : tournament.teams.length > 0 ||
-        tournament.teamDetails.length > 0 ||
-        tournament.registrationOpen;
+      : tournament.registrationFormat === "DYNAMIC"
+        ? tournament.teams.length > 0 || tournament.teamDetails.length > 0
+        : tournament.teams.length > 0 ||
+          tournament.teamDetails.length > 0 ||
+          tournament.registrationOpen;
 
   const splitColors = ["text-amber-500/90", "text-slate-300/90", "text-amber-700/90"];
   const splitBadgeColors = ["bg-amber-500/20 text-amber-500", "bg-slate-300/20 text-slate-300", "bg-amber-700/20 text-amber-700"];

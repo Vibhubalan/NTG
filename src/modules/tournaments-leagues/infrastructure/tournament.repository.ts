@@ -486,20 +486,15 @@ export class TournamentRepository {
 
     const allRegs = t.registrations;
     const isSoloCup = t.registrationFormat === "SOLO";
-    const isDynamicCup = t.registrationFormat === "DYNAMIC";
 
-    // DYNAMIC cups can have both formed teams (players who signed up as a
-    // 5-stack, or were later grouped by an admin) and leftover solos at the
-    // same time — show both instead of flipping entirely to teams once the
-    // first team exists.
+    // DYNAMIC leftover solos stay off the public roster until an admin (or
+    // a 5-stack signup) puts them on a team.
     const teamDetails = isSoloCup
       ? []
       : await enrichMissingRosterCards(buildTeamDetailsFromData(t.tournamentTeams, allRegs));
     const soloPlayers = isSoloCup
       ? allRegs.map(mapRegistrationToPlayerView)
-      : isDynamicCup
-        ? allRegs.filter((r) => !r.teamId).map(mapRegistrationToPlayerView)
-        : [];
+      : [];
 
     const teams = teamDetails.map((team) => team.name);
 
