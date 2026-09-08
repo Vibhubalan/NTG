@@ -106,6 +106,12 @@ export default async function TournamentDetailPage({ params }: Props) {
   const auctionEnded =
     auctionEligible && !admin.ok && tournament.status === "COMPLETED";
 
+  const myTeamNames = userId
+    ? tournament.teamDetails
+        .filter((team) => team.players.some((p) => p.userId === userId))
+        .map((team) => team.name)
+    : [];
+
   return (
     <>
       <TournamentDetailView
@@ -120,6 +126,7 @@ export default async function TournamentDetailPage({ params }: Props) {
         showMatchesTab={showMatchesTab}
         publishedGames={publishedGames}
         statsEligibility={statsEligibility}
+        myTeamNames={myTeamNames}
       />
       {admin.ok ? (
         <div className="mt-16 border-t border-white/[0.06] pt-8 text-center">
