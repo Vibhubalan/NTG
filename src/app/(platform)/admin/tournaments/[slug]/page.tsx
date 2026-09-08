@@ -136,6 +136,7 @@ export default async function AdminTournamentEditPage({ params }: Props) {
       partnerName: r.partnerName,
       riotId: r.snapshotRiotId,
       rankTier: valorant?.rankTier ?? r.snapshotRankTier,
+      peakRankTier: r.snapshotPeakRankTier,
       valorantRoles: valorant?.valorantRoles ?? null,
       steamId64: r.snapshotSteamId64,
       cs2Hours: r.snapshotCs2Hours,

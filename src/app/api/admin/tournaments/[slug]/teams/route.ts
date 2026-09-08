@@ -1,6 +1,6 @@
 import { guardResponse, isAuthedAdmin, requireAdmin } from "@/lib/auth-guard";
 import { serverEnv } from "@core/config/env.server";
-import { createTournamentTeam } from "@tournaments-leagues/index";
+import { createTournamentTeam, createTeamFromRegistrations } from "@tournaments-leagues/index";
 import { NextResponse } from "next/server";
 
 export const dynamic = "force-dynamic";
@@ -16,7 +16,7 @@ export async function POST(req: Request, { params }: Props) {
   if (!isAuthedAdmin(auth)) return guardResponse(auth)!;
 
   const { slug } = await params;
-  let body: { name: string; seed?: number };
+  let body: { name: string; seed?: number; registrationIds?: string[] };
   try {
     body = await req.json();
   } catch {
@@ -25,6 +25,14 @@ export async function POST(req: Request, { params }: Props) {
 
   if (!body.name?.trim()) {
     return NextResponse.json({ error: "Team name is required." }, { status: 400 });
+  }
+
+  if (Array.isArray(body.registrationIds) && body.registrationIds.length > 0) {
+    const result = await createTeamFromRegistrations(slug, body.name, body.registrationIds);
+    if (!result.ok) {
+      return NextResponse.json({ error: result.error }, { status: 400 });
+    }
+    return NextResponse.json({ ok: true, id: result.id });
   }
 
   const result = await createTournamentTeam(slug, body.name, body.seed);

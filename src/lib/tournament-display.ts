@@ -43,6 +43,8 @@ export function formatRegistrationLabel(format: string | null | undefined): stri
       return "1v1 Solo";
     case "DUO":
       return "2v2 Duo";
+    case "DYNAMIC":
+      return "Standard (5v5)";
     default:
       return "";
   }

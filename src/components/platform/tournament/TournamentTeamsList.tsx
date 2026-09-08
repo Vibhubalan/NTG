@@ -372,7 +372,10 @@ export default function TournamentTeamsList({
   registrationFormat,
 }: Props) {
   const [previewTeam, setPreviewTeam] = useState<TournamentTeamView | null>(null);
-  const isSoloCup = registrationFormat === "SOLO";
+  const isDynamicCup = registrationFormat === "DYNAMIC";
+  // Dynamic cups show a solo player pool until the admin has grouped players into teams.
+  const isSoloCup =
+    registrationFormat === "SOLO" || (isDynamicCup && teamDetails.length === 0);
 
   const rows: TournamentTeamView[] =
     teamDetails.length > 0

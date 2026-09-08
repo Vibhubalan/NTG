@@ -250,6 +250,7 @@ export async function listSeasonsAdmin() {
 }
 
 export type AdminCupFieldsSnapshot = {
+  slug: string;
   name: string;
   game: GameSlug;
   gameLabel: string | null;
@@ -307,6 +308,7 @@ export function toAdminCupFieldsSnapshot(
   t: NonNullable<Awaited<ReturnType<typeof getTournamentAdmin>>>,
 ): AdminCupFieldsSnapshot {
   return {
+    slug: t.slug,
     name: t.name,
     game: t.game,
     gameLabel: t.gameLabel,
@@ -359,6 +361,21 @@ export async function updateTournamentFull(
   if (!tournament) return { ok: false, error: "Tournament not found." };
 
   const data: Prisma.TournamentUpdateInput = {};
+
+  if (input.slug !== undefined) {
+    const nextSlug = slugify(input.slug);
+    if (!nextSlug) return { ok: false, error: "Invalid slug." };
+    if (nextSlug !== tournament.slug) {
+      const taken = await prisma.tournament.findFirst({
+        where: {
+          slug: { equals: nextSlug, mode: "insensitive" },
+          NOT: { id: tournament.id },
+        },
+      });
+      if (taken) return { ok: false, error: "A tournament with this slug already exists." };
+      data.slug = nextSlug;
+    }
+  }
 
   if (input.name !== undefined) data.name = input.name.trim();
   if (input.game !== undefined) data.game = input.game;
@@ -591,10 +608,12 @@ export async function updateTournamentFull(
     }
   }
 
-  const saved = await getTournamentAdmin(tournament.slug);
+  const savedSlug = typeof data.slug === "string" ? data.slug : tournament.slug;
+  const saved = await getTournamentAdmin(savedSlug);
   if (!saved) return { ok: false, error: "Tournament not found after save." };
 
   safeExpireTag(tournamentDetailTag(slug));
+  if (savedSlug !== slug) safeExpireTag(tournamentDetailTag(savedSlug));
 
   return { ok: true, tournament: toAdminCupFieldsSnapshot(saved) };
 }
@@ -686,6 +705,93 @@ export async function createTournamentTeam(
     data: { updatedAt: new Date() },
   });
   return { ok: true, id: team.id };
+}
+
+/**
+ * Dynamic-format helper: creates a named team and assigns a batch of solo
+ * PLAYER registrations to it in one transaction. Mirrors createTournamentTeam
+ * + createTeamPlayer, but bulk and also writes teamName onto each
+ * registration (createTeamPlayer only sets teamId, which is why the
+ * registrations table TEAM column can show "-" for assigned players).
+ */
+export async function createTeamFromRegistrations(
+  slug: string,
+  name: string,
+  registrationIds: string[],
+): Promise<{ ok: true; id: string } | { ok: false; error: string }> {
+  const trimmedName = name.trim();
+  if (!trimmedName) return { ok: false, error: "Team name is required." };
+  if (!registrationIds.length) {
+    return { ok: false, error: "Select at least one registration to form a team." };
+  }
+
+  const tournament = await prisma.tournament.findUnique({
+    where: { slug },
+    include: { tournamentTeams: { orderBy: { sortOrder: "desc" }, take: 1 } },
+  });
+  if (!tournament) return { ok: false, error: "Tournament not found." };
+
+  const regs = await prisma.tournamentRegistration.findMany({
+    where: { id: { in: registrationIds } },
+    include: { user: true },
+  });
+  if (regs.length !== registrationIds.length) {
+    return { ok: false, error: "One or more registrations were not found." };
+  }
+  for (const reg of regs) {
+    if (reg.tournamentId !== tournament.id) {
+      return { ok: false, error: "Registration does not belong to this cup." };
+    }
+    if (reg.participantRole !== "PLAYER") {
+      return { ok: false, error: "Only solo player registrations can be grouped into a team." };
+    }
+    if (reg.teamId) {
+      return { ok: false, error: "One or more selected players are already on a team." };
+    }
+  }
+
+  const teamSortOrder = (tournament.tournamentTeams[0]?.sortOrder ?? -1) + 1;
+
+  const teamId = await prisma.$transaction(async (tx) => {
+    const team = await tx.tournamentTeam.create({
+      data: {
+        tournamentId: tournament.id,
+        name: trimmedName,
+        sortOrder: teamSortOrder,
+      },
+    });
+
+    let sortOrder = 0;
+    for (const reg of regs) {
+      await tx.tournamentTeamPlayer.create({
+        data: {
+          teamId: team.id,
+          userId: reg.userId,
+          registrationId: reg.id,
+          displayName: reg.snapshotDisplayName ?? reg.user?.name ?? "Player",
+          riotGameName: reg.user?.riotGameName ?? null,
+          riotTagLine: reg.user?.riotTagLine ?? null,
+          valorantRoles: reg.snapshotValorantRoles ?? undefined,
+          peakPremierRank: reg.snapshotCs2PeakPremier,
+          membershipKind: "PRIMARY",
+          sortOrder: sortOrder++,
+        },
+      });
+      await tx.tournamentRegistration.update({
+        where: { id: reg.id },
+        data: { teamId: team.id, teamName: trimmedName },
+      });
+    }
+
+    return team.id;
+  });
+
+  await prisma.tournament.update({
+    where: { id: tournament.id },
+    data: { updatedAt: new Date() },
+  });
+
+  return { ok: true, id: teamId };
 }
 
 export async function updateTournamentTeam(
@@ -1082,6 +1188,7 @@ export type AdminRegistrationRow = {
   partnerName: string | null;
   riotId: string | null;
   rankTier: string | null;
+  peakRankTier: string | null;
   valorantRoles: string | null;
   steamId64: string | null;
   cs2Hours: number | null;
@@ -1151,6 +1258,7 @@ export async function listTournamentRegistrationsAdmin(
       partnerName: r.partnerName,
       riotId: r.snapshotRiotId,
       rankTier: valorant?.rankTier ?? r.snapshotRankTier,
+      peakRankTier: r.snapshotPeakRankTier,
       valorantRoles: valorant?.valorantRoles ?? null,
       steamId64: r.snapshotSteamId64,
       cs2Hours: r.snapshotCs2Hours,
@@ -1230,7 +1338,8 @@ export function buildRegistrationsCsv(
       "Role",
       "Team",
       "Riot ID",
-      "Rank",
+      "Current Rank",
+      "Peak Rank",
       "Valorant Roles",
       "Registered At",
     ];
@@ -1287,6 +1396,7 @@ export function buildRegistrationsCsv(
           csvEscape(r.teamName),
           csvEscape(r.riotId),
           csvEscape(r.rankTier),
+          csvEscape(r.peakRankTier),
           csvEscape(r.valorantRoles),
           csvEscape(at),
         ].join(","),

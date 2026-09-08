@@ -159,8 +159,8 @@ export default function AdminListingsPanel({ initialListings }: Props) {
 
       <AdminSection
         title="Listings"
-        showsOn="Public /listings board + homepage teaser"
-        viewHref="/listings"
+        showsOn="Public /careers board + homepage teaser"
+        viewHref="/careers"
         viewLabel="View board"
       >
         <div className="flex flex-wrap items-center justify-between gap-3">

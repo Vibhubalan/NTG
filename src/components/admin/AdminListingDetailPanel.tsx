@@ -31,7 +31,7 @@ const inputClass =
 
 export default function AdminListingDetailPanel({
   slug,
-  title,
+  title: initialTitle,
   listingType,
   gameKey,
   initialDescription,
@@ -48,6 +48,8 @@ export default function AdminListingDetailPanel({
   const descriptionRef = useRef<HTMLTextAreaElement>(null);
   const [applications, setApplications] = useState(initialApplications);
   const [rulebookUrl, setRulebookUrl] = useState(initialRulebookUrl);
+  const [title, setTitle] = useState(initialTitle);
+  const [savingTitle, setSavingTitle] = useState(false);
   const [description, setDescription] = useState(initialDescription ?? "");
   const [savingDescription, setSavingDescription] = useState(false);
   const [autoManageTryout, setAutoManageTryout] = useState(initialAutoManageTryout);
@@ -65,6 +67,10 @@ export default function AdminListingDetailPanel({
   useEffect(() => {
     setDescription(initialDescription ?? "");
   }, [initialDescription]);
+
+  useEffect(() => {
+    setTitle(initialTitle);
+  }, [initialTitle]);
 
   useEffect(() => {
     const el = descriptionRef.current;
@@ -96,6 +102,31 @@ export default function AdminListingDetailPanel({
   const selected = applications.find((a) => a.id === selectedId) ?? null;
   const isTryout = listingType === "ROSTER_TRYOUT";
   const descriptionDirty = description !== (initialDescription ?? "");
+  const titleDirty = title.trim() !== initialTitle.trim();
+
+  async function saveTitle() {
+    const trimmed = title.trim();
+    if (!trimmed) {
+      setMessage("Heading cannot be empty.");
+      return;
+    }
+    setSavingTitle(true);
+    setMessage(null);
+    const res = await fetch(`/api/admin/listings/${slug}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ title: trimmed }),
+    });
+    const data = await res.json();
+    setSavingTitle(false);
+    if (!res.ok) {
+      setMessage(data.error ?? "Could not save heading.");
+      return;
+    }
+    setTitle(trimmed);
+    setMessage("Listing heading saved.");
+    router.refresh();
+  }
 
   async function saveDescription() {
     setSavingDescription(true);
@@ -171,6 +202,30 @@ export default function AdminListingDetailPanel({
           {message}
         </p>
       ) : null}
+
+      <AdminSection title="Listing heading" showsOn="Public listing page, board card, and hero carousel">
+        <p className="mb-3 text-sm text-white/45">
+          The main title shown on the public listing page and cards. Changing it does not change the
+          listing URL (<span className="font-mono text-white/60">/careers/{slug}</span> stays the same).
+        </p>
+        <input
+          className={inputClass}
+          placeholder="Listing title"
+          value={title}
+          onChange={(e) => setTitle(e.target.value)}
+        />
+        <div className="mt-3 flex items-center gap-3">
+          <button
+            type="button"
+            onClick={saveTitle}
+            disabled={!titleDirty || savingTitle || !title.trim()}
+            className="rounded-xl bg-amber-600 px-5 py-2.5 text-xs font-bold text-white hover:bg-amber-500 disabled:opacity-50"
+          >
+            {savingTitle ? "Saving…" : "Save heading"}
+          </button>
+          {titleDirty ? <span className="text-xs text-amber-200/70">Unsaved changes</span> : null}
+        </div>
+      </AdminSection>
 
       <AdminSection title="Description" showsOn="Public listing page">
         <p className="mb-3 text-sm text-white/45">

@@ -14,6 +14,7 @@ const SEGMENT_LABELS: Record<string, string> = {
   signup: "Join",
   admin: "Admin",
   listings: "Listings",
+  careers: "Careers",
 };
 
 function titleFromSlug(slug: string) {
@@ -29,15 +30,15 @@ export function crumbsFromPath(pathname: string): Crumb[] {
     return [{ label: SEGMENT_LABELS[pathname.slice(1)] ?? "Account" }];
   }
 
-  if (pathname === "/listings") {
-    return [{ label: "Listings" }];
+  if (pathname === "/careers") {
+    return [{ label: "Opportunities" }];
   }
 
   const parts = pathname.split("/").filter(Boolean);
   const crumbs: Crumb[] = [];
 
-  if (parts[0] === "listings" && parts[1]) {
-    crumbs.push({ label: "Listings", href: "/listings" });
+  if (parts[0] === "careers" && parts[1]) {
+    crumbs.push({ label: "Opportunities", href: "/careers" });
     crumbs.push({ label: titleFromSlug(parts[1]) });
     return crumbs;
   }

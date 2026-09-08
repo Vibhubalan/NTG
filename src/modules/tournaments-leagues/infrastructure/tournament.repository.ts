@@ -486,8 +486,11 @@ export class TournamentRepository {
 
     const allRegs = t.registrations;
     const isSoloCup = t.registrationFormat === "SOLO";
-    const soloPlayers = isSoloCup ? allRegs.map(mapRegistrationToPlayerView) : [];
-    const teamDetails = isSoloCup
+    const isDynamicCup = t.registrationFormat === "DYNAMIC";
+    const dynamicTeamsFormed = isDynamicCup && t.tournamentTeams.length > 0;
+    const showSoloPlayers = isSoloCup || (isDynamicCup && !dynamicTeamsFormed);
+    const soloPlayers = showSoloPlayers ? allRegs.map(mapRegistrationToPlayerView) : [];
+    const teamDetails = showSoloPlayers
       ? []
       : await enrichMissingRosterCards(buildTeamDetailsFromData(t.tournamentTeams, allRegs));
 

@@ -26,7 +26,7 @@ export default async function ListingsTeaser() {
             Open roles and roster applications. Apply with your NTG member profile in a few clicks.
           </p>
           <Link
-            href="/listings"
+            href="/careers"
             className="mt-6 inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.18em] text-white/45 transition-colors hover:text-[var(--color-brand)]"
           >
             View all listings
@@ -38,7 +38,7 @@ export default async function ListingsTeaser() {
           {preview.map((l) => (
             <Link
               key={l.id}
-              href={`/listings/${l.slug}`}
+              href={`/careers/${l.slug}`}
               className="group flex items-center justify-between gap-4 rounded-2xl border border-white/[0.06] bg-white/[0.02] px-5 py-4 transition-all duration-300 hover:border-[var(--color-brand)]/25 hover:bg-white/[0.04]"
             >
               <div className="min-w-0">

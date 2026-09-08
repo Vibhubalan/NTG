@@ -16,7 +16,7 @@ export default function ListingCard({ listing }: Props) {
 
   return (
     <Link
-      href={`/listings/${listing.slug}`}
+      href={`/careers/${listing.slug}`}
       className="group flex min-h-[200px] w-full flex-col rounded-2xl border bg-[#0b0f16]/80 p-5 transition-[border-color,background-color] duration-300 hover:bg-[#0e141f] sm:min-h-[210px] sm:p-6"
       style={{ borderColor: withHexAlpha(accent, 0.6) }}
     >

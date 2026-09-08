@@ -43,6 +43,7 @@ type RegistrationRow = {
   partnerName: string | null;
   riotId: string | null;
   rankTier: string | null;
+  peakRankTier: string | null;
   valorantRoles: string | null;
   steamId64: string | null;
   cs2Hours: number | null;
@@ -190,7 +191,7 @@ const RANK_DOT: Record<string, string> = {
 
 type CupFields = Omit<
   TournamentData,
-  "slug" | "tournamentTeams" | "registrations" | "poolPlayers" | "placements" | "hideAfter"
+  "tournamentTeams" | "registrations" | "poolPlayers" | "placements" | "hideAfter"
 >;
 
 function applyCupFields(form: TournamentData, fields: CupFields): TournamentData {
@@ -234,6 +235,7 @@ function bracketUrlsPayload(links?: { name: string; url: string; isFinal: boolea
 function getSavePayload(form: TournamentData) {
   return {
     name: form.name.trim(),
+    slug: form.slug.trim(),
     game: form.game,
     gameLabel: emptyToNull(form.gameLabel),
     status: form.status,
@@ -346,6 +348,7 @@ export default function AdminTournamentEditor({
   }, [initial]);
 
   const [form, setForm] = useState<TournamentData>(initialFormState);
+  const [savedSlug, setSavedSlug] = useState(initial.slug);
   const [listVersion, setListVersion] = useState(0);
   const registrations = initial.registrations;
   const [tournamentTeams, setTournamentTeams] = useState(initial.tournamentTeams);
@@ -433,6 +436,73 @@ export default function AdminTournamentEditor({
     (form.registrationFormat === "AUCTION" || !form.registrationFormat);
   const isStandardFormat =
     SUPPORTS_FORMAT.includes(form.game) && form.registrationFormat === "STANDARD";
+  const isDynamicFormat = form.registrationFormat === "DYNAMIC";
+
+  const [registrationFilter, setRegistrationFilter] = useState("");
+  const filteredRegistrations = useMemo(() => {
+    const q = registrationFilter.trim().toLowerCase();
+    if (!q) return registrations;
+    return registrations.filter((r) => {
+      const haystack = [
+        r.displayName,
+        r.email,
+        r.phone,
+        r.riotId,
+        r.rankTier,
+        r.peakRankTier,
+        r.teamName,
+        r.olympusId,
+        r.partnerUsername,
+        r.partnerName,
+        formatParticipantRole(r.participantRole),
+      ]
+        .filter(Boolean)
+        .join(" ")
+        .toLowerCase();
+      return haystack.includes(q);
+    });
+  }, [registrations, registrationFilter]);
+
+  const [selectedRegistrationIds, setSelectedRegistrationIds] = useState<Set<string>>(new Set());
+  const [dynamicTeamName, setDynamicTeamName] = useState("");
+  const [creatingDynamicTeam, setCreatingDynamicTeam] = useState(false);
+
+  function toggleRegistrationSelected(id: string) {
+    setSelectedRegistrationIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  async function createTeamFromSelectedRegistrations() {
+    if (!dynamicTeamName.trim() || selectedRegistrationIds.size === 0 || creatingDynamicTeam) return;
+    setCreatingDynamicTeam(true);
+    try {
+      const res = await fetch(`/api/admin/tournaments/${savedSlug}/teams`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: dynamicTeamName.trim(),
+          registrationIds: Array.from(selectedRegistrationIds),
+        }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setDynamicTeamName("");
+        setSelectedRegistrationIds(new Set());
+        showMessage(`Team "${dynamicTeamName.trim()}" created.`);
+        refreshLists();
+      } else {
+        showMessage(data.error ?? "Failed to create team.", "error");
+      }
+    } catch {
+      showMessage("Failed to create team.", "error");
+    } finally {
+      setCreatingDynamicTeam(false);
+    }
+  }
 
   const prizeSplitDisplay =
     form.prizeSplit != null
@@ -441,7 +511,7 @@ export default function AdminTournamentEditor({
         ? defaultSplit(Number(form.prizePool))
         : [];
 
-  const cupUrl = `/esports/tournaments/${form.slug}`;
+  const cupUrl = `/esports/tournaments/${savedSlug}`;
   const hubUrl = "/esports/tournaments";
 
   function isRegistrationLiveNow(): boolean {
@@ -485,6 +555,7 @@ export default function AdminTournamentEditor({
       savedCupBaselineRef.current = getSavePayload(next);
       return next;
     });
+    if (fields.slug) setSavedSlug(fields.slug);
   }
 
   function refreshLists() {
@@ -536,7 +607,7 @@ export default function AdminTournamentEditor({
     setAddingMember(true);
     setMessage(null);
     try {
-      const res = await fetch(`/api/admin/tournaments/${form.slug}/registrations`, {
+      const res = await fetch(`/api/admin/tournaments/${savedSlug}/registrations`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -582,7 +653,7 @@ export default function AdminTournamentEditor({
       confirmLabel: "Remove",
       onConfirm: async () => {
         const res = await fetch(
-          `/api/admin/tournaments/${form.slug}/registrations/${reg.id}`,
+          `/api/admin/tournaments/${savedSlug}/registrations/${reg.id}`,
           { method: "DELETE" },
         );
         if (res.ok) {
@@ -597,7 +668,7 @@ export default function AdminTournamentEditor({
   }
 
   async function patchField(fields: Record<string, unknown>, successMsg = "Saved.") {
-    const res = await fetch(`/api/admin/tournaments/${form.slug}`, {
+    const res = await fetch(`/api/admin/tournaments/${savedSlug}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(fields),
@@ -623,7 +694,7 @@ export default function AdminTournamentEditor({
 
   async function patchTeamLogo(teamId: string, logoUrl: string | null, teamName: string) {
     try {
-      const res = await fetch(`/api/admin/tournaments/${form.slug}/teams/${teamId}`, {
+      const res = await fetch(`/api/admin/tournaments/${savedSlug}/teams/${teamId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ logoUrl }),
@@ -656,7 +727,7 @@ export default function AdminTournamentEditor({
     setLoading(true);
     setMessage(null);
     try {
-      const res = await fetch(`/api/admin/tournaments/${form.slug}/auction`, {
+      const res = await fetch(`/api/admin/tournaments/${savedSlug}/auction`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ bypass: bypassAuctionSavedLock }),
@@ -741,11 +812,12 @@ export default function AdminTournamentEditor({
     }
 
     try {
-      const res = await fetch(`/api/admin/tournaments/${form.slug}`, {
+      const res = await fetch(`/api/admin/tournaments/${savedSlug}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           name: form.name.trim(),
+          slug: form.slug.trim(),
           game: form.game,
           gameLabel: emptyToNull(form.gameLabel),
           seasonId: null,
@@ -796,6 +868,11 @@ export default function AdminTournamentEditor({
         applySavedCupFields(data.tournament as CupFields);
       }
 
+      const nextSlug =
+        typeof (data.tournament as { slug?: string } | undefined)?.slug === "string"
+          ? (data.tournament as { slug: string }).slug
+          : savedSlug;
+
       const mvpChanged =
         mvpEnabled !== savedMvpRef.current.enabled ||
         (mvpEnabled && selectedMvp?.id !== savedMvpRef.current.userId);
@@ -805,7 +882,7 @@ export default function AdminTournamentEditor({
         const placements = mvpEnabled && selectedMvp ? [{ role: "MVP" as const, userId: selectedMvp.id }] : [];
         const clearRoles = ["MVP"] as const;
 
-        const pRes = await fetch(`/api/admin/tournaments/${form.slug}/placements`, {
+        const pRes = await fetch(`/api/admin/tournaments/${nextSlug}/placements`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ placements, clearRoles }),
@@ -821,6 +898,9 @@ export default function AdminTournamentEditor({
       showMessage("All changes successfully saved.", "success");
       setSavedStatus(true);
       setTimeout(() => setSavedStatus(false), 2500);
+      if (nextSlug !== savedSlug) {
+        router.replace(`/admin/tournaments/${nextSlug}`);
+      }
       return true;
     } catch (err) {
       showMessage(err instanceof Error ? err.message : "Something went wrong.", "error");
@@ -835,7 +915,7 @@ export default function AdminTournamentEditor({
       title: `Delete ${form.name}?`,
       description: "This permanently removes the cup, teams, registrations, and results. This cannot be undone.",
       onConfirm: async () => {
-        const res = await fetch(`/api/admin/tournaments/${form.slug}`, { method: "DELETE" });
+        const res = await fetch(`/api/admin/tournaments/${savedSlug}`, { method: "DELETE" });
         if (res.ok) {
           router.push("/admin/tournaments");
           router.refresh();
@@ -851,7 +931,7 @@ export default function AdminTournamentEditor({
         "This team and all linked cup registrations (captain, co-captain, and players) will be permanently removed.",
       confirmLabel: "Delete team",
       onConfirm: async () => {
-        await fetch(`/api/admin/tournaments/${form.slug}/teams/${teamId}`, { method: "DELETE" });
+        await fetch(`/api/admin/tournaments/${savedSlug}/teams/${teamId}`, { method: "DELETE" });
         refreshLists();
       },
     });
@@ -862,7 +942,7 @@ export default function AdminTournamentEditor({
     if (!trimmed) return;
     setRenamingTeam(true);
     try {
-      const res = await fetch(`/api/admin/tournaments/${form.slug}/teams/${teamId}`, {
+      const res = await fetch(`/api/admin/tournaments/${savedSlug}/teams/${teamId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ name: trimmed }),
@@ -893,7 +973,7 @@ export default function AdminTournamentEditor({
       confirmLabel: "Remove player",
       onConfirm: async () => {
         await fetch(
-          `/api/admin/tournaments/${form.slug}/teams/${teamId}/players/${playerId}`,
+          `/api/admin/tournaments/${savedSlug}/teams/${teamId}/players/${playerId}`,
           { method: "DELETE" },
         );
         refreshLists();
@@ -919,7 +999,7 @@ export default function AdminTournamentEditor({
       confirmLabel: "Remove",
       onConfirm: async () => {
         const res = await fetch(
-          `/api/admin/tournaments/${form.slug}/registrations/${reg.id}`,
+          `/api/admin/tournaments/${savedSlug}/registrations/${reg.id}`,
           { method: "DELETE" },
         );
         if (res.ok) {
@@ -935,7 +1015,7 @@ export default function AdminTournamentEditor({
 
   async function addTeam() {
     if (!newTeamName.trim()) return;
-    const res = await fetch(`/api/admin/tournaments/${form.slug}/teams`, {
+    const res = await fetch(`/api/admin/tournaments/${savedSlug}/teams`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ name: newTeamName.trim() }),
@@ -952,7 +1032,7 @@ export default function AdminTournamentEditor({
   async function addPlayer(teamId: string) {
     const poolId = poolPick[teamId]?.trim();
     const name = newPlayerNames[teamId]?.trim();
-    const playersUrl = `/api/admin/tournaments/${form.slug}/teams/${teamId}/players`;
+    const playersUrl = `/api/admin/tournaments/${savedSlug}/teams/${teamId}/players`;
 
     if (poolId) {
       const res = await fetch(playersUrl, {
@@ -1011,7 +1091,7 @@ export default function AdminTournamentEditor({
         ? { userId: pick.slice("user:".length), membershipKind: "POACH" as const }
         : { registrationId: pick, membershipKind: "POACH" as const };
       const res = await fetch(
-        `/api/admin/tournaments/${form.slug}/teams/${teamId}/players`,
+        `/api/admin/tournaments/${savedSlug}/teams/${teamId}/players`,
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -1296,6 +1376,18 @@ export default function AdminTournamentEditor({
                   />
                 </div>
                 <div className="space-y-1">
+                  <label className="text-[10px] font-bold uppercase tracking-wider text-white/40">Slug (URL key)</label>
+                  <input
+                    className={inputClass}
+                    value={form.slug}
+                    onChange={(e) => setForm({ ...form, slug: e.target.value })}
+                    placeholder="e.g. auc-cup-1"
+                  />
+                  <p className="text-[10px] text-white/35">
+                    Public URL: /esports/tournaments/{form.slug || "…"} — changing this breaks old shared links.
+                  </p>
+                </div>
+                <div className="space-y-1">
                   <label className="text-[10px] font-bold uppercase tracking-wider text-white/40">Game Title</label>
                   <select
                     className={inputClass}
@@ -1351,6 +1443,12 @@ export default function AdminTournamentEditor({
                           title: "1v1 Solo",
                           desc: "Solo registration — no team or partner.",
                           activeClass: "border-amber-500/40 bg-amber-500/[0.08] text-amber-200",
+                        },
+                        {
+                          value: "DYNAMIC" as const,
+                          title: "Dynamic (Solo to Teams)",
+                          desc: "Players register solo. Admin groups them into named teams later.",
+                          activeClass: "border-fuchsia-500/40 bg-fuchsia-500/[0.08] text-fuchsia-200",
                         },
                       ] as const
                     ).map((opt) => (
@@ -1556,7 +1654,7 @@ export default function AdminTournamentEditor({
             >
               <RulebookUploadField
                 label="Rulebook (PDF or Word)"
-                prefix={`tournaments/${form.slug}/rulebook`}
+                prefix={`tournaments/${savedSlug}/rulebook`}
                 currentUrl={form.rulebookUrl}
                 onUploaded={(url) => setForm({ ...form, rulebookUrl: url })}
                 onUploadedComplete={async (url) => {
@@ -2031,7 +2129,7 @@ export default function AdminTournamentEditor({
                           const nextVal = !form.publicAuction;
                           setForm({ ...form, publicAuction: nextVal });
                           // Save immediately when toggled
-                          fetch(`/api/admin/tournaments/${form.slug}`, {
+                          fetch(`/api/admin/tournaments/${savedSlug}`, {
                             method: "PATCH",
                             headers: { "Content-Type": "application/json" },
                             body: JSON.stringify({ publicAuction: nextVal }),
@@ -2086,7 +2184,7 @@ export default function AdminTournamentEditor({
                 <ImageUploadField
                   label="Tournament Card Background"
                   hint="Banner background overlay behind registration open cards on /esports/tournaments"
-                  prefix={`tournaments/${form.slug}/hub`}
+                  prefix={`tournaments/${savedSlug}/hub`}
                   currentUrl={form.hubBannerUrl}
                   onUploaded={(url) => setForm({ ...form, hubBannerUrl: url, posterUrl: url })}
                   onUploadedComplete={async (url) => {
@@ -2120,7 +2218,7 @@ export default function AdminTournamentEditor({
                       key={team.id}
                       label={team.name}
                       hint="Square or wide logo on white background works best"
-                      prefix={`tournaments/${form.slug}/team-logos`}
+                      prefix={`tournaments/${savedSlug}/team-logos`}
                       currentUrl={team.logoUrl}
                       onUploaded={(url) => {
                         setTournamentTeams((teams) =>
@@ -2486,13 +2584,26 @@ export default function AdminTournamentEditor({
               showsOn="Player sign-ups with profile snapshots at registration time"
             >
               <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
-                <p className="text-sm text-white/45">{registrations.length} registered</p>
+                <p className="text-sm text-white/45">
+                  {registrationFilter.trim()
+                    ? `${filteredRegistrations.length} of ${registrations.length} registered`
+                    : `${registrations.length} registered`}
+                </p>
                 <a
-                  href={`/api/admin/tournaments/${form.slug}/registrations/export`}
+                  href={`/api/admin/tournaments/${savedSlug}/registrations/export`}
                   className="rounded-xl border border-white/15 bg-white/[0.03] px-4 py-2 text-xs font-semibold text-white/65 hover:bg-white/[0.06] hover:text-white transition-colors"
                 >
                   Export CSV
                 </a>
+              </div>
+
+              <div className="mb-4">
+                <input
+                  className={inputClass}
+                  value={registrationFilter}
+                  onChange={(e) => setRegistrationFilter(e.target.value)}
+                  placeholder="Search registered players by name, email, phone, Riot ID, or team…"
+                />
               </div>
 
               <div className="mb-6 space-y-3 rounded-xl border border-white/[0.06] bg-white/[0.02] p-4">
@@ -2633,13 +2744,66 @@ export default function AdminTournamentEditor({
                 </button>
               </div>
 
+              {isDynamicFormat && selectedRegistrationIds.size > 0 ? (
+                <div className="mb-4 flex flex-wrap items-center gap-3 rounded-xl border border-fuchsia-500/20 bg-fuchsia-500/[0.06] p-3">
+                  <p className="text-[10px] font-bold uppercase tracking-wider text-fuchsia-200">
+                    {selectedRegistrationIds.size} player{selectedRegistrationIds.size === 1 ? "" : "s"} selected
+                  </p>
+                  <input
+                    className={`${inputClass} max-w-xs`}
+                    value={dynamicTeamName}
+                    onChange={(e) => setDynamicTeamName(e.target.value)}
+                    placeholder="New team name"
+                  />
+                  <button
+                    type="button"
+                    onClick={createTeamFromSelectedRegistrations}
+                    disabled={creatingDynamicTeam || !dynamicTeamName.trim()}
+                    className="rounded-xl bg-fuchsia-600 px-4 py-2 text-xs font-bold text-white hover:bg-fuchsia-500 disabled:opacity-50 transition-colors"
+                  >
+                    {creatingDynamicTeam
+                      ? "Creating…"
+                      : `Create team from ${selectedRegistrationIds.size} selected`}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedRegistrationIds(new Set())}
+                    className="text-[10px] font-semibold text-white/40 hover:text-white/70"
+                  >
+                    Clear selection
+                  </button>
+                </div>
+              ) : null}
+
               {registrations.length === 0 ? (
                 <p className="text-sm text-white/35">No registrations yet.</p>
+              ) : filteredRegistrations.length === 0 ? (
+                <p className="text-sm text-white/35">No registrations match your search.</p>
               ) : (
                 <div className="overflow-x-auto rounded-xl border border-white/[0.06]">
                   <table className="min-w-full text-left text-xs text-white/70">
                     <thead className="border-b border-white/[0.06] bg-white/[0.02] text-[10px] uppercase tracking-wider text-white/40">
                       <tr>
+                        {isDynamicFormat ? (
+                          <th className="px-3 py-2">
+                            <input
+                              type="checkbox"
+                              aria-label="Select all unassigned players"
+                              checked={
+                                filteredRegistrations.filter((r) => !r.teamId).length > 0 &&
+                                filteredRegistrations
+                                  .filter((r) => !r.teamId)
+                                  .every((r) => selectedRegistrationIds.has(r.id))
+                              }
+                              onChange={(e) => {
+                                const unassigned = filteredRegistrations.filter((r) => !r.teamId);
+                                setSelectedRegistrationIds(
+                                  e.target.checked ? new Set(unassigned.map((r) => r.id)) : new Set(),
+                                );
+                              }}
+                            />
+                          </th>
+                        ) : null}
                         <th className="px-3 py-2">Name</th>
                         <th className="px-3 py-2">Email</th>
                         <th className="px-3 py-2">Phone</th>
@@ -2661,7 +2825,8 @@ export default function AdminTournamentEditor({
                         ) : (
                           <>
                             <th className="px-3 py-2">Riot ID</th>
-                            <th className="px-3 py-2">Rank</th>
+                            <th className="px-3 py-2">Current rank</th>
+                            <th className="px-3 py-2">Peak rank</th>
                             <th className="px-3 py-2">Roles</th>
                           </>
                         )}
@@ -2670,8 +2835,19 @@ export default function AdminTournamentEditor({
                       </tr>
                     </thead>
                     <tbody>
-                      {registrations.map((r) => (
+                      {filteredRegistrations.map((r) => (
                         <tr key={r.id} className="border-b border-white/[0.04]">
+                          {isDynamicFormat ? (
+                            <td className="px-3 py-2">
+                              <input
+                                type="checkbox"
+                                aria-label={`Select ${r.displayName ?? "player"}`}
+                                checked={selectedRegistrationIds.has(r.id)}
+                                disabled={Boolean(r.teamId)}
+                                onChange={() => toggleRegistrationSelected(r.id)}
+                              />
+                            </td>
+                          ) : null}
                           <td className="px-3 py-2 font-medium text-white/85">{r.displayName ?? "-"}</td>
                           <td className="px-3 py-2">{r.email ?? "-"}</td>
                           <td className="px-3 py-2 font-mono">{r.phone ?? "-"}</td>
@@ -2694,6 +2870,7 @@ export default function AdminTournamentEditor({
                             <>
                               <td className="px-3 py-2 font-mono">{r.riotId ?? "-"}</td>
                               <td className="px-3 py-2">{r.rankTier ?? "-"}</td>
+                              <td className="px-3 py-2">{r.peakRankTier ?? "-"}</td>
                               <td className="px-3 py-2">{r.valorantRoles ?? "-"}</td>
                             </>
                           )}
@@ -2733,7 +2910,7 @@ export default function AdminTournamentEditor({
                 </p>
                 {tournamentTeams.length > 0 ? (
                   <a
-                    href={`/api/admin/tournaments/${form.slug}/teams/export`}
+                    href={`/api/admin/tournaments/${savedSlug}/teams/export`}
                     className="rounded-xl border border-white/15 bg-white/[0.03] px-4 py-2 text-xs font-semibold text-white/65 hover:bg-white/[0.06] hover:text-white transition-colors"
                   >
                     Export CSV
@@ -3190,9 +3367,9 @@ export default function AdminTournamentEditor({
             <AdminSection
               title="Custom lobby matches"
               showsOn="Public Matches tab after you publish candidates"
-              viewHref={`/esports/tournaments/${form.slug}`}
+              viewHref={`/esports/tournaments/${savedSlug}`}
             >
-              <AdminTournamentGamesPanel slug={form.slug} teams={form.tournamentTeams} />
+              <AdminTournamentGamesPanel slug={savedSlug} teams={form.tournamentTeams} />
             </AdminSection>
           </div>
         )}

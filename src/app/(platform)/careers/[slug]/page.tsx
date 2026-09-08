@@ -11,10 +11,10 @@ type Props = { params: Promise<{ slug: string }> };
 export async function generateMetadata({ params }: Props) {
   const { slug } = await params;
   const listing = await getListingBySlug(slug);
-  return { title: listing ? listing.title : "Listing" };
+  return { title: listing ? listing.title : "Opportunity" };
 }
 
-export default async function ListingDetailPage({ params }: Props) {
+export default async function CareerDetailPage({ params }: Props) {
   const { slug } = await params;
   const session = await getSession();
   const userId = session?.user?.id;
@@ -35,8 +35,8 @@ export default async function ListingDetailPage({ params }: Props) {
   return (
     <div className="mx-auto max-w-3xl px-4 pb-24 pt-8 sm:px-6 lg:max-w-4xl">
       <nav className="text-xs text-white/35">
-        <Link href="/listings" className="hover:text-white/60">
-          Listings
+        <Link href="/careers" className="hover:text-white/60">
+          Opportunities
         </Link>
         <span className="mx-2">/</span>
         <span className="text-white/50">{navLabel}</span>

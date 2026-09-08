@@ -44,7 +44,7 @@ export default function TryoutStatusBlock({ team }: Props) {
         </div>
         {team.tryoutListingSlug ? (
           <Link
-            href={`/listings/${team.tryoutListingSlug}`}
+            href={`/careers/${team.tryoutListingSlug}`}
             className="shrink-0 rounded-full border border-emerald-500/30 bg-emerald-500/15 px-4 py-1.5 text-xs font-bold uppercase tracking-wider text-emerald-300 transition-colors hover:bg-emerald-500/25"
           >
             Apply Now →
@@ -108,7 +108,7 @@ export default function TryoutStatusBlock({ team }: Props) {
         </p>
         {team.tryoutListingSlug ? (
           <Link
-            href={`/listings/${team.tryoutListingSlug}`}
+            href={`/careers/${team.tryoutListingSlug}`}
             className="mt-4 inline-flex rounded-full border border-[var(--color-iris)]/25 bg-[var(--color-iris)]/10 px-5 py-2 text-[10px] font-bold uppercase tracking-wider text-[var(--color-iris)] transition-colors hover:bg-[var(--color-iris)]/15"
           >
             View tryout details →
