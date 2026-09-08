@@ -63,6 +63,12 @@ const nextConfig: NextConfig = {
       },
     ];
   },
+  async redirects() {
+    return [
+      { source: "/listings", destination: "/careers", permanent: true },
+      { source: "/listings/:slug", destination: "/careers/:slug", permanent: true },
+    ];
+  },
 };
 
 export default nextConfig;

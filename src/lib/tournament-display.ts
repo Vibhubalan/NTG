@@ -44,7 +44,7 @@ export function formatRegistrationLabel(format: string | null | undefined): stri
     case "DUO":
       return "2v2 Duo";
     case "DYNAMIC":
-      return "Dynamic (Solo to Teams)";
+      return "Standard (5v5)";
     default:
       return "";
   }

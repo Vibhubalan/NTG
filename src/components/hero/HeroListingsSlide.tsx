@@ -25,7 +25,7 @@ export default function HeroListingsSlide({ listings }: Props) {
         {preview.map((l) => (
           <Link
             key={l.id}
-            href={`/listings/${l.slug}`}
+            href={`/careers/${l.slug}`}
             className="group flex items-center justify-between gap-4 rounded-2xl border border-white/[0.06] bg-white/[0.02] px-5 py-4 text-left transition-colors hover:border-white/15 hover:bg-white/[0.04]"
           >
             <div className="min-w-0">
@@ -44,7 +44,7 @@ export default function HeroListingsSlide({ listings }: Props) {
       </div>
 
       <Link
-        href="/listings"
+        href="/careers"
         className="mt-8 text-[10px] font-medium uppercase tracking-[0.22em] text-white/35 transition-colors hover:text-white/70"
       >
         View all listings

@@ -43,6 +43,7 @@ type RegistrationRow = {
   partnerName: string | null;
   riotId: string | null;
   rankTier: string | null;
+  peakRankTier: string | null;
   valorantRoles: string | null;
   steamId64: string | null;
   cs2Hours: number | null;
@@ -169,7 +170,7 @@ const RANK_DOT: Record<string, string> = {
 
 type CupFields = Omit<
   TournamentData,
-  "slug" | "tournamentTeams" | "registrations" | "poolPlayers" | "placements" | "hideAfter"
+  "tournamentTeams" | "registrations" | "poolPlayers" | "placements" | "hideAfter"
 >;
 
 function applyCupFields(form: TournamentData, fields: CupFields): TournamentData {
@@ -213,6 +214,7 @@ function bracketUrlsPayload(links?: { name: string; url: string; isFinal: boolea
 function getSavePayload(form: TournamentData) {
   return {
     name: form.name.trim(),
+    slug: form.slug.trim(),
     game: form.game,
     gameLabel: emptyToNull(form.gameLabel),
     status: form.status,
@@ -324,6 +326,7 @@ export default function AdminTournamentEditor({
   }, [initial]);
 
   const [form, setForm] = useState<TournamentData>(initialFormState);
+  const [savedSlug, setSavedSlug] = useState(initial.slug);
   const [listVersion, setListVersion] = useState(0);
   const registrations = initial.registrations;
   const [tournamentTeams, setTournamentTeams] = useState(initial.tournamentTeams);
@@ -414,6 +417,8 @@ export default function AdminTournamentEditor({
         r.email,
         r.phone,
         r.riotId,
+        r.rankTier,
+        r.peakRankTier,
         r.teamName,
         r.olympusId,
         r.partnerUsername,
@@ -444,7 +449,7 @@ export default function AdminTournamentEditor({
     if (!dynamicTeamName.trim() || selectedRegistrationIds.size === 0 || creatingDynamicTeam) return;
     setCreatingDynamicTeam(true);
     try {
-      const res = await fetch(`/api/admin/tournaments/${form.slug}/teams`, {
+      const res = await fetch(`/api/admin/tournaments/${savedSlug}/teams`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -475,7 +480,7 @@ export default function AdminTournamentEditor({
         ? defaultSplit(Number(form.prizePool))
         : [];
 
-  const cupUrl = `/esports/tournaments/${form.slug}`;
+  const cupUrl = `/esports/tournaments/${savedSlug}`;
   const hubUrl = "/esports/tournaments";
 
   function isRegistrationLiveNow(): boolean {
@@ -519,6 +524,7 @@ export default function AdminTournamentEditor({
       savedCupBaselineRef.current = getSavePayload(next);
       return next;
     });
+    if (fields.slug) setSavedSlug(fields.slug);
   }
 
   function refreshLists() {
@@ -570,7 +576,7 @@ export default function AdminTournamentEditor({
     setAddingMember(true);
     setMessage(null);
     try {
-      const res = await fetch(`/api/admin/tournaments/${form.slug}/registrations`, {
+      const res = await fetch(`/api/admin/tournaments/${savedSlug}/registrations`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -616,7 +622,7 @@ export default function AdminTournamentEditor({
       confirmLabel: "Remove",
       onConfirm: async () => {
         const res = await fetch(
-          `/api/admin/tournaments/${form.slug}/registrations/${reg.id}`,
+          `/api/admin/tournaments/${savedSlug}/registrations/${reg.id}`,
           { method: "DELETE" },
         );
         if (res.ok) {
@@ -631,7 +637,7 @@ export default function AdminTournamentEditor({
   }
 
   async function patchField(fields: Record<string, unknown>, successMsg = "Saved.") {
-    const res = await fetch(`/api/admin/tournaments/${form.slug}`, {
+    const res = await fetch(`/api/admin/tournaments/${savedSlug}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(fields),
@@ -657,7 +663,7 @@ export default function AdminTournamentEditor({
 
   async function patchTeamLogo(teamId: string, logoUrl: string | null, teamName: string) {
     try {
-      const res = await fetch(`/api/admin/tournaments/${form.slug}/teams/${teamId}`, {
+      const res = await fetch(`/api/admin/tournaments/${savedSlug}/teams/${teamId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ logoUrl }),
@@ -690,7 +696,7 @@ export default function AdminTournamentEditor({
     setLoading(true);
     setMessage(null);
     try {
-      const res = await fetch(`/api/admin/tournaments/${form.slug}/auction`, {
+      const res = await fetch(`/api/admin/tournaments/${savedSlug}/auction`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ bypass: bypassAuctionSavedLock }),
@@ -775,11 +781,12 @@ export default function AdminTournamentEditor({
     }
 
     try {
-      const res = await fetch(`/api/admin/tournaments/${form.slug}`, {
+      const res = await fetch(`/api/admin/tournaments/${savedSlug}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           name: form.name.trim(),
+          slug: form.slug.trim(),
           game: form.game,
           gameLabel: emptyToNull(form.gameLabel),
           seasonId: null,
@@ -829,6 +836,11 @@ export default function AdminTournamentEditor({
         applySavedCupFields(data.tournament as CupFields);
       }
 
+      const nextSlug =
+        typeof (data.tournament as { slug?: string } | undefined)?.slug === "string"
+          ? (data.tournament as { slug: string }).slug
+          : savedSlug;
+
       const mvpChanged =
         mvpEnabled !== savedMvpRef.current.enabled ||
         (mvpEnabled && selectedMvp?.id !== savedMvpRef.current.userId);
@@ -838,7 +850,7 @@ export default function AdminTournamentEditor({
         const placements = mvpEnabled && selectedMvp ? [{ role: "MVP" as const, userId: selectedMvp.id }] : [];
         const clearRoles = ["MVP"] as const;
 
-        const pRes = await fetch(`/api/admin/tournaments/${form.slug}/placements`, {
+        const pRes = await fetch(`/api/admin/tournaments/${nextSlug}/placements`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ placements, clearRoles }),
@@ -854,6 +866,9 @@ export default function AdminTournamentEditor({
       showMessage("All changes successfully saved.", "success");
       setSavedStatus(true);
       setTimeout(() => setSavedStatus(false), 2500);
+      if (nextSlug !== savedSlug) {
+        router.replace(`/admin/tournaments/${nextSlug}`);
+      }
       return true;
     } catch (err) {
       showMessage(err instanceof Error ? err.message : "Something went wrong.", "error");
@@ -868,7 +883,7 @@ export default function AdminTournamentEditor({
       title: `Delete ${form.name}?`,
       description: "This permanently removes the cup, teams, registrations, and results. This cannot be undone.",
       onConfirm: async () => {
-        const res = await fetch(`/api/admin/tournaments/${form.slug}`, { method: "DELETE" });
+        const res = await fetch(`/api/admin/tournaments/${savedSlug}`, { method: "DELETE" });
         if (res.ok) {
           router.push("/admin/tournaments");
           router.refresh();
@@ -884,7 +899,7 @@ export default function AdminTournamentEditor({
         "This team and all linked cup registrations (captain, co-captain, and players) will be permanently removed.",
       confirmLabel: "Delete team",
       onConfirm: async () => {
-        await fetch(`/api/admin/tournaments/${form.slug}/teams/${teamId}`, { method: "DELETE" });
+        await fetch(`/api/admin/tournaments/${savedSlug}/teams/${teamId}`, { method: "DELETE" });
         refreshLists();
       },
     });
@@ -895,7 +910,7 @@ export default function AdminTournamentEditor({
     if (!trimmed) return;
     setRenamingTeam(true);
     try {
-      const res = await fetch(`/api/admin/tournaments/${form.slug}/teams/${teamId}`, {
+      const res = await fetch(`/api/admin/tournaments/${savedSlug}/teams/${teamId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ name: trimmed }),
@@ -926,7 +941,7 @@ export default function AdminTournamentEditor({
       confirmLabel: "Remove player",
       onConfirm: async () => {
         await fetch(
-          `/api/admin/tournaments/${form.slug}/teams/${teamId}/players/${playerId}`,
+          `/api/admin/tournaments/${savedSlug}/teams/${teamId}/players/${playerId}`,
           { method: "DELETE" },
         );
         refreshLists();
@@ -952,7 +967,7 @@ export default function AdminTournamentEditor({
       confirmLabel: "Remove",
       onConfirm: async () => {
         const res = await fetch(
-          `/api/admin/tournaments/${form.slug}/registrations/${reg.id}`,
+          `/api/admin/tournaments/${savedSlug}/registrations/${reg.id}`,
           { method: "DELETE" },
         );
         if (res.ok) {
@@ -968,7 +983,7 @@ export default function AdminTournamentEditor({
 
   async function addTeam() {
     if (!newTeamName.trim()) return;
-    const res = await fetch(`/api/admin/tournaments/${form.slug}/teams`, {
+    const res = await fetch(`/api/admin/tournaments/${savedSlug}/teams`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ name: newTeamName.trim() }),
@@ -985,7 +1000,7 @@ export default function AdminTournamentEditor({
   async function addPlayer(teamId: string) {
     const poolId = poolPick[teamId]?.trim();
     const name = newPlayerNames[teamId]?.trim();
-    const playersUrl = `/api/admin/tournaments/${form.slug}/teams/${teamId}/players`;
+    const playersUrl = `/api/admin/tournaments/${savedSlug}/teams/${teamId}/players`;
 
     if (poolId) {
       const res = await fetch(playersUrl, {
@@ -1044,7 +1059,7 @@ export default function AdminTournamentEditor({
         ? { userId: pick.slice("user:".length), membershipKind: "POACH" as const }
         : { registrationId: pick, membershipKind: "POACH" as const };
       const res = await fetch(
-        `/api/admin/tournaments/${form.slug}/teams/${teamId}/players`,
+        `/api/admin/tournaments/${savedSlug}/teams/${teamId}/players`,
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -1320,6 +1335,18 @@ export default function AdminTournamentEditor({
                   />
                 </div>
                 <div className="space-y-1">
+                  <label className="text-[10px] font-bold uppercase tracking-wider text-white/40">Slug (URL key)</label>
+                  <input
+                    className={inputClass}
+                    value={form.slug}
+                    onChange={(e) => setForm({ ...form, slug: e.target.value })}
+                    placeholder="e.g. auc-cup-1"
+                  />
+                  <p className="text-[10px] text-white/35">
+                    Public URL: /esports/tournaments/{form.slug || "…"} — changing this breaks old shared links.
+                  </p>
+                </div>
+                <div className="space-y-1">
                   <label className="text-[10px] font-bold uppercase tracking-wider text-white/40">Game Title</label>
                   <select
                     className={inputClass}
@@ -1586,7 +1613,7 @@ export default function AdminTournamentEditor({
             >
               <RulebookUploadField
                 label="Rulebook (PDF or Word)"
-                prefix={`tournaments/${form.slug}/rulebook`}
+                prefix={`tournaments/${savedSlug}/rulebook`}
                 currentUrl={form.rulebookUrl}
                 onUploaded={(url) => setForm({ ...form, rulebookUrl: url })}
                 onUploadedComplete={async (url) => {
@@ -1924,7 +1951,7 @@ export default function AdminTournamentEditor({
                           const nextVal = !form.publicAuction;
                           setForm({ ...form, publicAuction: nextVal });
                           // Save immediately when toggled
-                          fetch(`/api/admin/tournaments/${form.slug}`, {
+                          fetch(`/api/admin/tournaments/${savedSlug}`, {
                             method: "PATCH",
                             headers: { "Content-Type": "application/json" },
                             body: JSON.stringify({ publicAuction: nextVal }),
@@ -1979,7 +2006,7 @@ export default function AdminTournamentEditor({
                 <ImageUploadField
                   label="Tournament Card Background"
                   hint="Banner background overlay behind registration open cards on /esports/tournaments"
-                  prefix={`tournaments/${form.slug}/hub`}
+                  prefix={`tournaments/${savedSlug}/hub`}
                   currentUrl={form.hubBannerUrl}
                   onUploaded={(url) => setForm({ ...form, hubBannerUrl: url, posterUrl: url })}
                   onUploadedComplete={async (url) => {
@@ -2013,7 +2040,7 @@ export default function AdminTournamentEditor({
                       key={team.id}
                       label={team.name}
                       hint="Square or wide logo on white background works best"
-                      prefix={`tournaments/${form.slug}/team-logos`}
+                      prefix={`tournaments/${savedSlug}/team-logos`}
                       currentUrl={team.logoUrl}
                       onUploaded={(url) => {
                         setTournamentTeams((teams) =>
@@ -2385,7 +2412,7 @@ export default function AdminTournamentEditor({
                     : `${registrations.length} registered`}
                 </p>
                 <a
-                  href={`/api/admin/tournaments/${form.slug}/registrations/export`}
+                  href={`/api/admin/tournaments/${savedSlug}/registrations/export`}
                   className="rounded-xl border border-white/15 bg-white/[0.03] px-4 py-2 text-xs font-semibold text-white/65 hover:bg-white/[0.06] hover:text-white transition-colors"
                 >
                   Export CSV
@@ -2620,7 +2647,8 @@ export default function AdminTournamentEditor({
                         ) : (
                           <>
                             <th className="px-3 py-2">Riot ID</th>
-                            <th className="px-3 py-2">Rank</th>
+                            <th className="px-3 py-2">Current rank</th>
+                            <th className="px-3 py-2">Peak rank</th>
                             <th className="px-3 py-2">Roles</th>
                           </>
                         )}
@@ -2664,6 +2692,7 @@ export default function AdminTournamentEditor({
                             <>
                               <td className="px-3 py-2 font-mono">{r.riotId ?? "-"}</td>
                               <td className="px-3 py-2">{r.rankTier ?? "-"}</td>
+                              <td className="px-3 py-2">{r.peakRankTier ?? "-"}</td>
                               <td className="px-3 py-2">{r.valorantRoles ?? "-"}</td>
                             </>
                           )}
@@ -2703,7 +2732,7 @@ export default function AdminTournamentEditor({
                 </p>
                 {tournamentTeams.length > 0 ? (
                   <a
-                    href={`/api/admin/tournaments/${form.slug}/teams/export`}
+                    href={`/api/admin/tournaments/${savedSlug}/teams/export`}
                     className="rounded-xl border border-white/15 bg-white/[0.03] px-4 py-2 text-xs font-semibold text-white/65 hover:bg-white/[0.06] hover:text-white transition-colors"
                   >
                     Export CSV
@@ -3160,9 +3189,9 @@ export default function AdminTournamentEditor({
             <AdminSection
               title="Custom lobby matches"
               showsOn="Public Matches tab after you publish candidates"
-              viewHref={`/esports/tournaments/${form.slug}`}
+              viewHref={`/esports/tournaments/${savedSlug}`}
             >
-              <AdminTournamentGamesPanel slug={form.slug} teams={form.tournamentTeams} />
+              <AdminTournamentGamesPanel slug={savedSlug} teams={form.tournamentTeams} />
             </AdminSection>
           </div>
         )}

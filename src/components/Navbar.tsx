@@ -20,7 +20,7 @@ const loungeLinks: NavLinkItem[] = [
   { label: "Tournaments", href: "/esports/tournaments" },
   { label: "Leaderboards", href: "/esports/leaderboard" },
   { label: "Roster", href: "/esports/roster" },
-  { label: "Opportunities", href: "/listings" },
+  { label: "Opportunities", href: "/careers" },
 ];
 
 function isExternalHref(href: string) {
@@ -62,7 +62,7 @@ function HomeIcon({ className }: { className?: string }) {
 }
 
 function isCompetitiveRoute(path: string) {
-  const roots = ["/esports", "/profile", "/admin", "/listings"];
+  const roots = ["/esports", "/profile", "/admin", "/listings", "/careers"];
   return roots.some((r) => path === r || path.startsWith(`${r}/`));
 }
 
@@ -597,7 +597,7 @@ function NavbarContent() {
     ? loungeLinks
     : [homeNavLink, ...loungeLinks]
   ).map((link) =>
-    link.href === "/listings" && openListingsCount > 0
+    link.href === "/careers" && openListingsCount > 0
       ? { ...link, count: openListingsCount }
       : link,
   );

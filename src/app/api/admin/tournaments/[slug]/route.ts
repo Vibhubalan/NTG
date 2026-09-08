@@ -118,6 +118,7 @@ export async function PATCH(req: Request, { params }: Props) {
     teamsPerGroup: body.teamsPerGroup as number | null | undefined,
     advancePerGroup: body.advancePerGroup as number | null | undefined,
     rankPoints: body.rankPoints as { rank: string; floor: number }[] | null | undefined,
+    slug: typeof body.slug === "string" ? body.slug : undefined,
     });
   } catch (err) {
     console.error("[admin/tournaments PATCH]", err);
@@ -129,11 +130,13 @@ export async function PATCH(req: Request, { params }: Props) {
     return NextResponse.json({ error: result.error }, { status: 400 });
   }
 
+  const savedSlug = result.tournament.slug || slug;
+
   try {
     if (body.publicAuction !== undefined) {
       const isPublic = !!body.publicAuction;
       await prisma.tournament.update({
-        where: { slug },
+        where: { slug: savedSlug },
         data: { publicAuction: isPublic },
       });
       (result.tournament as { publicAuction?: boolean }).publicAuction = isPublic;
@@ -142,13 +145,13 @@ export async function PATCH(req: Request, { params }: Props) {
     if (body.yourGamesEnabled !== undefined) {
       const enabled = !!body.yourGamesEnabled;
       await prisma.tournament.update({
-        where: { slug },
+        where: { slug: savedSlug },
         data: { yourGamesEnabled: enabled },
       });
       (result.tournament as { yourGamesEnabled?: boolean }).yourGamesEnabled = enabled;
     }
 
-    await logAdminAction(auth.userId, "tournament.update", slug, {
+    await logAdminAction(auth.userId, "tournament.update", savedSlug, {
       fields: Object.keys(body),
       tournamentName: result.tournament.name,
     });

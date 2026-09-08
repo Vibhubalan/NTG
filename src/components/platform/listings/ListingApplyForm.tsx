@@ -95,7 +95,7 @@ export default function ListingApplyForm({
             : "Log in or create an NTG account to apply."}
         </p>
         <Link
-          href={`/login?callbackUrl=/listings/${listing.slug}`}
+          href={`/login?callbackUrl=/careers/${listing.slug}`}
           className="cta mt-4 inline-flex w-full items-center justify-center rounded-full py-3 text-xs font-semibold uppercase tracking-[0.18em]"
         >
           Continue

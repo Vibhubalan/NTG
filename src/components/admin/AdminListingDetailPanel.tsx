@@ -206,7 +206,7 @@ export default function AdminListingDetailPanel({
       <AdminSection title="Listing heading" showsOn="Public listing page, board card, and hero carousel">
         <p className="mb-3 text-sm text-white/45">
           The main title shown on the public listing page and cards. Changing it does not change the
-          listing URL (<span className="font-mono text-white/60">/listings/{slug}</span> stays the same).
+          listing URL (<span className="font-mono text-white/60">/careers/{slug}</span> stays the same).
         </p>
         <input
           className={inputClass}

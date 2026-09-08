@@ -12,7 +12,7 @@ type Props = {
   searchParams: Promise<{ type?: string }>;
 };
 
-export default async function ListingsPage({ searchParams }: Props) {
+export default async function CareersPage({ searchParams }: Props) {
   const { type } = await searchParams;
   const listings = await listOpenListings();
 

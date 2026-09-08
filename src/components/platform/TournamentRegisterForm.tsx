@@ -102,15 +102,6 @@ function RegisterShell({
   );
 }
 
-function RankPullHint({ show }: { show: boolean }) {
-  if (!show) return null;
-  return (
-    <p className="text-center text-[11px] leading-snug text-white/40">
-      Fetching your current and peak rank from Riot — this can take a few seconds. Please don&apos;t close this page.
-    </p>
-  );
-}
-
 function ProfilePreview({
   preview,
   game,
@@ -424,7 +415,6 @@ export default function TournamentRegisterForm({
                 {loading ? "Switching…" : "Confirm switch to captain"}
               </button>
             </div>
-            <RankPullHint show={loading && game === "VALORANT"} />
           </div>
         ) : null}
       </RegisterShell>
@@ -652,7 +642,6 @@ export default function TournamentRegisterForm({
             {loading ? <Spinner size="xs" /> : null}
             {loading ? "Registering…" : "Register for 1v1"}
           </button>
-          <RankPullHint show={loading && game === "VALORANT"} />
 
           {error ? <p className="text-sm text-red-400/90">{error}</p> : null}
         </div>
@@ -666,9 +655,6 @@ export default function TournamentRegisterForm({
         <div className="shine-border-inner space-y-4 rounded-[1.35rem] bg-[#0a1020]/85 p-6 backdrop-blur-sm">
           <div>
             <p className="text-[10px] font-medium uppercase tracking-[0.32em] text-[var(--color-brand)]/85">Register</p>
-            <p className="mt-2 text-sm text-white/45">
-              Dynamic registration. Register solo now — the admin will group registered players into teams before the cup starts.
-            </p>
           </div>
 
           <ProfilePreview preview={preview} game={game} />
@@ -686,9 +672,8 @@ export default function TournamentRegisterForm({
             className="cta flex w-full items-center justify-center gap-2 rounded-full py-3 text-xs font-semibold uppercase tracking-[0.18em] disabled:opacity-50"
           >
             {loading ? <Spinner size="xs" /> : null}
-            {loading ? "Registering…" : "Register solo"}
+            {loading ? "Registering…" : "Register"}
           </button>
-          <RankPullHint show={loading && game === "VALORANT"} />
 
           {error ? <p className="text-sm text-red-400/90">{error}</p> : null}
         </div>
@@ -740,7 +725,6 @@ export default function TournamentRegisterForm({
               {loading ? <Spinner size="xs" /> : null}
               {loading ? "Registering…" : "Register 2v2 team"}
             </button>
-            <RankPullHint show={loading && game === "VALORANT"} />
           </div>
 
           {error ? <p className="text-sm text-red-400/90">{error}</p> : null}
@@ -812,7 +796,6 @@ export default function TournamentRegisterForm({
               {loading ? <Spinner size="xs" /> : null}
               {loading ? "Registering…" : "Register team"}
             </button>
-            <RankPullHint show={loading && game === "VALORANT"} />
           </div>
 
           {error ? <p className="text-sm text-red-400/90">{error}</p> : null}
@@ -1041,7 +1024,6 @@ export default function TournamentRegisterForm({
                 {loading ? "Registering…" : "Confirm registration"}
               </button>
             </div>
-            <RankPullHint show={loading && game === "VALORANT"} />
           </div>
         ) : null}
 
@@ -1086,7 +1068,6 @@ export default function TournamentRegisterForm({
           </div>
         ) : null}
 
-        <RankPullHint show={loading && step === "confirm" && game === "VALORANT"} />
         {error && layout === "featured" ? <p className="mt-2 text-sm text-red-400/90">{error}</p> : null}
       </div>
     </RegisterShell>

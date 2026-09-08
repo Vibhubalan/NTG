@@ -249,6 +249,7 @@ export async function listSeasonsAdmin() {
 }
 
 export type AdminCupFieldsSnapshot = {
+  slug: string;
   name: string;
   game: GameSlug;
   gameLabel: string | null;
@@ -305,6 +306,7 @@ export function toAdminCupFieldsSnapshot(
   t: NonNullable<Awaited<ReturnType<typeof getTournamentAdmin>>>,
 ): AdminCupFieldsSnapshot {
   return {
+    slug: t.slug,
     name: t.name,
     game: t.game,
     gameLabel: t.gameLabel,
@@ -354,6 +356,21 @@ export async function updateTournamentFull(
   if (!tournament) return { ok: false, error: "Tournament not found." };
 
   const data: Prisma.TournamentUpdateInput = {};
+
+  if (input.slug !== undefined) {
+    const nextSlug = slugify(input.slug);
+    if (!nextSlug) return { ok: false, error: "Invalid slug." };
+    if (nextSlug !== tournament.slug) {
+      const taken = await prisma.tournament.findFirst({
+        where: {
+          slug: { equals: nextSlug, mode: "insensitive" },
+          NOT: { id: tournament.id },
+        },
+      });
+      if (taken) return { ok: false, error: "A tournament with this slug already exists." };
+      data.slug = nextSlug;
+    }
+  }
 
   if (input.name !== undefined) data.name = input.name.trim();
   if (input.game !== undefined) data.game = input.game;
@@ -582,10 +599,12 @@ export async function updateTournamentFull(
     }
   }
 
-  const saved = await getTournamentAdmin(tournament.slug);
+  const savedSlug = typeof data.slug === "string" ? data.slug : tournament.slug;
+  const saved = await getTournamentAdmin(savedSlug);
   if (!saved) return { ok: false, error: "Tournament not found after save." };
 
   safeExpireTag(tournamentDetailTag(slug));
+  if (savedSlug !== slug) safeExpireTag(tournamentDetailTag(savedSlug));
 
   return { ok: true, tournament: toAdminCupFieldsSnapshot(saved) };
 }
@@ -1160,6 +1179,7 @@ export type AdminRegistrationRow = {
   partnerName: string | null;
   riotId: string | null;
   rankTier: string | null;
+  peakRankTier: string | null;
   valorantRoles: string | null;
   steamId64: string | null;
   cs2Hours: number | null;
@@ -1229,6 +1249,7 @@ export async function listTournamentRegistrationsAdmin(
       partnerName: r.partnerName,
       riotId: r.snapshotRiotId,
       rankTier: valorant?.rankTier ?? r.snapshotRankTier,
+      peakRankTier: r.snapshotPeakRankTier,
       valorantRoles: valorant?.valorantRoles ?? null,
       steamId64: r.snapshotSteamId64,
       cs2Hours: r.snapshotCs2Hours,
@@ -1308,7 +1329,8 @@ export function buildRegistrationsCsv(
       "Role",
       "Team",
       "Riot ID",
-      "Rank",
+      "Current Rank",
+      "Peak Rank",
       "Valorant Roles",
       "Registered At",
     ];
@@ -1365,6 +1387,7 @@ export function buildRegistrationsCsv(
           csvEscape(r.teamName),
           csvEscape(r.riotId),
           csvEscape(r.rankTier),
+          csvEscape(r.peakRankTier),
           csvEscape(r.valorantRoles),
           csvEscape(at),
         ].join(","),
