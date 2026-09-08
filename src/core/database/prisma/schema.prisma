@@ -124,6 +124,17 @@ enum TournamentGameStatus {
   HIDDEN
 }
 
+enum VetoFormat {
+  BO1
+  BO3
+  BO5
+}
+
+enum VetoStatus {
+  VETO_LIVE
+  VETO_COMPLETE
+}
+
 enum TournamentGameSide {
   Red
   Blue
@@ -409,6 +420,8 @@ model Tournament {
   /** Short public note under prize split (shown with rulebook while registration is open). */
   rulebookDisclaimer   String?
   teams                Json?
+  /** Map pool offered in the veto for this cup (string[]). Falls back to a default. */
+  vetoMapPool          Json?
   createdAt            DateTime          @default(now())
   updatedAt            DateTime          @updatedAt
 
@@ -418,6 +431,7 @@ model Tournament {
   placements      TournamentPlacement[]
   badges          PlayerBadge[]
   tournamentGames TournamentGame[]
+  vetoMatches     TournamentMatch[]
 }
 
 model TournamentTeam {
@@ -440,6 +454,8 @@ model TournamentTeam {
   registrations        TournamentRegistration[]
   gamesAsTeamA         TournamentGame[]         @relation("GameTeamA")
   gamesAsTeamB         TournamentGame[]         @relation("GameTeamB")
+  vetoMatchesAsTeamA   TournamentMatch[]        @relation("VetoTeamA")
+  vetoMatchesAsTeamB   TournamentMatch[]        @relation("VetoTeamB")
 
   @@index([tournamentId, sortOrder])
 }
@@ -533,6 +549,32 @@ model TournamentGamePlayer {
   @@index([puuid])
   @@index([userId])
   @@unique([gameId, puuid])
+}
+
+/**
+ * A bracket fixture that has entered map veto. Created on demand the first time
+ * someone starts a veto for a Challonge match — there is no fixture sync, the
+ * bracket view is the source of truth for what matches exist.
+ */
+model TournamentMatch {
+  id               String          @id @default(cuid())
+  tournamentId     String
+  tournament       Tournament      @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
+  /** BracketMatchView.id — the Challonge match id this fixture came from. */
+  challongeMatchId String
+  teamAId          String
+  teamA            TournamentTeam  @relation("VetoTeamA", fields: [teamAId], references: [id], onDelete: Cascade)
+  teamBId          String
+  teamB            TournamentTeam  @relation("VetoTeamB", fields: [teamBId], references: [id], onDelete: Cascade)
+  format           VetoFormat      @default(BO1)
+  status           VetoStatus      @default(VETO_LIVE)
+  /** Written back by the services app when the veto completes. */
+  vetoResult       Json?
+  createdAt        DateTime        @default(now())
+  updatedAt        DateTime        @updatedAt
+
+  @@unique([tournamentId, challongeMatchId])
+  @@index([tournamentId, status])
 }
 
 model TournamentRegistration {

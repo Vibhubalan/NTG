@@ -77,6 +77,7 @@ type TournamentData = {
   teamsPerGroup: number | null;
   advancePerGroup: number | null;
   rankPoints: { rank: string; floor: number }[] | null;
+  vetoMapPool: string[] | null;
   seasonId: string | null;
   status: string;
   description: string | null;
@@ -143,6 +144,26 @@ function defaultRegistrationFormatForGame(game: string): "AUCTION" | "STANDARD" 
   if (game === FIFA_FORMAT_GAME) return "DUO";
   return "AUCTION";
 }
+
+/** Every standard Valorant map, in/out of rotation — admins pick the cup's pool from these. */
+const ALL_VALORANT_MAPS = [
+  "Abyss",
+  "Ascent",
+  "Bind",
+  "Breeze",
+  "Corrode",
+  "Fracture",
+  "Haven",
+  "Icebox",
+  "Lotus",
+  "Pearl",
+  "Split",
+  "Summit",
+  "Sunset",
+];
+
+/** Seed pool for the veto — Riot rotates this every act, so admins adjust per cup. */
+const DEFAULT_VETO_MAP_POOL = ["Ascent", "Breeze", "Haven", "Lotus", "Split", "Summit", "Sunset"];
 
 const DEFAULT_VALORANT_RANK_POINTS: { rank: string; floor: number }[] = [
   { rank: "Immortal", floor: 12 },
@@ -247,6 +268,7 @@ function getSavePayload(form: TournamentData) {
     teamsPerGroup: form.teamsPerGroup,
     advancePerGroup: form.advancePerGroup,
     rankPoints: form.rankPoints,
+    vetoMapPool: form.vetoMapPool,
     publicAuction: form.publicAuction ?? false,
     yourGamesEnabled: form.yourGamesEnabled ?? true,
   };
@@ -332,7 +354,15 @@ export default function AdminTournamentEditor({
   const [tournamentTeams, setTournamentTeams] = useState(initial.tournamentTeams);
   const poolPlayers = initial.poolPlayers;
   const [activeTab, setActiveTab] = useState<
-    "general" | "auction" | "media" | "prizes" | "standings" | "registrations" | "teams" | "matches"
+    | "general"
+    | "auction"
+    | "veto"
+    | "media"
+    | "prizes"
+    | "standings"
+    | "registrations"
+    | "teams"
+    | "matches"
   >("general");
   const initialMvpRole = initial.placements.find((p) => p.role === "MVP");
   const initialMvpUser = initialMvpRole?.user;
@@ -359,6 +389,7 @@ export default function AdminTournamentEditor({
   const [loading, setLoading] = useState(false);
   const [confirmCreateAuction, setConfirmCreateAuction] = useState(false);
   const [bypassAuctionSavedLock, setBypassAuctionSavedLock] = useState(false);
+  const [customMapDraft, setCustomMapDraft] = useState("");
   const isDirty = useMemo(() => {
     const cupDirty = !savePayloadsEqual(getSavePayload(form), savedCupBaselineRef.current);
     const mvpDirty =
@@ -823,6 +854,7 @@ export default function AdminTournamentEditor({
           teamsPerGroup: form.teamsPerGroup,
           advancePerGroup: form.advancePerGroup,
           rankPoints: form.rankPoints,
+          vetoMapPool: form.vetoMapPool,
           yourGamesEnabled: form.yourGamesEnabled ?? true,
         }),
       });
@@ -1146,6 +1178,15 @@ export default function AdminTournamentEditor({
           },
         ]
       : []),
+    {
+      id: "veto" as const,
+      label: "Veto",
+      icon: (
+        <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" />
+        </svg>
+      ),
+    },
     {
       id: "media" as const,
       label: "Media",
@@ -1745,6 +1786,143 @@ export default function AdminTournamentEditor({
           </div>
         )}
 
+        {activeTab === "veto" && (
+          <div className="space-y-6 animate-in fade-in duration-200">
+            <AdminSection
+              title="Map Veto Setup"
+              showsOn="Map pool offered to captains in the veto"
+            >
+              <div className="mt-2 space-y-4 rounded-xl border border-fuchsia-500/20 bg-fuchsia-500/[0.03] p-4">
+                <p className="text-[11px] font-bold uppercase tracking-wider text-fuchsia-200/80">
+                  Current Map Pool
+                </p>
+                <p className="-mt-2 text-[10px] leading-relaxed text-white/40">
+                  Click maps to add or remove them from this cup&apos;s veto pool. Riot rotates the
+                  competitive pool every act, so adjust as needed — anything not in the standard 13
+                  can be typed in below. A veto snapshots the pool when it starts, so editing here
+                  never disturbs a veto already in progress. BO1 needs at least 1 map, BO3 at least
+                  3, BO5 at least 5.
+                </p>
+
+                {(() => {
+                  const pool = form.vetoMapPool ?? DEFAULT_VETO_MAP_POOL;
+                  const selected = new Set(pool.map((m) => m.trim().toLowerCase()));
+                  const isOn = (map: string) => selected.has(map.trim().toLowerCase());
+                  // Custom entries the admin typed that aren't standard maps.
+                  const customMaps = pool.filter(
+                    (m) =>
+                      m.trim() &&
+                      !ALL_VALORANT_MAPS.some(
+                        (k) => k.toLowerCase() === m.trim().toLowerCase(),
+                      ),
+                  );
+
+                  function toggle(map: string) {
+                    const next = isOn(map)
+                      ? pool.filter((m) => m.trim().toLowerCase() !== map.trim().toLowerCase())
+                      : [...pool, map];
+                    setForm({ ...form, vetoMapPool: next });
+                  }
+
+                  const chip = (map: string, on: boolean) =>
+                    `rounded-lg border px-3 py-2 text-xs font-semibold transition ${
+                      on
+                        ? "border-fuchsia-400/60 bg-fuchsia-500/15 text-white"
+                        : "border-white/10 bg-white/[0.03] text-white/40 hover:border-white/25 hover:text-white/70"
+                    }`;
+
+                  return (
+                    <>
+                      <div className="grid grid-cols-3 gap-2 sm:grid-cols-4">
+                        {ALL_VALORANT_MAPS.map((map) => (
+                          <button
+                            key={map}
+                            type="button"
+                            onClick={() => toggle(map)}
+                            aria-pressed={isOn(map)}
+                            className={chip(map, isOn(map))}
+                          >
+                            {map}
+                          </button>
+                        ))}
+                      </div>
+
+                      {customMaps.length > 0 ? (
+                        <div className="space-y-2">
+                          <p className="text-[10px] font-semibold uppercase tracking-wider text-white/35">
+                            Custom maps
+                          </p>
+                          <div className="grid grid-cols-3 gap-2 sm:grid-cols-4">
+                            {customMaps.map((map) => (
+                              <button
+                                key={map}
+                                type="button"
+                                onClick={() => toggle(map)}
+                                title="Click to remove"
+                                className={chip(map, true)}
+                              >
+                                {map}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      ) : null}
+
+                      <div className="flex flex-wrap items-center gap-2">
+                        <input
+                          value={customMapDraft}
+                          onChange={(e) => setCustomMapDraft(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key !== "Enter") return;
+                            e.preventDefault();
+                            const name = customMapDraft.trim();
+                            if (name && !isOn(name)) {
+                              setForm({ ...form, vetoMapPool: [...pool, name] });
+                            }
+                            setCustomMapDraft("");
+                          }}
+                          placeholder="Add another map…"
+                          className="flex-1 min-w-[160px] rounded-lg border border-white/10 bg-white/[0.04] px-3 py-2 text-sm text-white outline-none focus:border-fuchsia-400/50"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const name = customMapDraft.trim();
+                            if (name && !isOn(name)) {
+                              setForm({ ...form, vetoMapPool: [...pool, name] });
+                            }
+                            setCustomMapDraft("");
+                          }}
+                          className="rounded-full border border-white/15 px-4 py-2 text-[10px] font-semibold uppercase tracking-wider text-white/70 transition hover:border-white/40"
+                        >
+                          Add
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setForm({ ...form, vetoMapPool: [...DEFAULT_VETO_MAP_POOL] })
+                          }
+                          className="rounded-full border border-white/15 px-4 py-2 text-[10px] font-semibold uppercase tracking-wider text-white/70 transition hover:border-white/40"
+                        >
+                          Reset to current pool
+                        </button>
+                      </div>
+
+                      <p className="text-[10px] text-white/30">
+                        {pool.filter((m) => m.trim()).length} maps selected
+                        {pool.filter((m) => m.trim()).length < 5
+                          ? " — BO5 needs at least 5"
+                          : ""}
+                        . Save changes to apply.
+                      </p>
+                    </>
+                  );
+                })()}
+              </div>
+            </AdminSection>
+          </div>
+        )}
+
         {activeTab === "auction" && form.registrationFormat === "AUCTION" && (
           <div className="space-y-6 animate-in fade-in duration-200">
             <AdminSection
@@ -1936,7 +2114,7 @@ export default function AdminTournamentEditor({
                       <div>
                         <h4 className="text-xs font-semibold text-white/80">Public Auction Visibility</h4>
                         <p className="text-[10px] text-white/40 mt-0.5">
-                          When enabled, the "Enter Auction" button becomes visible to all registered users on the tournament details page.
+                          When enabled, the &quot;Enter Auction&quot; button becomes visible to all registered users on the tournament details page.
                         </p>
                         {autoManaged && (
                           <p className="text-[10px] text-cyan-300/70 mt-1">

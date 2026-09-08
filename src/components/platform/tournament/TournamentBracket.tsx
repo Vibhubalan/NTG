@@ -9,6 +9,7 @@ import type {
   TournamentBracketView,
 } from "@core/contracts/tournament-bracket";
 import { generateRoundRobinBracketFromParticipants } from "@/lib/challonge-bracket-gen";
+import MatchVetoLauncher, { type VetoContextValue, VetoContext } from "./MatchVetoLauncher";
 
 // ─── Layout constants ────────────────────────────────────────────────────────
 const CARD_W = 220; // match card width  (px)
@@ -224,6 +225,12 @@ function MatchCard({
   const pending = match.state === "pending";
 
   return (
+    // Wrapper is unclipped so the veto panel can open below the card; the card
+    // itself keeps its overflow/clip so score fills stay inside the radius.
+    <div
+      className={`relative ${fluid ? "w-full" : ""}`}
+      style={{ width: fluid ? undefined : CARD_W }}
+    >
     <div
       className={`relative isolate select-none overflow-hidden rounded-xl border border-white/[0.08] bg-[#0c101b] shadow-xl transition-all duration-300 hover:border-white/20 ${
         fluid ? "w-full" : ""
@@ -276,6 +283,9 @@ function MatchCard({
           );
         })}
       </div>
+    </div>
+
+      <MatchVetoLauncher match={match} />
     </div>
   );
 }
@@ -953,6 +963,8 @@ type Props = {
   stageName?: string | null;
   format?: string;
   fallbackTeams?: string[];
+  /** Set to show "Start Veto" on the viewer's own open fixtures. */
+  veto?: VetoContextValue;
 };
 
 type MatchPosition = {
@@ -1340,14 +1352,22 @@ function EliminationBracketView({
 
 // ─── Main Export ─────────────────────────────────────────────────────────────
 
-export default function TournamentBracket({
+export default function TournamentBracket({ veto, ...props }: Props) {
+  return (
+    <VetoContext.Provider value={veto ?? null}>
+      <BracketViews {...props} />
+    </VetoContext.Provider>
+  );
+}
+
+function BracketViews({
   bracket,
   accentHex = "#22c55e",
   tournamentName,
   stageName,
   format,
   fallbackTeams,
-}: Props) {
+}: Omit<Props, "veto">) {
   const isRoundRobinFormat = Boolean(
     (format && format.toLowerCase().includes("round")) ||
       (bracket.tournamentType && bracket.tournamentType.toLowerCase().includes("round")) ||
