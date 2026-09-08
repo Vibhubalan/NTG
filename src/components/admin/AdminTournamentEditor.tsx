@@ -10,6 +10,7 @@ import { useAdminDeleteConfirm } from "@/components/admin/useAdminDeleteConfirm"
 import type { PrizeSplitRow } from "@core/contracts";
 import { emptyToNull, prizeSplitForSave } from "@/lib/admin-fields";
 import { formatParticipantRole } from "@/lib/tournament-display";
+import { parseRankToTierId, rankMeetsMinBracket, RANK_BRACKET_FILTERS, type RankBracketFilterKey } from "@/lib/valorant-rank";
 import { parseBracketUrlItem, normalizeBracketUrlItems, type BracketUrlItem } from "@/lib/challonge";
 
 type Team = {
@@ -43,7 +44,9 @@ type RegistrationRow = {
   partnerName: string | null;
   riotId: string | null;
   rankTier: string | null;
+  rankTierId: number | null;
   peakRankTier: string | null;
+  peakRankTierId: number | null;
   valorantRoles: string | null;
   steamId64: string | null;
   cs2Hours: number | null;
@@ -439,29 +442,69 @@ export default function AdminTournamentEditor({
   const isDynamicFormat = form.registrationFormat === "DYNAMIC";
 
   const [registrationFilter, setRegistrationFilter] = useState("");
+  const [currentRankMin, setCurrentRankMin] = useState<RankBracketFilterKey | "">("");
+  const [peakRankMin, setPeakRankMin] = useState<RankBracketFilterKey | "">("");
+  const [registrationKind, setRegistrationKind] = useState<"" | "solo" | "team">("");
+  const [onlyUnassignedSolos, setOnlyUnassignedSolos] = useState(false);
+  const fiveStackTeamIds = useMemo(
+    () =>
+      new Set(
+        registrations
+          .filter((r) => r.participantRole === "CAPTAIN" && r.teamId)
+          .map((r) => r.teamId as string),
+      ),
+    [registrations],
+  );
   const filteredRegistrations = useMemo(() => {
     const q = registrationFilter.trim().toLowerCase();
-    if (!q) return registrations;
     return registrations.filter((r) => {
-      const haystack = [
-        r.displayName,
-        r.email,
-        r.phone,
-        r.riotId,
-        r.rankTier,
-        r.peakRankTier,
-        r.teamName,
-        r.olympusId,
-        r.partnerUsername,
-        r.partnerName,
-        formatParticipantRole(r.participantRole),
-      ]
-        .filter(Boolean)
-        .join(" ")
-        .toLowerCase();
-      return haystack.includes(q);
+      if (q) {
+        const haystack = [
+          r.displayName,
+          r.email,
+          r.phone,
+          r.riotId,
+          r.rankTier,
+          r.peakRankTier,
+          r.teamName,
+          r.olympusId,
+          r.partnerUsername,
+          r.partnerName,
+          formatParticipantRole(r.participantRole),
+        ]
+          .filter(Boolean)
+          .join(" ")
+          .toLowerCase();
+        if (!haystack.includes(q)) return false;
+      }
+      if (currentRankMin) {
+        const id = parseRankToTierId(r.rankTierId, r.rankTier);
+        if (!rankMeetsMinBracket(id, currentRankMin)) return false;
+      }
+      if (peakRankMin) {
+        const id = parseRankToTierId(r.peakRankTierId, r.peakRankTier);
+        if (!rankMeetsMinBracket(id, peakRankMin)) return false;
+      }
+      const onFiveStack =
+        Boolean(r.teamId) &&
+        (r.participantRole === "CAPTAIN" || fiveStackTeamIds.has(r.teamId as string));
+      if (registrationKind === "solo" && onFiveStack) return false;
+      if (registrationKind === "team" && !onFiveStack) return false;
+      if (onlyUnassignedSolos && r.teamId) return false;
+      return true;
     });
-  }, [registrations, registrationFilter]);
+  }, [
+    registrations,
+    registrationFilter,
+    currentRankMin,
+    peakRankMin,
+    registrationKind,
+    onlyUnassignedSolos,
+    fiveStackTeamIds,
+  ]);
+  const tableFiltersActive = Boolean(
+    registrationFilter.trim() || currentRankMin || peakRankMin || registrationKind || onlyUnassignedSolos,
+  );
 
   const [selectedRegistrationIds, setSelectedRegistrationIds] = useState<Set<string>>(new Set());
   const [dynamicTeamName, setDynamicTeamName] = useState("");
@@ -2585,7 +2628,7 @@ export default function AdminTournamentEditor({
             >
               <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
                 <p className="text-sm text-white/45">
-                  {registrationFilter.trim()
+                  {tableFiltersActive
                     ? `${filteredRegistrations.length} of ${registrations.length} registered`
                     : `${registrations.length} registered`}
                 </p>
@@ -2597,13 +2640,93 @@ export default function AdminTournamentEditor({
                 </a>
               </div>
 
-              <div className="mb-4">
-                <input
-                  className={inputClass}
-                  value={registrationFilter}
-                  onChange={(e) => setRegistrationFilter(e.target.value)}
-                  placeholder="Search registered players by name, email, phone, Riot ID, or team…"
-                />
+              <div className="mb-4 space-y-3">
+                <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-[1fr_minmax(10.5rem,13rem)_minmax(10.5rem,13rem)_minmax(10.5rem,13rem)]">
+                  <input
+                    className={inputClass}
+                    value={registrationFilter}
+                    onChange={(e) => setRegistrationFilter(e.target.value)}
+                    placeholder="Search registered players by name, email, phone, Riot ID, or team…"
+                  />
+                  {form.game !== "CS2" && form.game !== "EA_FC26" ? (
+                    <>
+                      <select
+                        className={inputClass}
+                        value={currentRankMin}
+                        onChange={(e) =>
+                          setCurrentRankMin(e.target.value as RankBracketFilterKey | "")
+                        }
+                        aria-label="Filter by current rank"
+                      >
+                        <option value="" className="bg-[#0a1020]">
+                          Current rank: all
+                        </option>
+                        {RANK_BRACKET_FILTERS.map((b) => (
+                          <option key={`current-${b.key}`} value={b.key} className="bg-[#0a1020]">
+                            {b.key === "UNRANKED" ? "Unranked" : `${b.label} and above`}
+                          </option>
+                        ))}
+                      </select>
+                      <select
+                        className={inputClass}
+                        value={peakRankMin}
+                        onChange={(e) =>
+                          setPeakRankMin(e.target.value as RankBracketFilterKey | "")
+                        }
+                        aria-label="Filter by peak rank"
+                      >
+                        <option value="" className="bg-[#0a1020]">
+                          Peak rank: all
+                        </option>
+                        {RANK_BRACKET_FILTERS.map((b) => (
+                          <option key={`peak-${b.key}`} value={b.key} className="bg-[#0a1020]">
+                            {b.key === "UNRANKED" ? "Unranked" : `${b.label} and above`}
+                          </option>
+                        ))}
+                      </select>
+                    </>
+                  ) : null}
+                  {isDynamicFormat ? (
+                    <select
+                      className={inputClass}
+                      value={registrationKind}
+                      onChange={(e) => setRegistrationKind(e.target.value as "" | "solo" | "team")}
+                      aria-label="Filter by solo or team registration"
+                    >
+                      <option value="" className="bg-[#0a1020]">
+                        Registration: all
+                      </option>
+                      <option value="solo" className="bg-[#0a1020]">
+                        Solo registration
+                      </option>
+                      <option value="team" className="bg-[#0a1020]">
+                        Team (5v5) registration
+                      </option>
+                    </select>
+                  ) : null}
+                </div>
+                {isDynamicFormat ? (
+                  <label className="flex cursor-pointer items-center gap-2 text-xs text-white/60">
+                    <input
+                      type="checkbox"
+                      checked={onlyUnassignedSolos}
+                      onChange={(e) => {
+                        const on = e.target.checked;
+                        setOnlyUnassignedSolos(on);
+                        if (on) {
+                          setSelectedRegistrationIds((prev) => {
+                            const keep = new Set<string>();
+                            for (const r of registrations) {
+                              if (prev.has(r.id) && !r.teamId) keep.add(r.id);
+                            }
+                            return keep;
+                          });
+                        }
+                      }}
+                    />
+                    Only solo players not already on a team (can add to a new team)
+                  </label>
+                ) : null}
               </div>
 
               <div className="mb-6 space-y-3 rounded-xl border border-white/[0.06] bg-white/[0.02] p-4">
@@ -2778,7 +2901,7 @@ export default function AdminTournamentEditor({
               {registrations.length === 0 ? (
                 <p className="text-sm text-white/35">No registrations yet.</p>
               ) : filteredRegistrations.length === 0 ? (
-                <p className="text-sm text-white/35">No registrations match your search.</p>
+                <p className="text-sm text-white/35">No registrations match your filters.</p>
               ) : (
                 <div className="overflow-x-auto rounded-xl border border-white/[0.06]">
                   <table className="min-w-full text-left text-xs text-white/70">
@@ -2839,13 +2962,14 @@ export default function AdminTournamentEditor({
                         <tr key={r.id} className="border-b border-white/[0.04]">
                           {isDynamicFormat ? (
                             <td className="px-3 py-2">
-                              <input
-                                type="checkbox"
-                                aria-label={`Select ${r.displayName ?? "player"}`}
-                                checked={selectedRegistrationIds.has(r.id)}
-                                disabled={Boolean(r.teamId)}
-                                onChange={() => toggleRegistrationSelected(r.id)}
-                              />
+                              {!r.teamId ? (
+                                <input
+                                  type="checkbox"
+                                  aria-label={`Select ${r.displayName ?? "player"}`}
+                                  checked={selectedRegistrationIds.has(r.id)}
+                                  onChange={() => toggleRegistrationSelected(r.id)}
+                                />
+                              ) : null}
                             </td>
                           ) : null}
                           <td className="px-3 py-2 font-medium text-white/85">{r.displayName ?? "-"}</td>
