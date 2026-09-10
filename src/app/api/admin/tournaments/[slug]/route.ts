@@ -120,6 +120,7 @@ export async function PATCH(req: Request, { params }: Props) {
     rankPoints: body.rankPoints as { rank: string; floor: number }[] | null | undefined,
     slug: typeof body.slug === "string" ? body.slug : undefined,
     vetoMapPool: body.vetoMapPool as string[] | null | undefined,
+    vetoFormats: body.vetoFormats,
     });
   } catch (err) {
     console.error("[admin/tournaments PATCH]", err);

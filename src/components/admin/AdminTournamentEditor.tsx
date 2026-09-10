@@ -1,5 +1,6 @@
 "use client";
 
+import { VETO_STAGES, effectivePoolSize, vetoPoolError, type VetoFormats } from "@/lib/veto-format";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState, useMemo } from "react";
 import ImageUploadField from "@/components/admin/ImageUploadField";
@@ -81,6 +82,7 @@ type TournamentData = {
   advancePerGroup: number | null;
   rankPoints: { rank: string; floor: number }[] | null;
   vetoMapPool: string[] | null;
+  vetoFormats: VetoFormats;
   seasonId: string | null;
   status: string;
   description: string | null;
@@ -272,6 +274,7 @@ function getSavePayload(form: TournamentData) {
     advancePerGroup: form.advancePerGroup,
     rankPoints: form.rankPoints,
     vetoMapPool: form.vetoMapPool,
+    vetoFormats: form.vetoFormats,
     publicAuction: form.publicAuction ?? false,
     yourGamesEnabled: form.yourGamesEnabled ?? true,
   };
@@ -898,6 +901,7 @@ export default function AdminTournamentEditor({
           advancePerGroup: form.advancePerGroup,
           rankPoints: form.rankPoints,
           vetoMapPool: form.vetoMapPool,
+          vetoFormats: form.vetoFormats,
           yourGamesEnabled: form.yourGamesEnabled ?? true,
         }),
       });
@@ -1831,6 +1835,59 @@ export default function AdminTournamentEditor({
 
         {activeTab === "veto" && (
           <div className="space-y-6 animate-in fade-in duration-200">
+            <AdminSection
+              title="Series Format"
+              showsOn="BO1 / BO3 / BO5 used for each stage's veto"
+            >
+              <div className="mt-2 space-y-3 rounded-xl border border-fuchsia-500/20 bg-fuchsia-500/[0.03] p-4">
+                <p className="text-[10px] leading-relaxed text-white/40">
+                  Each veto takes its format from where the match sits in the Challonge bracket —
+                  players can&apos;t change it. Saving a change restarts any veto still in progress
+                  whose format changes; finished vetoes keep theirs.
+                </p>
+
+                {VETO_STAGES.map(({ stage, label }) => (
+                  <div key={stage} className="flex flex-wrap items-center justify-between gap-2">
+                    <span className="text-xs font-semibold text-white/70">{label}</span>
+                    <div className="flex gap-2">
+                      {(["BO1", "BO3", "BO5"] as const).map((f) => {
+                        const on = form.vetoFormats[stage] === f;
+                        return (
+                          <button
+                            key={f}
+                            type="button"
+                            aria-pressed={on}
+                            onClick={() =>
+                              setForm({ ...form, vetoFormats: { ...form.vetoFormats, [stage]: f } })
+                            }
+                            className={`rounded-lg border px-3 py-1.5 text-xs font-semibold transition ${
+                              on
+                                ? "border-fuchsia-400/60 bg-fuchsia-500/15 text-white"
+                                : "border-white/10 bg-white/[0.03] text-white/40 hover:border-white/25 hover:text-white/70"
+                            }`}
+                          >
+                            {f}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                ))}
+
+                {(() => {
+                  const poolError = vetoPoolError(
+                    form.vetoFormats,
+                    effectivePoolSize(form.vetoMapPool ?? DEFAULT_VETO_MAP_POOL),
+                  );
+                  return poolError ? (
+                    <p className="text-[10px] leading-snug text-amber-300">
+                      {poolError} Add maps below before saving.
+                    </p>
+                  ) : null;
+                })()}
+              </div>
+            </AdminSection>
+
             <AdminSection
               title="Map Veto Setup"
               showsOn="Map pool offered to captains in the veto"

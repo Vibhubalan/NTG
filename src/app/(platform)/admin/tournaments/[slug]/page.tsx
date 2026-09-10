@@ -1,3 +1,4 @@
+import { parseVetoFormats } from "@/lib/veto-format";
 import { notFound } from "next/navigation";
 import AdminTournamentEditor from "@/components/admin/AdminTournamentEditor";
 import {
@@ -75,6 +76,7 @@ export default async function AdminTournamentEditPage({ params }: Props) {
     vetoMapPool: Array.isArray(t.vetoMapPool)
       ? (t.vetoMapPool as unknown[]).filter((m): m is string => typeof m === "string")
       : null,
+    vetoFormats: parseVetoFormats(t.vetoFormats),
     bracketUrl: t.bracketUrl,
     bracketUrls: normalizeBracketUrlItems({
       bracketUrl: t.bracketUrl,
