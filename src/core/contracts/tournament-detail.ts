@@ -49,6 +49,8 @@ export type TournamentDetail = {
   prizePoolMode?: "MANUAL" | "DYNAMIC";
   prizePerPlayer?: string | null;
   registrationOpen: boolean;
+  /** True after the signup window has ended (DYNAMIC public teams gate). */
+  registrationClosed: boolean;
   registrationOpensAt: string | null;
   registrationClosesAt: string | null;
   auctionStartsAt: string | null;

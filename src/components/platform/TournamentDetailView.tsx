@@ -201,7 +201,8 @@ export default function TournamentDetailView({
     tournament.registrationFormat === "SOLO"
       ? tournament.soloPlayers.length > 0 || tournament.registrationOpen
       : tournament.registrationFormat === "DYNAMIC"
-        ? tournament.teams.length > 0 || tournament.teamDetails.length > 0
+        ? Boolean(tournament.registrationClosed) &&
+          (tournament.teams.length > 0 || tournament.teamDetails.length > 0)
         : tournament.teams.length > 0 ||
           tournament.teamDetails.length > 0 ||
           tournament.registrationOpen;

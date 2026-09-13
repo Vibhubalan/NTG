@@ -3,7 +3,11 @@ import { rosterPresetLabel } from "@/lib/roster-games";
 import { slugify } from "../domain/helpers";
 import { getDefaultFormTemplate } from "./listing-form.service";
 import { serializeFieldOptions, formatResponseForDisplay } from "../domain/listing-form";
-import { validateTryoutSchedule } from "../domain/tryout-schedule";
+import {
+  computeTryoutListingStatus,
+  resolveTryoutClosesAt,
+  validateTryoutSchedule,
+} from "../domain/tryout-schedule";
 import {
   normalizeTryoutGameKey,
   tryoutGameConflictMessage,
@@ -252,6 +256,8 @@ export async function updateListing(
     input.tryoutOpenDays !== undefined ? input.tryoutOpenDays : listing.tryoutOpenDays;
   const nextAutoManage =
     input.autoManageTryout !== undefined ? input.autoManageTryout : listing.autoManageTryout;
+  const nextRepeatDays =
+    input.tryoutRepeatDays !== undefined ? input.tryoutRepeatDays : listing.tryoutRepeatDays;
 
   const scheduleErr = validateTryoutSchedule({
     tryoutOpensAt: nextOpens,
@@ -260,6 +266,42 @@ export async function updateListing(
     autoManageTryout: nextAutoManage,
   });
   if (scheduleErr) return { ok: false, error: scheduleErr };
+
+  const scheduleTouched =
+    input.tryoutOpensAt !== undefined ||
+    input.tryoutClosesAt !== undefined ||
+    input.tryoutOpenDays !== undefined ||
+    input.autoManageTryout !== undefined ||
+    input.tryoutRepeatDays !== undefined;
+
+  let nextStatus = input.status;
+  if (
+    scheduleTouched &&
+    input.status === undefined &&
+    nextType === "ROSTER_TRYOUT" &&
+    listing.status !== "DRAFT"
+  ) {
+    const scheduleFields = {
+      type: "ROSTER_TRYOUT" as const,
+      status: listing.status,
+      autoManageTryout: nextAutoManage,
+      tryoutOpensAt: nextOpens,
+      tryoutClosesAt: nextCloses,
+      tryoutOpenDays: nextOpenDays,
+      tryoutRepeatDays: nextRepeatDays,
+    };
+
+    if (nextAutoManage) {
+      const derived = computeTryoutListingStatus(scheduleFields);
+      if (derived) nextStatus = derived;
+    } else {
+      // Manual mode: extending the close into the future should reopen applications.
+      const closes = resolveTryoutClosesAt(nextOpens, nextCloses, nextOpenDays);
+      if (closes && closes.getTime() > Date.now() && listing.status === "CLOSED") {
+        nextStatus = "OPEN";
+      }
+    }
+  }
 
   await prisma.listing.update({
     where: { slug },
@@ -272,7 +314,7 @@ export async function updateListing(
         : input.gameLabel !== undefined
           ? { gameLabel: input.gameLabel?.trim() || null }
           : {}),
-      ...(input.status !== undefined ? { status: input.status } : {}),
+      ...(nextStatus !== undefined ? { status: nextStatus } : {}),
       ...(input.sortOrder !== undefined ? { sortOrder: input.sortOrder } : {}),
       ...(input.rulebookUrl !== undefined ? { rulebookUrl: input.rulebookUrl } : {}),
       ...(input.tryoutOpensAt !== undefined

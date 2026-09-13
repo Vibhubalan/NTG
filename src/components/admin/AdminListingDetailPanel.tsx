@@ -8,7 +8,7 @@ import AdminListingApplicationView from "@/components/admin/AdminListingApplicat
 import RulebookUploadField from "@/components/admin/RulebookUploadField";
 import type { AdminListingApplicationRow } from "@roster-listings/index";
 import type { ListingFormFieldView } from "@core/contracts/roster-listings";
-import { formatIstDateInput, parseIstDateInput } from "@/lib/ist-date-input";
+import { formatIstDateInput, parseIstDateInput, parseIstDateInputEndOfDay } from "@/lib/ist-date-input";
 
 type Props = {
   slug: string;
@@ -176,7 +176,9 @@ export default function AdminListingDetailPanel({
       tryoutOpensAt: tryoutOpensAt ? parseIstDateInput(tryoutOpensAt).toISOString() : null,
       tryoutOpenDays: useCloseDate ? null : openDays,
       tryoutClosesAt:
-        useCloseDate && tryoutClosesAt ? parseIstDateInput(tryoutClosesAt).toISOString() : null,
+        useCloseDate && tryoutClosesAt
+          ? parseIstDateInputEndOfDay(tryoutClosesAt).toISOString()
+          : null,
       tryoutRepeatDays: repeatDays,
     };
 
