@@ -422,6 +422,8 @@ model Tournament {
   teams                Json?
   /** Map pool offered in the veto for this cup (string[]). Falls back to a default. */
   vetoMapPool          Json?
+  /** Series length per stage ({ group, playoffs, semis, final } → BO1/BO3/BO5). Missing = defaults. */
+  vetoFormats          Json?
   createdAt            DateTime          @default(now())
   updatedAt            DateTime          @updatedAt
 

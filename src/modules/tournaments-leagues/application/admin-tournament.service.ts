@@ -1,5 +1,7 @@
 import { prisma } from "@core/database/client";
 import { safeExpireTag } from "@/lib/safe-revalidate";
+import { effectivePoolSize, parseVetoFormats, vetoPoolError, type VetoFormats } from "@/lib/veto-format";
+import { restartChangedVetoes } from "@/lib/veto-stage";
 import { tournamentDetailTag } from "./tournament.service";
 import type { PrizeSplitRow } from "@core/contracts";
 import type {
@@ -105,6 +107,8 @@ export type UpdateTournamentInput = Partial<
   advancePerGroup?: number | null;
   rankPoints?: { rank: string; floor: number }[] | null;
   vetoMapPool?: string[] | null;
+  /** Untrusted request body — sanitised by parseVetoFormats on save. */
+  vetoFormats?: unknown;
 };
 
 function parsePrizeSplit(value: unknown): PrizeSplitRow[] | null {
@@ -287,6 +291,7 @@ export type AdminCupFieldsSnapshot = {
   advancePerGroup: number | null;
   rankPoints: { rank: string; floor: number }[] | null;
   vetoMapPool: string[] | null;
+  vetoFormats: VetoFormats;
 };
 
 function parseRankPoints(value: unknown): { rank: string; floor: number }[] | null {
@@ -350,6 +355,7 @@ export function toAdminCupFieldsSnapshot(
     vetoMapPool: Array.isArray(t.vetoMapPool)
       ? (t.vetoMapPool as unknown[]).filter((m): m is string => typeof m === "string")
       : null,
+    vetoFormats: parseVetoFormats(t.vetoFormats),
   };
 }
 
@@ -359,6 +365,20 @@ export async function updateTournamentFull(
 ): Promise<{ ok: true; tournament: AdminCupFieldsSnapshot } | { ok: false; error: string }> {
   const tournament = await prisma.tournament.findFirst({ where: slugWhere(slug) });
   if (!tournament) return { ok: false, error: "Tournament not found." };
+
+  // Veto setup is only validated when it changes, so unrelated edits to an older cup still save.
+  const nextVetoFormats = parseVetoFormats(
+    input.vetoFormats !== undefined ? input.vetoFormats : tournament.vetoFormats,
+  );
+  const vetoFormatsChanged =
+    JSON.stringify(nextVetoFormats) !== JSON.stringify(parseVetoFormats(tournament.vetoFormats));
+  const nextPoolSize = effectivePoolSize(
+    input.vetoMapPool !== undefined ? input.vetoMapPool : tournament.vetoMapPool,
+  );
+  if (vetoFormatsChanged || nextPoolSize !== effectivePoolSize(tournament.vetoMapPool)) {
+    const vetoError = vetoPoolError(nextVetoFormats, nextPoolSize);
+    if (vetoError) return { ok: false, error: `${vetoError} Add maps to the veto pool first.` };
+  }
 
   const data: Prisma.TournamentUpdateInput = {};
 
@@ -482,6 +502,11 @@ export async function updateTournamentFull(
     const pool = (input.vetoMapPool ?? []).map((m) => m.trim()).filter(Boolean);
     data.vetoMapPool = pool.length ? (pool as unknown as Prisma.InputJsonValue) : Prisma.JsonNull;
   }
+  if (input.vetoFormats !== undefined) {
+    data.vetoFormats = input.vetoFormats
+      ? (parseVetoFormats(input.vetoFormats) as unknown as Prisma.InputJsonValue)
+      : Prisma.JsonNull;
+  }
   if (input.hideAfter !== undefined) {
     data.hideAfter =
       input.hideAfter === null ? null : input.hideAfter ? new Date(input.hideAfter) : undefined;
@@ -554,6 +579,13 @@ export async function updateTournamentFull(
   }
 
   await prisma.tournament.update({ where: { id: tournament.id }, data });
+
+  if (vetoFormatsChanged) {
+    // Never fail the save over this — worst case a live veto keeps its old format.
+    await restartChangedVetoes(tournament.id).catch((err) => {
+      console.error("[admin] restartChangedVetoes failed:", err instanceof Error ? err.message : err);
+    });
+  }
 
   if (clearWinnersAfterSave) {
     await clearAutoSyncedChampions(tournament.id).catch((err) => {

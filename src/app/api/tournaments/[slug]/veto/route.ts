@@ -2,6 +2,8 @@ import { guardResponse, isAuthedSession, requireAdmin, requireSession } from "@/
 import { serverEnv } from "@core/config/env.server";
 import { prisma } from "@core/database/client";
 import { tryVetoLink } from "@/lib/veto-link";
+import { stagesForMatches } from "@/lib/veto-stage";
+import { effectivePoolSize, minPoolSize, parseVetoFormats } from "@/lib/veto-format";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
@@ -13,9 +15,7 @@ const startVetoSchema = z.object({
   challongeMatchId: z.string().min(1),
   teamAName: z.string().min(1),
   teamBName: z.string().min(1),
-  format: z.enum(["BO1", "BO3", "BO5"]).default("BO1"),
-  /** Bracket state as the client saw it. Advisory — the authoritative value
-   *  lives in Challonge, and re-fetching it here would burn the API quota. */
+  /** Bracket state as the client saw it. Advisory — not re-checked against Challonge. */
   matchState: z.enum(["pending", "open", "complete"]).optional(),
 });
 
@@ -23,6 +23,7 @@ const startVetoSchema = z.object({
 function normalizeTeamName(name: string): string {
   return name.trim().toLowerCase().replace(/\s+/g, " ");
 }
+
 
 export async function POST(req: Request, { params }: Props) {
   if (!serverEnv.databaseUrl) {
@@ -36,13 +37,18 @@ export async function POST(req: Request, { params }: Props) {
   if (!parsed.success) {
     return NextResponse.json({ error: "Invalid request." }, { status: 400 });
   }
-  const { challongeMatchId, teamAName, teamBName, format, matchState } = parsed.data;
+  const { challongeMatchId, teamAName, teamBName, matchState } = parsed.data;
 
   const { slug } = await params;
   const tournament = await prisma.tournament.findUnique({
     where: { slug },
     select: {
       id: true,
+      status: true,
+      bracketUrl: true,
+      bracketUrls: true,
+      vetoMapPool: true,
+      vetoFormats: true,
       tournamentTeams: {
         select: {
           id: true,
@@ -95,25 +101,46 @@ export async function POST(req: Request, { params }: Props) {
     );
   }
 
-  // Created on first start; later clicks by either side rejoin the same veto.
-  // teamA is the bracket's top slot, and the veto engine gives it the first turn —
-  // so slot order here is load-bearing, not cosmetic.
-  const match = await prisma.tournamentMatch.upsert({
-    where: {
-      tournamentId_challongeMatchId: { tournamentId: tournament.id, challongeMatchId },
-    },
-    create: {
-      tournamentId: tournament.id,
-      challongeMatchId,
-      teamAId: teamA.id,
-      teamBId: teamB.id,
-      format,
-    },
-    update: {},
-    select: { id: true },
-  });
+  const where = {
+    tournamentId_challongeMatchId: { tournamentId: tournament.id, challongeMatchId },
+  };
+  // Later clicks by either side rejoin the same veto and keep its format, so only
+  // a first start has to find the match in the bracket.
+  let matchId = (await prisma.tournamentMatch.findUnique({ where, select: { id: true } }))?.id;
+  if (!matchId) {
+    // Format comes from the cup's per-stage config, never from the players.
+    const stage = (await stagesForMatches(tournament, [challongeMatchId])).get(challongeMatchId);
+    if (!stage) console.warn(`[veto] ${slug}: match ${challongeMatchId} not in any bracket, using BO1`);
+    const format = stage ? parseVetoFormats(tournament.vetoFormats)[stage] : "BO1";
 
-  const url = tryVetoLink(match.id, auth.userId);
+    const poolSize = effectivePoolSize(tournament.vetoMapPool);
+    if (poolSize < minPoolSize(format)) {
+      return NextResponse.json(
+        {
+          error: `This match is ${format}, which needs at least ${minPoolSize(format)} maps, but the cup's pool has ${poolSize}. An admin needs to add maps in the Veto tab.`,
+        },
+        { status: 409 },
+      );
+    }
+
+    // teamA is the bracket's top slot, and the veto engine gives it the first turn —
+    // so slot order here is load-bearing, not cosmetic.
+    const match = await prisma.tournamentMatch.upsert({
+      where,
+      create: {
+        tournamentId: tournament.id,
+        challongeMatchId,
+        teamAId: teamA.id,
+        teamBId: teamB.id,
+        format,
+      },
+      update: {},
+      select: { id: true },
+    });
+    matchId = match.id;
+  }
+
+  const url = tryVetoLink(matchId, auth.userId);
   if (!url) {
     return NextResponse.json({ error: "Veto app is not configured." }, { status: 503 });
   }
