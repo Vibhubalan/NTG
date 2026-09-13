@@ -18,6 +18,7 @@ function minimalDetail(overrides: Partial<TournamentDetail> = {}): TournamentDet
     prizeNotes: null,
     prizeSplit: null,
     registrationOpen: true,
+    registrationClosed: false,
     registrationOpensAt: null,
     registrationClosesAt: null,
     auctionStartsAt: null,

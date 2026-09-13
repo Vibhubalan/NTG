@@ -1,5 +1,6 @@
 export {
   isTournamentRegistrationLive,
+  hasTournamentRegistrationClosed,
   getRegistrationCloseAt,
   computeAutoStatus,
   validateAutoSchedule,
