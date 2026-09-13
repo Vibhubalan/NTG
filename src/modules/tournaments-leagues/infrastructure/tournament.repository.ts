@@ -6,7 +6,10 @@ import { gameMetaFor } from "@/lib/tournament-display";
 import { normalizeBracketUrlItems, normalizeBracketUrls } from "@/lib/challonge";
 import { teamNamesMatch } from "@/lib/tournament-champion";
 import { pickRiotPlayerCardFields } from "@/lib/valorant-player-card";
-import { isTournamentRegistrationLive } from "../domain/registration-window";
+import {
+  hasTournamentRegistrationClosed,
+  isTournamentRegistrationLive,
+} from "../domain/registration-window";
 import { slugWhere } from "@/lib/slug-utils";
 import { computeDisplayedPrizePool } from "@/lib/prize-pool";
 
@@ -313,11 +316,27 @@ async function enrichMissingRosterCards(
 function isRegistrationOpen(t: {
   status: TournamentStatus;
   autoManageStatus: boolean;
+  registrationFormat?: string | null;
   registrationOpensAt: Date | null;
+  auctionStartsAt?: Date | null;
+  auctionEndsAt?: Date | null;
   startsAt: Date | null;
   endsAt: Date | null;
 }): boolean {
   return isTournamentRegistrationLive(t);
+}
+
+function isRegistrationClosed(t: {
+  status: TournamentStatus;
+  autoManageStatus: boolean;
+  registrationFormat?: string | null;
+  registrationOpensAt: Date | null;
+  auctionStartsAt?: Date | null;
+  auctionEndsAt?: Date | null;
+  startsAt: Date | null;
+  endsAt: Date | null;
+}): boolean {
+  return hasTournamentRegistrationClosed(t);
 }
 
 function formatRegistrationBannerDetail(t: {
@@ -486,12 +505,17 @@ export class TournamentRepository {
 
     const allRegs = t.registrations;
     const isSoloCup = t.registrationFormat === "SOLO";
+    const isDynamicCup = t.registrationFormat === "DYNAMIC";
+    const registrationClosed = isRegistrationClosed(t);
 
     // DYNAMIC leftover solos stay off the public roster until an admin (or
-    // a 5-stack signup) puts them on a team.
-    const teamDetails = isSoloCup
+    // a 5-stack signup) puts them on a team. Formed DYNAMIC teams stay private
+    // until registration closes.
+    const rawTeamDetails = isSoloCup
       ? []
       : await enrichMissingRosterCards(buildTeamDetailsFromData(t.tournamentTeams, allRegs));
+    const teamDetails =
+      isDynamicCup && !registrationClosed ? [] : rawTeamDetails;
     const soloPlayers = isSoloCup
       ? allRegs.map(mapRegistrationToPlayerView)
       : [];
@@ -533,6 +557,7 @@ export class TournamentRepository {
       prizeSplit: t.prizePoolMode === "DYNAMIC" ? null : parsePrizeSplit(t.prizeSplit),
       registrationCount: allRegs.length,
       registrationOpen: isRegistrationOpen(t),
+      registrationClosed,
       registrationOpensAt: t.registrationOpensAt?.toISOString() ?? null,
       registrationClosesAt: t.registrationClosesAt?.toISOString() ?? null,
       auctionStartsAt: t.auctionStartsAt?.toISOString() ?? null,

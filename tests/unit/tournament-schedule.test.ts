@@ -4,6 +4,7 @@ import {
   computeAutoStatus,
   getRegistrationCloseAt,
   getTournamentCompleteAt,
+  hasTournamentRegistrationClosed,
   hasValidAutoSchedule,
   isTournamentRegistrationLive,
   validateAutoSchedule,
@@ -93,6 +94,24 @@ describe("tournament-schedule", () => {
     expect(
       isTournamentRegistrationLive(
         { ...standard, autoManageStatus: false, status: "REGISTRATION_OPEN" },
+        new Date("2026-06-10T19:00:00Z"),
+      ),
+    ).toBe(true);
+  });
+
+  it("hasTournamentRegistrationClosed is false before/during open, true after close", () => {
+    expect(hasTournamentRegistrationClosed(standard, new Date("2026-05-20T12:00:00Z"))).toBe(false);
+    expect(hasTournamentRegistrationClosed(standard, new Date("2026-06-05T12:00:00Z"))).toBe(false);
+    expect(hasTournamentRegistrationClosed(standard, new Date("2026-06-10T10:00:00Z"))).toBe(true);
+    expect(
+      hasTournamentRegistrationClosed(
+        { ...standard, autoManageStatus: false, status: "UPCOMING" },
+        new Date("2026-06-10T19:00:00Z"),
+      ),
+    ).toBe(false);
+    expect(
+      hasTournamentRegistrationClosed(
+        { ...standard, autoManageStatus: false, status: "IN_PROGRESS" },
         new Date("2026-06-10T19:00:00Z"),
       ),
     ).toBe(true);

@@ -147,6 +147,22 @@ export function isTournamentRegistrationLive(
   return t.status === "REGISTRATION_OPEN";
 }
 
+/** True once the signup window has ended (not merely "not open yet"). */
+export function hasTournamentRegistrationClosed(
+  t: TournamentScheduleInput,
+  now: Date = new Date(),
+): boolean {
+  if (t.autoManageStatus && hasValidAutoSchedule(t)) {
+    return now.getTime() >= registrationCloseAnchor(t)!.getTime();
+  }
+
+  return (
+    t.status !== "DRAFT" &&
+    t.status !== "UPCOMING" &&
+    t.status !== "REGISTRATION_OPEN"
+  );
+}
+
 export function getEffectiveAuctionStartsAt(
   t: Pick<TournamentScheduleInput, "auctionStartsAt" | "registrationFormat">,
 ): Date | null {
