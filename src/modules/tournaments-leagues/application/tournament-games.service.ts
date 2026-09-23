@@ -290,14 +290,43 @@ async function resolveTeamRoster(
           registration: true,
         },
       },
+      registrations: {
+        include: { user: true },
+      },
     },
   });
   if (!team) throw new Error("Team not found.");
 
   const players: RosterPlayerIdentity[] = [];
   let region = "ap";
+  const seenUserIds = new Set<string>();
+  const seenPuuids = new Set<string>();
 
-  for (const row of team.players) {
+  const sourceRows: Array<{
+    userId: string | null;
+    riotGameName: string | null;
+    riotTagLine: string | null;
+    user: {
+      riotPuuid: string | null;
+      riotGameName: string | null;
+      riotTagLine: string | null;
+      riotRegion: string | null;
+    } | null;
+    registration: { snapshotRiotId: string | null } | null;
+  }> = [
+    ...team.players,
+    ...team.registrations
+      .filter((reg) => !team.players.some((p) => p.userId && p.userId === reg.userId))
+      .map((reg) => ({
+        userId: reg.userId,
+        riotGameName: null,
+        riotTagLine: null,
+        user: reg.user,
+        registration: { snapshotRiotId: reg.snapshotRiotId },
+      })),
+  ];
+
+  for (const row of sourceRows) {
     const fromUser = row.user
       ? splitRiotFields(row.user.riotGameName, row.user.riotTagLine, null)
       : null;
@@ -336,6 +365,11 @@ async function resolveTeamRoster(
     }
 
     if (!puuid || !identity) continue;
+    if (seenPuuids.has(puuid)) continue;
+    if (row.userId && seenUserIds.has(row.userId)) continue;
+
+    seenPuuids.add(puuid);
+    if (row.userId) seenUserIds.add(row.userId);
 
     players.push({
       puuid,
