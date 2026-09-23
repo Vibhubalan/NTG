@@ -9,10 +9,10 @@ export const dynamic = "force-dynamic";
 type Props = { params: Promise<{ slug: string }> };
 
 /**
- * Typeahead for DYNAMIC 5v5 captains to add teammates by NTG username or Riot
- * ID. Authenticated only — never exposes email/phone (unlike admin member
- * search). `exclude` lets the client hide teammates already picked for the
- * roster-in-progress before they're submitted.
+ * Typeahead for DYNAMIC / STANDARD 5v5 captains to add teammates by NTG
+ * username or Riot ID. Authenticated only — never exposes email/phone
+ * (unlike admin member search). `exclude` lets the client hide teammates
+ * already picked for the roster-in-progress before they're submitted.
  */
 export async function GET(req: Request, { params }: Props) {
   if (!serverEnv.databaseUrl) {

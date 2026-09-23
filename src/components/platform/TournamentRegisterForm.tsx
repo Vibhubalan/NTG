@@ -349,6 +349,7 @@ export default function TournamentRegisterForm({
   const [partnerUsername, setPartnerUsername] = useState("");
   const [dynamicMode, setDynamicMode] = useState<"solo" | "team">("solo");
   const [dynamicTeammates, setDynamicTeammates] = useState<DynamicTeamCandidate[]>([]);
+  const [standardTeammates, setStandardTeammates] = useState<DynamicTeamCandidate[]>([]);
   const [acceptedTerms, setAcceptedTerms] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -674,8 +675,23 @@ export default function TournamentRegisterForm({
     }
   }
 
+  function addStandardTeammate(candidate: DynamicTeamCandidate) {
+    setStandardTeammates((prev) =>
+      prev.some((c) => c.userId === candidate.userId) || prev.length >= 5
+        ? prev
+        : [...prev, candidate],
+    );
+  }
+
+  function removeStandardTeammate(userId: string) {
+    setStandardTeammates((prev) => prev.filter((c) => c.userId !== userId));
+  }
+
   async function submitStandardRegistration() {
     if (submitting.current || loading || !acceptedTerms) return;
+    if (game === "VALORANT" && (standardTeammates.length < 4 || standardTeammates.length > 5)) {
+      return;
+    }
     submitting.current = true;
     setLoading(true);
     setError(null);
@@ -686,7 +702,9 @@ export default function TournamentRegisterForm({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           teamName: teamName.trim(),
-          memberUsernames: memberUsernames.map((u) => u.trim()),
+          ...(game === "VALORANT"
+            ? { memberUserIds: standardTeammates.map((c) => c.userId) }
+            : { memberUsernames: memberUsernames.map((u) => u.trim()) }),
           acceptedTerms: true,
         }),
       });
@@ -813,7 +831,10 @@ export default function TournamentRegisterForm({
     }
   }
 
-  const standardMembersComplete = memberUsernames.every((u) => u.trim().length >= 2);
+  const standardMembersComplete =
+    game === "VALORANT"
+      ? standardTeammates.length >= 4 && standardTeammates.length <= 5
+      : memberUsernames.every((u) => u.trim().length >= 2);
 
   if (resolvedFormat === "SOLO") {
     return (
@@ -1038,13 +1059,18 @@ export default function TournamentRegisterForm({
   }
 
   if (registrationFormat === "STANDARD") {
+    const starters = standardTeammates.slice(0, 4);
+    const sub = standardTeammates[4] ?? null;
+    const rosterCount = game === "VALORANT" ? standardTeammates.length + 1 : 5;
     return (
       <div className="shine-border rounded-[1.35rem] lg:sticky lg:top-28">
         <div className="shine-border-inner space-y-4 rounded-[1.35rem] bg-[#0a1020]/85 p-6 backdrop-blur-sm">
           <div>
             <p className="text-[10px] font-medium uppercase tracking-[0.32em] text-[var(--color-brand)]/85">Register</p>
             <p className="mt-2 text-sm text-white/45">
-              Register your full 5-player team. You are the captain. Add 4 teammates by NTG username.
+              {game === "VALORANT"
+                ? "You are the captain. Add 4 starters. A 6th player can sit as Sub (optional)."
+                : "Register your full 5-player team. You are the captain. Add 4 teammates by NTG username."}
             </p>
           </div>
 
@@ -1057,20 +1083,68 @@ export default function TournamentRegisterForm({
               value={teamName}
               onChange={(e) => setTeamName(e.target.value)}
             />
-            <p className="text-xs font-medium uppercase tracking-wider text-white/40">Teammates</p>
-            {memberUsernames.map((username, index) => (
-              <input
-                key={index}
-                className={inputClass}
-                placeholder={`Teammate ${index + 1} username`}
-                value={username}
-                onChange={(e) => {
-                  const next = [...memberUsernames];
-                  next[index] = e.target.value;
-                  setMemberUsernames(next);
-                }}
-              />
-            ))}
+            {game === "VALORANT" ? (
+              <>
+                <p className="text-xs font-medium uppercase tracking-wider text-white/40">
+                  Starters ({starters.length}/4)
+                </p>
+                {starters.length > 0 ? (
+                  <div className="flex flex-wrap gap-2">
+                    {starters.map((candidate) => (
+                      <TeammateChip
+                        key={candidate.userId}
+                        candidate={candidate}
+                        onRemove={() => removeStandardTeammate(candidate.userId)}
+                      />
+                    ))}
+                  </div>
+                ) : null}
+                {starters.length < 4 ? (
+                  <TeammateSearchField
+                    slug={slug}
+                    excludeUserIds={standardTeammates.map((c) => c.userId)}
+                    onSelect={addStandardTeammate}
+                    inputClass={inputClass}
+                  />
+                ) : (
+                  <div className="space-y-2 border-t border-white/[0.06] pt-3">
+                    <p className="text-xs font-medium uppercase tracking-wider text-white/40">
+                      Sub (optional) {sub ? "1/1" : "0/1"}
+                    </p>
+                    {sub ? (
+                      <TeammateChip
+                        candidate={sub}
+                        onRemove={() => removeStandardTeammate(sub.userId)}
+                      />
+                    ) : (
+                      <TeammateSearchField
+                        slug={slug}
+                        excludeUserIds={standardTeammates.map((c) => c.userId)}
+                        onSelect={addStandardTeammate}
+                        inputClass={inputClass}
+                      />
+                    )}
+                  </div>
+                )}
+              </>
+            ) : (
+              <>
+                <p className="text-xs font-medium uppercase tracking-wider text-white/40">Teammates</p>
+                {memberUsernames.map((username, index) => (
+                  <input
+                    key={index}
+                    className={inputClass}
+                    placeholder={`Teammate ${index + 1} username`}
+                    value={username}
+                    onChange={(e) => {
+                      const next = [...memberUsernames];
+                      next[index] = e.target.value;
+                      setMemberUsernames(next);
+                    }}
+                  />
+                ))}
+              </>
+            )}
             <p className="text-xs text-white/40">
               All teammates must be NTG members with complete game profiles
               {game === "CS2" ? " (Steam linked)" : game === "VALORANT" ? " (Riot ID linked)" : ""}.
@@ -1088,7 +1162,11 @@ export default function TournamentRegisterForm({
               className="cta flex w-full items-center justify-center gap-2 rounded-full py-3 text-xs font-semibold uppercase tracking-[0.18em] disabled:opacity-50"
             >
               {loading ? <Spinner size="xs" /> : null}
-              {loading ? "Registering…" : "Register team"}
+              {loading
+                ? "Registering…"
+                : game === "VALORANT"
+                  ? `Register team (${rosterCount}/5${standardTeammates.length === 5 ? "+sub" : ""})`
+                  : "Register team"}
             </button>
           </div>
 

@@ -17,6 +17,11 @@ import {
   normalizeCs2FaceitRank,
 } from "@auth-membership/application/registration-helpers";
 import { riotIdSegmentLengths } from "@/lib/riot-id";
+import {
+  isValidValorant5v5TeammateCount,
+  splitSnapshotRiotId,
+  valorant5v5TeammateCountError,
+} from "@/lib/valorant-team-roster";
 import { ensureCs2RankDefaults } from "@auth-membership/application/game-profile.service";
 import { displayCurrentValorantRank } from "@auth-membership/domain/game-profile";
 import { isTournamentRegistrationLive } from "../domain/registration-window";
@@ -40,7 +45,8 @@ export type TournamentRegisterInput = {
 
 export type StandardTeamRegisterInput = {
   teamName: string;
-  memberUsernames: string[];
+  memberUsernames?: string[];
+  memberUserIds?: string[];
   valorantRoles?: ValorantRole[];
 };
 
@@ -304,6 +310,33 @@ function userSnapshotFields(user: {
     snapshotCs2Hours: user.cs2HoursPlayed,
     snapshotCs2PeakPremier: user.playerProfile?.cs2PeakPremierRank ?? null,
     snapshotCs2FaceitRank: user.playerProfile?.cs2FaceitRank ?? null,
+  };
+}
+
+function rosterPlayerCreateData(opts: {
+  teamId: string;
+  userId: string;
+  registrationId: string;
+  displayName: string;
+  riotGameName: string | null;
+  riotTagLine: string | null;
+  valorantRoles?: ValorantRole[] | null;
+  peakPremierRank?: string | null;
+  sortOrder: number;
+}) {
+  return {
+    teamId: opts.teamId,
+    userId: opts.userId,
+    registrationId: opts.registrationId,
+    displayName: opts.displayName,
+    riotGameName: opts.riotGameName,
+    riotTagLine: opts.riotTagLine,
+    valorantRoles: opts.valorantRoles
+      ? (opts.valorantRoles as unknown as Prisma.InputJsonValue)
+      : undefined,
+    peakPremierRank: opts.peakPremierRank ?? null,
+    membershipKind: "PRIMARY" as const,
+    sortOrder: opts.sortOrder,
   };
 }
 
@@ -709,8 +742,8 @@ async function resolveStandardTeamMembers(
   tournamentId: string,
 ): Promise<{ ok: true; members: ResolvedStandardMember[] } | { ok: false; error: string }> {
   const trimmed = memberUsernames.map((u) => u.trim()).filter(Boolean);
-  if (trimmed.length !== 4) {
-    return { ok: false, error: "Enter exactly 4 teammate usernames." };
+  if (!isValidValorant5v5TeammateCount(trimmed.length)) {
+    return { ok: false, error: valorant5v5TeammateCountError() };
   }
 
   const captainKey = usernameKeyFromDisplayName(captainDisplayName ?? "");
@@ -832,13 +865,17 @@ export async function registerStandardTeam(
     return { ok: false, error: "Team name is required." };
   }
 
-  const membersResolved = await resolveStandardTeamMembers(
-    tournament.game,
-    userId,
-    user.playerProfile?.displayName ?? user.name,
-    input.memberUsernames,
-    tournament.id,
-  );
+  const membersResolved = input.memberUserIds?.length
+    ? await resolveDynamicTeamMembers(userId, input.memberUserIds, tournament.id, {
+        allowSub: tournament.game === GameSlug.VALORANT,
+      })
+    : await resolveStandardTeamMembers(
+        tournament.game,
+        userId,
+        user.playerProfile?.displayName ?? user.name,
+        input.memberUsernames ?? [],
+        tournament.id,
+      );
   if (!membersResolved.ok) return membersResolved;
 
   let snapshotRankTier: string | null = null;
@@ -909,8 +946,28 @@ export async function registerStandardTeam(
         },
       });
 
+      const rosterRows: Array<{
+        userId: string;
+        registrationId: string;
+        displayName: string;
+        riotGameName: string | null;
+        riotTagLine: string | null;
+        valorantRoles: ValorantRole[] | null;
+        peakPremierRank: string | null;
+      }> = [
+        {
+          userId,
+          registrationId: captainReg.id,
+          displayName: user.playerProfile?.displayName ?? user.name ?? "Captain",
+          riotGameName: user.riotGameName,
+          riotTagLine: user.riotTagLine,
+          valorantRoles: snapshotValorantRoles,
+          peakPremierRank: snapshotCs2PeakPremier,
+        },
+      ];
+
       for (const member of membersResolved.members) {
-        await tx.tournamentRegistration.create({
+        const memberReg = await tx.tournamentRegistration.create({
           data: {
             tournamentId: tournament.id,
             userId: member.userId,
@@ -924,6 +981,22 @@ export async function registerStandardTeam(
             status: "APPROVED",
           },
         });
+        const riot = splitSnapshotRiotId(member.snapshot.snapshotRiotId);
+        rosterRows.push({
+          userId: member.userId,
+          registrationId: memberReg.id,
+          displayName: member.displayName,
+          riotGameName: riot.riotGameName,
+          riotTagLine: riot.riotTagLine,
+          valorantRoles: member.snapshot.snapshotValorantRoles,
+          peakPremierRank: member.snapshot.snapshotCs2PeakPremier,
+        });
+      }
+
+      for (const [sortOrder, row] of rosterRows.entries()) {
+        await tx.tournamentTeamPlayer.create({
+          data: rosterPlayerCreateData({ ...row, teamId: team.id, sortOrder }),
+        });
       }
 
       await tx.tournamentTeam.update({
@@ -934,13 +1007,14 @@ export async function registerStandardTeam(
       return captainReg;
     });
 
+    const rosterSize = membersResolved.members.length + 1;
     await logUserActivity({
       userId,
       email: user.email,
       name: user.name,
       action: "TOURNAMENT_REGISTER",
       target: slug,
-      details: `Registered for cup "${tournament.name}" as Captain of ${teamName} with full 5-player roster.`,
+      details: `Registered for cup "${tournament.name}" as Captain of ${teamName} with a ${rosterSize}-player 5v5 roster.`,
     });
 
     return { ok: true, registrationId: result.id };
@@ -1299,11 +1373,10 @@ export type DynamicTeamCandidate = {
 };
 
 /**
- * Typeahead for the DYNAMIC 5v5 captain flow. Only surfaces Valorant members
- * who are eligible to register (linked Riot ID, at least one Valorant role,
- * completed signup) and are not already on this cup's registration list.
- * not already on this cup's registration list. `excludeUserIds` lets the
- * client hide teammates already added to the roster-in-progress.
+ * Typeahead for DYNAMIC / STANDARD 5v5 captains. Only surfaces Valorant
+ * members who are eligible to register (linked Riot ID, at least one Valorant
+ * role, completed signup) and are not already on this cup's registration
+ * list. `excludeUserIds` lets the client hide teammates already added.
  */
 export async function searchDynamicTeamCandidates(
   slug: string,
@@ -1356,7 +1429,7 @@ export async function searchDynamicTeamCandidates(
         SELECT 1
         FROM "Tournament" t
         WHERE t.slug = ${slug}
-          AND t."registrationFormat"::text = 'DYNAMIC'
+          AND t."registrationFormat"::text IN ('DYNAMIC', 'STANDARD')
           AND t.game::text = 'VALORANT'
           AND NOT EXISTS (
             SELECT 1
@@ -1406,7 +1479,7 @@ export async function searchDynamicTeamCandidates(
         SELECT 1
         FROM "Tournament" t
         WHERE t.slug = ${slug}
-          AND t."registrationFormat"::text = 'DYNAMIC'
+          AND t."registrationFormat"::text IN ('DYNAMIC', 'STANDARD')
           AND t.game::text = 'VALORANT'
           AND NOT EXISTS (
             SELECT 1
@@ -1430,10 +1503,12 @@ async function resolveDynamicTeamMembers(
   captainUserId: string,
   memberUserIds: string[],
   tournamentId: string,
+  opts?: { allowSub?: boolean },
 ): Promise<{ ok: true; members: ResolvedStandardMember[] } | { ok: false; error: string }> {
   const ids = [...new Set(memberUserIds.map((id) => id.trim()).filter(Boolean))];
-  if (ids.length !== 4) {
-    return { ok: false, error: "Add exactly 4 teammates to register a 5v5 team." };
+  const allowSub = opts?.allowSub ?? false;
+  if (!isValidValorant5v5TeammateCount(ids.length, { allowSub })) {
+    return { ok: false, error: valorant5v5TeammateCountError({ allowSub }) };
   }
   if (ids.includes(captainUserId)) {
     return { ok: false, error: "You cannot list yourself as a teammate." };
@@ -1453,7 +1528,7 @@ async function resolveDynamicTeamMembers(
     }),
   ]);
 
-  if (users.length !== 4) {
+  if (users.length !== ids.length) {
     return { ok: false, error: "One or more teammates were not found. Search and add them again." };
   }
 
@@ -1594,8 +1669,21 @@ export async function registerDynamicTeam(
         },
       });
 
-      for (const member of membersResolved.members) {
-        await tx.tournamentRegistration.create({
+      const rosterRows = [
+        rosterPlayerCreateData({
+          teamId: team.id,
+          userId,
+          registrationId: captainReg.id,
+          displayName: user.playerProfile?.displayName ?? user.name ?? "Captain",
+          riotGameName: user.riotGameName,
+          riotTagLine: user.riotTagLine,
+          valorantRoles: user.playerProfile?.valorantRoles ?? [],
+          sortOrder: 0,
+        }),
+      ];
+
+      for (const [index, member] of membersResolved.members.entries()) {
+        const memberReg = await tx.tournamentRegistration.create({
           data: {
             tournamentId: tournament.id,
             userId: member.userId,
@@ -1609,6 +1697,23 @@ export async function registerDynamicTeam(
             status: "APPROVED",
           },
         });
+        const riot = splitSnapshotRiotId(member.snapshot.snapshotRiotId);
+        rosterRows.push(
+          rosterPlayerCreateData({
+            teamId: team.id,
+            userId: member.userId,
+            registrationId: memberReg.id,
+            displayName: member.displayName,
+            riotGameName: riot.riotGameName,
+            riotTagLine: riot.riotTagLine,
+            valorantRoles: member.snapshot.snapshotValorantRoles,
+            sortOrder: index + 1,
+          }),
+        );
+      }
+
+      for (const row of rosterRows) {
+        await tx.tournamentTeamPlayer.create({ data: row });
       }
 
       await tx.tournamentTeam.update({

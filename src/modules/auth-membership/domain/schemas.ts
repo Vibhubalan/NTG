@@ -134,13 +134,29 @@ export const dynamicTeamRegisterSchema = z.object({
   ...registrationTermsField,
 });
 
-export const standardTournamentRegisterSchema = z.object({
-  teamName: sanitizedString.pipe(z.string().min(2).max(48)),
-  memberUsernames: z.array(usernameSchema).length(4, "Enter exactly 4 teammate usernames."),
-  valorantRoles: valorantRolesSchema.optional(),
-  cs2PeakPremierRank: cs2PremierRankSchema.optional(),
-  ...registrationTermsField,
-});
+export const standardTournamentRegisterSchema = z
+  .object({
+    teamName: sanitizedString.pipe(z.string().min(2).max(48)),
+    memberUsernames: z
+      .array(usernameSchema)
+      .min(4, "Enter 4 teammate usernames.")
+      .max(5, "At most 4 teammates and 1 optional sub.")
+      .optional(),
+    memberUserIds: z
+      .array(z.string().trim().min(1).max(40))
+      .min(4, "Add 4 teammates, plus an optional sub.")
+      .max(5, "At most 4 teammates and 1 optional sub.")
+      .optional(),
+    valorantRoles: valorantRolesSchema.optional(),
+    cs2PeakPremierRank: cs2PremierRankSchema.optional(),
+    ...registrationTermsField,
+  })
+  .refine(
+    (data) =>
+      (data.memberUserIds && data.memberUserIds.length >= 4) ||
+      (data.memberUsernames && data.memberUsernames.length >= 4),
+    { message: "Add 4 teammates, plus an optional sub." },
+  );
 
 export const profileAccountPatchSchema = z.object({
   dateOfBirth: z
