@@ -2603,6 +2603,17 @@ export async function adminAddTournamentRegistration(
 
   const participantRole = input.participantRole ?? "PLAYER";
 
+  const baseData = {
+    tournamentId: tournament.id,
+    userId,
+    participantRole,
+    ...snapshot.data,
+    snapshotValorantRoles: snapshot.data.snapshotValorantRoles
+      ? (snapshot.data.snapshotValorantRoles as unknown as import("@prisma/client").Prisma.InputJsonValue)
+      : undefined,
+    status: "APPROVED" as const,
+  };
+
   if (tournament.registrationFormat === "STANDARD" && participantRole === "PLAYER") {
     const teamId = input.teamId?.trim();
     if (!teamId) {
@@ -2662,17 +2673,6 @@ export async function adminAddTournamentRegistration(
 
     return { ok: true, registrationId: reg.id };
   }
-
-  const baseData = {
-    tournamentId: tournament.id,
-    userId,
-    participantRole,
-    ...snapshot.data,
-    snapshotValorantRoles: snapshot.data.snapshotValorantRoles
-      ? (snapshot.data.snapshotValorantRoles as unknown as import("@prisma/client").Prisma.InputJsonValue)
-      : undefined,
-    status: "APPROVED" as const,
-  };
 
   try {
     if (participantRole === "CAPTAIN") {
