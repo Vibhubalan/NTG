@@ -695,9 +695,9 @@ export default function AdminTournamentEditor({
             participantRole === "CAPTAIN" && isStandardFormat ? teammateUsernames : undefined,
         }),
       });
-      const data = await res.json();
+      const data = await res.json().catch(() => ({}));
       if (!res.ok) {
-        setMessage(data.error ?? "Could not add member.");
+        showMessage(data.error ?? "Could not add member.", "error");
         return;
       }
       setSelectedMember(null);
@@ -708,8 +708,10 @@ export default function AdminTournamentEditor({
       setAddMemberUsernames(["", "", "", "", ""]);
       setAddTeamId("");
       setAddRole("PLAYER");
-      setMessage("Member added to cup.");
+      showMessage("Member added to cup.");
       refreshLists();
+    } catch {
+      showMessage("Could not add member.", "error");
     } finally {
       setAddingMember(false);
     }
@@ -2977,6 +2979,13 @@ export default function AdminTournamentEditor({
                 >
                   {addingMember ? "Adding…" : "Add to cup"}
                 </button>
+                {message ? (
+                  <p
+                    className={`text-xs ${messageTone === "error" ? "text-rose-300" : "text-emerald-300"}`}
+                  >
+                    {message}
+                  </p>
+                ) : null}
               </div>
 
               {isDynamicFormat && selectedRegistrationIds.size > 0 ? (
