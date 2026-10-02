@@ -27,6 +27,7 @@ export async function POST(req: Request, { params }: Props) {
     coCaptainUsername?: string;
     coCaptainUsernames?: string[];
     memberUsernames?: string[];
+    teamId?: string;
   };
   try {
     body = await req.json();

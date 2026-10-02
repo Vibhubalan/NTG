@@ -434,7 +434,8 @@ export default function AdminTournamentEditor({
   const [addRole, setAddRole] = useState<"PLAYER" | "CAPTAIN">("PLAYER");
   const [addTeamName, setAddTeamName] = useState("");
   const [addCoCaptainUsernames, setAddCoCaptainUsernames] = useState(["", "", "", ""]);
-  const [addMemberUsernames, setAddMemberUsernames] = useState(["", "", "", ""]);
+  const [addMemberUsernames, setAddMemberUsernames] = useState(["", "", "", "", ""]);
+  const [addTeamId, setAddTeamId] = useState("");
   const [addingMember, setAddingMember] = useState(false);
 
   const isAuctionFormat =
@@ -443,6 +444,30 @@ export default function AdminTournamentEditor({
   const isStandardFormat =
     SUPPORTS_FORMAT.includes(form.game) && form.registrationFormat === "STANDARD";
   const isDynamicFormat = form.registrationFormat === "DYNAMIC";
+  const standardTeamOptions = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const registration of registrations) {
+      if (!registration.teamId) continue;
+      counts.set(registration.teamId, (counts.get(registration.teamId) ?? 0) + 1);
+    }
+    const byId = new Map<string, { id: string; name: string; count: number }>();
+    for (const team of tournamentTeams) {
+      byId.set(team.id, {
+        id: team.id,
+        name: team.name,
+        count: counts.get(team.id) ?? team.players.length,
+      });
+    }
+    for (const registration of registrations) {
+      if (!registration.teamId || byId.has(registration.teamId)) continue;
+      byId.set(registration.teamId, {
+        id: registration.teamId,
+        name: registration.teamName ?? "Team",
+        count: counts.get(registration.teamId) ?? 1,
+      });
+    }
+    return [...byId.values()].sort((a, b) => a.name.localeCompare(b.name));
+  }, [registrations, tournamentTeams]);
 
   const [registrationFilter, setRegistrationFilter] = useState("");
   const [currentRankMin, setCurrentRankMin] = useState<RankBracketFilterKey | "">("");
@@ -649,7 +674,8 @@ export default function AdminTournamentEditor({
 
   async function addMemberRegistration() {
     if (!selectedMember) return;
-    const participantRole = isStandardFormat ? "CAPTAIN" : addRole;
+    const participantRole = addRole;
+    const teammateUsernames = addMemberUsernames.map((u) => u.trim()).filter((u) => u.length >= 2);
     setAddingMember(true);
     setMessage(null);
     try {
@@ -660,14 +686,13 @@ export default function AdminTournamentEditor({
           userId: selectedMember.id,
           participantRole,
           teamName: participantRole === "CAPTAIN" ? addTeamName.trim() : undefined,
+          teamId: participantRole === "PLAYER" && isStandardFormat ? addTeamId : undefined,
           coCaptainUsernames:
             participantRole === "CAPTAIN" && isAuctionFormat && form.coCaptainSlots > 0
               ? addCoCaptainUsernames.slice(0, form.coCaptainSlots).map((u) => u.trim())
               : undefined,
           memberUsernames:
-            participantRole === "CAPTAIN" && isStandardFormat
-              ? addMemberUsernames.map((u) => u.trim())
-              : undefined,
+            participantRole === "CAPTAIN" && isStandardFormat ? teammateUsernames : undefined,
         }),
       });
       const data = await res.json();
@@ -680,7 +705,8 @@ export default function AdminTournamentEditor({
       setMemberResults([]);
       setAddTeamName("");
       setAddCoCaptainUsernames(["", "", "", ""]);
-      setAddMemberUsernames(["", "", "", ""]);
+      setAddMemberUsernames(["", "", "", "", ""]);
+      setAddTeamId("");
       setAddRole("PLAYER");
       setMessage("Member added to cup.");
       refreshLists();
@@ -2836,9 +2862,11 @@ export default function AdminTournamentEditor({
                       value={addRole}
                       onChange={(e) => setAddRole(e.target.value as "PLAYER" | "CAPTAIN")}
                     >
-                      {isAuctionFormat ? (
+                      {isAuctionFormat || isStandardFormat ? (
                         <>
-                          <option value="PLAYER" className="bg-[#0a1020]">Player</option>
+                          <option value="PLAYER" className="bg-[#0a1020]">
+                            {isStandardFormat ? "Player (joins a team)" : "Player"}
+                          </option>
                           <option value="CAPTAIN" className="bg-[#0a1020]">Captain (creates team)</option>
                         </>
                       ) : (
@@ -2846,6 +2874,25 @@ export default function AdminTournamentEditor({
                       )}
                     </select>
                   </div>
+                  {isStandardFormat && addRole === "PLAYER" ? (
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-bold uppercase tracking-wider text-white/40">Team</label>
+                      <select
+                        className={inputClass}
+                        value={addTeamId}
+                        onChange={(e) => setAddTeamId(e.target.value)}
+                      >
+                        <option value="" className="bg-[#0a1020]">
+                          Select a registered team
+                        </option>
+                        {standardTeamOptions.map((team) => (
+                          <option key={team.id} value={team.id} className="bg-[#0a1020]" disabled={team.count >= 6}>
+                            {team.name} ({team.count}/6)
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  ) : null}
                   {addRole === "CAPTAIN" ? (
                     <>
                       <div className="space-y-1">
@@ -2860,7 +2907,9 @@ export default function AdminTournamentEditor({
                       <div className="space-y-1 sm:col-span-2">
                         {isStandardFormat ? (
                           <>
-                            <label className="text-[10px] font-bold uppercase tracking-wider text-white/40">Teammate usernames (4)</label>
+                            <label className="text-[10px] font-bold uppercase tracking-wider text-white/40">
+                              Teammates (1 required, up to 5 — team size 2 to 6)
+                            </label>
                             <div className="grid gap-2 sm:grid-cols-2">
                               {addMemberUsernames.map((username, index) => (
                                 <input
@@ -2872,7 +2921,7 @@ export default function AdminTournamentEditor({
                                     next[index] = e.target.value;
                                     setAddMemberUsernames(next);
                                   }}
-                                  placeholder={`Teammate ${index + 1}`}
+                                  placeholder={index === 0 ? "Teammate 1 (required)" : `Teammate ${index + 1} (optional)`}
                                 />
                               ))}
                             </div>
@@ -2916,7 +2965,13 @@ export default function AdminTournamentEditor({
                           !addCoCaptainUsernames
                             .slice(0, form.coCaptainSlots)
                             .every((u) => u.trim().length >= 2)) ||
-                        (isStandardFormat && !addMemberUsernames.every((u) => u.trim().length >= 2))))
+                        (isStandardFormat &&
+                          (addMemberUsernames.map((u) => u.trim()).filter((u) => u.length >= 2).length < 1 ||
+                            addMemberUsernames.map((u) => u.trim()).filter((u) => u.length >= 2).length > 5)))) ||
+                    (addRole === "PLAYER" &&
+                      isStandardFormat &&
+                      (!addTeamId ||
+                        (standardTeamOptions.find((team) => team.id === addTeamId)?.count ?? 0) >= 6))
                   }
                   className="rounded-xl bg-indigo-600 px-5 py-2.5 text-xs font-bold text-white hover:bg-indigo-500 disabled:opacity-50 transition-colors"
                 >
