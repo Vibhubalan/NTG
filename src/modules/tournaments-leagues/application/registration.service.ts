@@ -18,6 +18,9 @@ import {
 } from "@auth-membership/application/registration-helpers";
 import { riotIdSegmentLengths } from "@/lib/riot-id";
 import {
+  ADMIN_STANDARD_MAX_ROSTER,
+  ADMIN_STANDARD_MAX_TEAMMATES,
+  ADMIN_STANDARD_MIN_TEAMMATES,
   isValidValorant5v5TeammateCount,
   splitSnapshotRiotId,
   valorant5v5TeammateCountError,
@@ -740,9 +743,17 @@ async function resolveStandardTeamMembers(
   captainDisplayName: string | null,
   memberUsernames: string[],
   tournamentId: string,
+  bounds?: { minTeammates: number; maxTeammates: number },
 ): Promise<{ ok: true; members: ResolvedStandardMember[] } | { ok: false; error: string }> {
   const trimmed = memberUsernames.map((u) => u.trim()).filter(Boolean);
-  if (!isValidValorant5v5TeammateCount(trimmed.length)) {
+  if (bounds) {
+    if (trimmed.length < bounds.minTeammates || trimmed.length > bounds.maxTeammates) {
+      return {
+        ok: false,
+        error: `Add ${bounds.minTeammates} to ${bounds.maxTeammates} teammates (team size ${bounds.minTeammates + 1}–${bounds.maxTeammates + 1} including the captain).`,
+      };
+    }
+  } else if (!isValidValorant5v5TeammateCount(trimmed.length)) {
     return { ok: false, error: valorant5v5TeammateCountError() };
   }
 
@@ -2550,6 +2561,7 @@ export async function adminAddTournamentRegistration(
     coCaptainUsername?: string;
     coCaptainUsernames?: string[];
     memberUsernames?: string[];
+    teamId?: string;
   },
 ): Promise<{ ok: true; registrationId: string } | { ok: false; error: string }> {
   const tournament = await prisma.tournament.findUnique({
@@ -2592,10 +2604,63 @@ export async function adminAddTournamentRegistration(
   const participantRole = input.participantRole ?? "PLAYER";
 
   if (tournament.registrationFormat === "STANDARD" && participantRole === "PLAYER") {
-    return {
-      ok: false,
-      error: "Standard cups register full teams. Add a captain with 4 teammates instead.",
-    };
+    const teamId = input.teamId?.trim();
+    if (!teamId) {
+      return { ok: false, error: "Select a team for this player." };
+    }
+    const team = await prisma.tournamentTeam.findFirst({
+      where: { id: teamId, tournamentId: tournament.id },
+    });
+    if (!team) return { ok: false, error: "Team not found on this cup." };
+
+    const onTeam = await prisma.tournamentRegistration.count({
+      where: { tournamentId: tournament.id, teamId: team.id },
+    });
+    if (onTeam >= ADMIN_STANDARD_MAX_ROSTER) {
+      return { ok: false, error: "This team already has 6 players." };
+    }
+
+    const riot = splitSnapshotRiotId(snapshot.data.snapshotRiotId);
+    const linkedUser = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { riotGameName: true, riotTagLine: true },
+    });
+
+    const reg = await prisma.$transaction(async (tx) => {
+      const created = await tx.tournamentRegistration.create({
+        data: {
+          ...baseData,
+          participantRole: "PLAYER",
+          teamId: team.id,
+          teamName: team.name,
+        },
+      });
+      await tx.tournamentTeamPlayer.create({
+        data: rosterPlayerCreateData({
+          teamId: team.id,
+          userId,
+          registrationId: created.id,
+          displayName: snapshot.data.snapshotDisplayName ?? user.name ?? "Player",
+          riotGameName: linkedUser?.riotGameName ?? riot.riotGameName,
+          riotTagLine: linkedUser?.riotTagLine ?? riot.riotTagLine,
+          valorantRoles: snapshot.data.snapshotValorantRoles,
+          peakPremierRank: snapshot.data.snapshotCs2PeakPremier,
+          sortOrder: onTeam,
+        }),
+      });
+      return created;
+    });
+
+    await logUserActivity({
+      userId,
+      email: user.email,
+      name: user.name,
+      action: "TOURNAMENT_REGISTER",
+      target: slug,
+      details: `Added to cup "${tournament.name}" as a player on ${team.name} (by Admin).`,
+    });
+
+    return { ok: true, registrationId: reg.id };
   }
 
   const baseData = {
@@ -2622,16 +2687,27 @@ export async function adminAddTournamentRegistration(
       if (!captainUser) return { ok: false, error: "Member not found." };
 
       if (tournament.registrationFormat === "STANDARD") {
-        if (!input.memberUsernames?.length) {
-          return { ok: false, error: "Four teammate usernames are required for standard registration." };
+        const teammateNames = (input.memberUsernames ?? []).map((u) => u.trim()).filter(Boolean);
+        if (
+          teammateNames.length < ADMIN_STANDARD_MIN_TEAMMATES ||
+          teammateNames.length > ADMIN_STANDARD_MAX_TEAMMATES
+        ) {
+          return {
+            ok: false,
+            error: "Add 1 to 5 teammates so the team has 2 to 6 players including the captain.",
+          };
         }
 
         const membersResolved = await resolveStandardTeamMembers(
           tournament.game,
           userId,
           captainUser.playerProfile?.displayName ?? captainUser.name,
-          input.memberUsernames,
+          teammateNames,
           tournament.id,
+          {
+            minTeammates: ADMIN_STANDARD_MIN_TEAMMATES,
+            maxTeammates: ADMIN_STANDARD_MAX_TEAMMATES,
+          },
         );
         if (!membersResolved.ok) return membersResolved;
 
@@ -2656,8 +2732,23 @@ export async function adminAddTournamentRegistration(
             },
           });
 
-          for (const member of membersResolved.members) {
-            await tx.tournamentRegistration.create({
+          const captainRiot = splitSnapshotRiotId(snapshot.data.snapshotRiotId);
+          const rosterRows = [
+            rosterPlayerCreateData({
+              teamId: team.id,
+              userId,
+              registrationId: created.id,
+              displayName: snapshot.data.snapshotDisplayName ?? user.name ?? "Captain",
+              riotGameName: captainRiot.riotGameName,
+              riotTagLine: captainRiot.riotTagLine,
+              valorantRoles: snapshot.data.snapshotValorantRoles,
+              peakPremierRank: snapshot.data.snapshotCs2PeakPremier,
+              sortOrder: 0,
+            }),
+          ];
+
+          for (const [index, member] of membersResolved.members.entries()) {
+            const memberReg = await tx.tournamentRegistration.create({
               data: {
                 tournamentId: tournament.id,
                 userId: member.userId,
@@ -2671,6 +2762,24 @@ export async function adminAddTournamentRegistration(
                 status: "APPROVED",
               },
             });
+            const memberRiot = splitSnapshotRiotId(member.snapshot.snapshotRiotId);
+            rosterRows.push(
+              rosterPlayerCreateData({
+                teamId: team.id,
+                userId: member.userId,
+                registrationId: memberReg.id,
+                displayName: member.displayName,
+                riotGameName: memberRiot.riotGameName,
+                riotTagLine: memberRiot.riotTagLine,
+                valorantRoles: member.snapshot.snapshotValorantRoles,
+                peakPremierRank: member.snapshot.snapshotCs2PeakPremier,
+                sortOrder: index + 1,
+              }),
+            );
+          }
+
+          for (const row of rosterRows) {
+            await tx.tournamentTeamPlayer.create({ data: row });
           }
 
           await tx.tournamentTeam.update({
@@ -2687,7 +2796,7 @@ export async function adminAddTournamentRegistration(
           name: user.name,
           action: "TOURNAMENT_REGISTER",
           target: slug,
-          details: `Registered for cup "${tournament.name}" as Captain of ${teamName} with full roster (by Admin).`,
+          details: `Registered for cup "${tournament.name}" as Captain of ${teamName} with ${membersResolved.members.length + 1} players (by Admin).`,
         });
 
         return { ok: true, registrationId: reg.id };

@@ -3,6 +3,10 @@ export const VALORANT_5V5_STARTER_COUNT = 5;
 export const VALORANT_5V5_MAX_ROSTER = 6;
 export const VALORANT_5V5_REQUIRED_TEAMMATES = 4;
 export const VALORANT_5V5_MAX_TEAMMATES = 5;
+/** Admin Standard cups: captain plus 1–5 teammates (roster of 2–6). */
+export const ADMIN_STANDARD_MIN_TEAMMATES = 1;
+export const ADMIN_STANDARD_MAX_TEAMMATES = 5;
+export const ADMIN_STANDARD_MAX_ROSTER = 6;
 
 /** Teammates added by the captain (excludes the captain). */
 export function isValidValorant5v5TeammateCount(
