@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { Space_Grotesk, Inter } from "next/font/google";
+import { Analytics } from '@vercel/analytics/next';
 import Navbar from "@/components/Navbar";
 import AuthSessionProvider from "@/components/providers/SessionProvider";
 import RouteProgressBar from "@/components/providers/RouteProgressBar";
@@ -86,6 +87,7 @@ export default async function RootLayout({
           <Navbar />
           {children}
         </AuthSessionProvider>
+        <Analytics />
       </body>
     </html>
   );
