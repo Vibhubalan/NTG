@@ -67,6 +67,17 @@ const nextConfig: NextConfig = {
     return [
       { source: "/listings", destination: "/careers", permanent: true },
       { source: "/listings/:slug", destination: "/careers/:slug", permanent: true },
+      // Short link for the GTA 6 booking form, which lives in someone else's
+      // Apps Script. Has to be a redirect, not an embed: the script sends
+      // X-Frame-Options that block framing, and Google 403s server-side
+      // proxying. Temporary on purpose — redeploying the script changes its
+      // /exec URL, and a permanent redirect would stay cached in browsers.
+      {
+        source: "/gta6",
+        destination:
+          "https://script.google.com/macros/s/AKfycbzuGpJDB1-5D3xNOCJYV1wMkmSyU2BkgZEy_d8QFtqy6P0sGSIgKB-53d77o5cM9rYS/exec",
+        permanent: false,
+      },
     ];
   },
 };
